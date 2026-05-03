@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestione Piano Vasca</title>
+  
+  <!-- Tailwind CSS per lo stile -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React e ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel per compilare JSX nel browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    /* Utility personalizzata per nascondere la scrollbar mantenendo la funzionalità */
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+  
+  <!-- Div contenitore per l'app React -->
+  <div id="root"></div>
+
+  <!-- Script principale dell'applicazione -->
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useMemo } = React;
+
+    // --- COMPONENTI ICONE (Sostituiscono lucide-react per funzionare in HTML standalone) ---
+    const Icon = ({ children, size = 24, className = "" }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {children}
+      </svg>
+    );
+    const DownloadIcon = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>;
+    const UploadIcon = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Icon>;
+    const Trash2Icon = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
+    const InfoIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
+    const EraserIcon = (p) => <Icon {...p}><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></Icon>;
+    const ClockIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
+
+    // --- CONFIGURAZIONE INIZIALE ---
+    const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+    const ORE_INIZIO = 8;  // 08:00
+    const ORE_FINE = 22;   // 22:00
+    const CORSIE = ['1A', '1B', '2', '3', '4', '5', '6'];
+
+    const ATTIVITA_DI_BASE = [
+      { id: 'libero', name: 'Nuoto Libero', color: 'bg-slate-300 text-slate-800', border: 'border-slate-400' },
+      { id: 'scuola_bambini', name: 'Scuola Nuoto Bambini', color: 'bg-sky-300 text-sky-900', border: 'border-sky-400' },
+      { id: 'scuola_adulti', name: 'Scuola Nuoto Adulti', color: 'bg-green-500 text-white', border: 'border-green-600' },
+      { id: 'acquagym', name: 'Acquagym', color: 'bg-fuchsia-500 text-white', border: 'border-fuchsia-600' },
+      { id: 'propaganda', name: 'Propaganda', color: 'bg-blue-600 text-white', border: 'border-blue-700' },
+      { id: 'privato', name: 'Lez. Privata', color: 'bg-yellow-300 text-yellow-900', border: 'border-yellow-400' },
+    ];
+
+    function App() {
+      // --- STATO DELL'APPLICAZIONE ---
+      const [giornoSelezionato, setGiornoSelezionato] = useState(0);
+      const [piano, setPiano] = useState({}); // Mappa: "giorno-ora-corsia" -> idAttivita
+      const [attivita, setAttivita] = useState(ATTIVITA_DI_BASE);
+      const [strumentoAttivo, setStrumentoAttivo] = useState('libero'); // L'attività attualmente selezionata come "pennello"
+      const [isDisegnando, setIsDisegnando] = useState(false);
+      const [intervallo, setIntervallo] = useState(30); // Imposta gli slot di default a 30 minuti
+
+      // Array di supporto per griglia generati dinamicamente
+      const fasceOrarie = useMemo(() => {
+        const fasce = [];
+        let h = ORE_INIZIO;
+        let m = 0;
+        while (h < ORE_FINE) {
+          const start = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          let nextM = m + intervallo;
+          let nextH = h + Math.floor(nextM / 60);
+          nextM = nextM % 60;
+
+          let endH = nextH >= ORE_FINE ? ORE_FINE : nextH;
+          let endM = nextH >= ORE_FINE ? 0 : nextM;
+
+          const end = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+          fasce.push({ id: start, label: `${start} - ${end}` });
+
+          h = nextH;
+          m = nextM;
+
+          if (h >= ORE_FINE) break;
+        }
+        return fasce;
+      }, [intervallo]);
+
+      // --- LOGICA DI DISEGNO (PENNELATURA) ---
+      const applicaStrumento = useCallback((fasciaId, corsia) => {
+        setPiano(prev => {
+          const nuovoPiano = { ...prev };
+          const key = `${giornoSelezionato}-${fasciaId}-${corsia}`;
+          
+          // Controlla se la corsia 1 è attualmente unita (stessa attività su 1A e 1B)
+          const isCorsia1Merged = 
+            prev[`${giornoSelezionato}-${fasciaId}-1A`] && 
+            prev[`${giornoSelezionato}-${fasciaId}-1A`] === prev[`${giornoSelezionato}-${fasciaId}-1B`];
+          
+          if (strumentoAttivo === 'gomma') {
+            delete nuovoPiano[key];
+            // Se stiamo cancellando una corsia 1 unita, puliamo entrambe per dividerle di nuovo
+            if (isCorsia1Merged && corsia === '1A') {
+              delete nuovoPiano[`${giornoSelezionato}-${fasciaId}-1B`];
+            }
+          } else {
+            nuovoPiano[key] = strumentoAttivo;
+            // Se stiamo colorando una corsia 1 unita, manteniamo l'unione applicando il colore a entrambe
+            if (isCorsia1Merged && corsia === '1A') {
+              nuovoPiano[`${giornoSelezionato}-${fasciaId}-1B`] = strumentoAttivo;
+            }
+          }
+          return nuovoPiano;
+        });
+      }, [giornoSelezionato, strumentoAttivo]);
+
+      const handleMouseDown = (fasciaId, corsia) => {
+        setIsDisegnando(true);
+        applicaStrumento(fasciaId, corsia);
+      };
+
+      const handleMouseEnter = (fasciaId, corsia) => {
+        if (isDisegnando) {
+          applicaStrumento(fasciaId, corsia);
+        }
+      };
+
+      // Ferma il disegno se il mouse viene rilasciato ovunque nello schermo
+      useEffect(() => {
+        const handleMouseUp = () => setIsDisegnando(false);
+        window.addEventListener('mouseup', handleMouseUp);
+        return () => window.removeEventListener('mouseup', handleMouseUp);
+      }, []);
+
+      // --- FUNZIONI DI SALVATAGGIO / CARICAMENTO (JSON) ---
+      const esportaDati = () => {
+        const dataStr = JSON.stringify({ piano, attivita }, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = "mio_piano_vasca.json";
+        link.click();
+        URL.revokeObjectURL(url);
+      };
+
+      const importaDati = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const dati = JSON.parse(e.target.result);
+            if (dati.piano) setPiano(dati.piano);
+            if (dati.attivita) setAttivita(dati.attivita);
+          } catch (error) {
+            alert("Errore nel caricamento del file. Assicurati che sia il file JSON corretto.");
+          }
+        };
+        reader.readAsText(file);
+        // Reset dell'input
+        event.target.value = null;
+      };
+
+      const svuotaPiano = () => {
+        if (confirm("Sei sicuro di voler cancellare tutto il piano vasca? L'operazione non è reversibile.")) {
+          setPiano({});
+        }
+      };
+
+      // --- RENDER COMPONENTI ---
+      const attivitaCorrente = attivita.find(a => a.id === strumentoAttivo);
+
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
+          
+          {/* HEADER E CONTROLLI */}
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm p-4">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+                <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                  🌊 Gestione Piano Vasca
+                </h1>
+                <div className="flex items-center gap-2">
+                  <button onClick={esportaDati} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors">
+                    <DownloadIcon size={16} /> Esporta
+                  </button>
+                  <label className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium cursor-pointer transition-colors">
+                    <UploadIcon size={16} /> Importa
+                    <input type="file" accept=".json" onChange={importaDati} className="hidden" />
+                  </label>
+                  <button onClick={svuotaPiano} className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-medium transition-colors">
+                    <Trash2Icon size={16} /> Svuota
+                  </button>
+                </div>
+              </div>
+
+              {/* BARRA DEGLI STRUMENTI (PENNELI) */}
+              <div className="bg-slate-100 p-3 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 mr-2">
+                  <span>Tavolozza:</span>
+                </div>
+                <div className="flex flex-wrap gap-2 flex-1">
+                  {attivita.map(att => (
+                    <button
+                      key={att.id}
+                      onClick={() => setStrumentoAttivo(att.id)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all shadow-sm flex items-center gap-2 border-2 ${
+                        strumentoAttivo === att.id 
+                          ? 'ring-2 ring-offset-2 ring-blue-500 scale-105 shadow-md ' + att.border
+                          : 'border-transparent hover:scale-105 opacity-80'
+                      } ${att.color}`}
+                    >
+                      {att.name}
+                    </button>
+                  ))}
+                  <div className="w-px h-8 bg-slate-300 mx-2"></div>
+                  <button
+                    onClick={() => setStrumentoAttivo('gomma')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all shadow-sm flex items-center gap-2 border-2 ${
+                      strumentoAttivo === 'gomma' 
+                        ? 'ring-2 ring-offset-2 ring-slate-500 border-slate-400 bg-white'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 opacity-80'
+                    }`}
+                  >
+                    <EraserIcon size={16} /> Gomma
+                  </button>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          {/* MAIN CONTENT */}
+          <main className="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col gap-6">
+            
+            {/* SELEZIONE GIORNO E ORARI */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                {GIORNI.map((giorno, idx) => (
+                  <button
+                    key={giorno}
+                    onClick={() => setGiornoSelezionato(idx)}
+                    className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${
+                      giornoSelezionato === idx
+                        ? 'bg-slate-800 text-white shadow-md'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {giorno}
+                  </button>
+                ))}
+              </div>
+
+              {/* SELETTORE FLESSIBILITA' ORARI */}
+              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm shrink-0">
+                <ClockIcon size={16} className="text-slate-500" />
+                <span className="text-sm font-medium text-slate-600">Slot:</span>
+                <select
+                  value={intervallo}
+                  onChange={(e) => setIntervallo(Number(e.target.value))}
+                  className="text-sm font-bold text-blue-600 bg-transparent focus:outline-none cursor-pointer"
+                >
+                  <option value={60}>60 min</option>
+                  <option value={45}>45 min</option>
+                  <option value={30}>30 min</option>
+                  <option value={15}>15 min</option>
+                </select>
+              </div>
+            </div>
+
+            {/* ISTRUZIONI RAPIDE */}
+            <div className="bg-blue-50 text-blue-800 p-3 rounded-lg flex items-center gap-3 text-sm border border-blue-100">
+              <InfoIcon size={18} className="text-blue-500 shrink-0" />
+              <p>
+                Stai modificando <strong>{GIORNI[giornoSelezionato]}</strong>. 
+                Strumento attivo: <strong className="bg-white px-2 py-0.5 rounded shadow-sm">{strumentoAttivo === 'gomma' ? 'Gomma' : attivitaCorrente?.name}</strong>. 
+                Clicca e trascina per colorare. <strong>Novità:</strong> se assegni la stessa attività a 1A e 1B, si fonderanno in un'unica grande corsia! Usa la gomma per separarle di nuovo.
+              </p>
+            </div>
+
+            {/* GRIGLIA PIANO VASCA */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse select-none">
+                  <thead>
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                        Orario
+                      </th>
+                      {CORSIE.map(corsia => (
+                        <th key={corsia} className="bg-slate-50 border-b border-r border-slate-200 p-3 min-w-[120px] text-center text-sm font-bold text-slate-700">
+                          Corsia {corsia}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fasceOrarie.map(fascia => (
+                      <tr key={fascia.id} className="hover:bg-slate-50/50">
+                        <td className="sticky left-0 z-10 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]">
+                          {fascia.label}
+                        </td>
+                        {CORSIE.map(corsia => {
+                          const act1A = piano[`${giornoSelezionato}-${fascia.id}-1A`];
+                          const act1B = piano[`${giornoSelezionato}-${fascia.id}-1B`];
+                          const isMerged = act1A && act1A === act1B;
+
+                          // Se la corsia 1 è unita (stessa attività), nascondiamo la cella 1B...
+                          if (corsia === '1B' && isMerged) return null;
+
+                          const key = `${giornoSelezionato}-${fascia.id}-${corsia}`;
+                          const attivitaId = piano[key];
+                          const infoAttivita = attivita.find(a => a.id === attivitaId);
+                          
+                          // ...e diciamo alla cella 1A di espandersi per coprire lo spazio di entrambe (colSpan)
+                          const colSpan = (corsia === '1A' && isMerged) ? 2 : 1;
+
+                          return (
+                            <td 
+                              key={corsia} 
+                              colSpan={colSpan}
+                              className="border-b border-r border-slate-200 p-1 h-10 cursor-crosshair transition-colors duration-75 relative group"
+                              onMouseDown={() => handleMouseDown(fascia.id, corsia)}
+                              onMouseEnter={() => handleMouseEnter(fascia.id, corsia)}
+                            >
+                              <div className={`w-full h-full rounded flex items-center justify-center p-1 text-xs font-semibold text-center transition-all ${
+                                infoAttivita ? infoAttivita.color : 'bg-transparent hover:bg-slate-100'
+                              }`}>
+                                {infoAttivita ? infoAttivita.name : ''}
+                              </div>
+                              {/* Hint visivo al passaggio del mouse se cella vuota */}
+                              {!infoAttivita && strumentoAttivo !== 'gomma' && (
+                                 <div className="absolute inset-1 rounded bg-slate-200 opacity-0 group-hover:opacity-30 pointer-events-none transition-opacity"></div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    // Inizializzazione dell'app React nel DOM
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
