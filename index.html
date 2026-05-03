@@ -887,12 +887,15 @@
                             <div className={`w-full h-full min-h-[48px] rounded flex flex-col items-center justify-center p-1 text-center transition-all shadow-sm ${
                               infoAttivita ? infoAttivita.color : 'bg-transparent hover:bg-slate-100 shadow-none'
                             }`}>
-                              <span className="text-xs font-bold">{infoAttivita ? infoAttivita.name : ''}</span>
-                              
-                              {nomeLivello && (
-                                <span className="text-[10px] font-bold bg-white/30 px-1.5 py-0.5 rounded-full mt-1">
-                                  {nomeLivello}
-                                </span>
+                              {nomeLivello ? (
+                                <>
+                                  <span className="text-xs font-bold leading-tight">Liv. {cellCurrent.livello} - {nomeLivello}</span>
+                                  <span className="text-[10px] font-bold bg-white/30 px-1.5 py-0.5 rounded-full mt-1">
+                                    {infoAttivita ? infoAttivita.name : ''}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-xs font-bold">{infoAttivita ? infoAttivita.name : ''}</span>
                               )}
 
                               {cellCurrent?.durata && (
