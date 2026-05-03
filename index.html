@@ -232,7 +232,10 @@
         try {
             const { db, appId, doc, setDoc } = firebaseInstances;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
-            await setDoc(docRef, { piano: pianoDaSalvare, updatedAt: new Date().toISOString() }, { merge: true });
+            
+            // Rimosso { merge: true } per far sì che le eliminazioni (chiavi rimosse) 
+            // vengano propagate correttamente anche sul database
+            await setDoc(docRef, { piano: pianoDaSalvare, updatedAt: new Date().toISOString() });
             
             lastSavedPiano.current = JSON.stringify(pianoDaSalvare); 
             setStatoSalvataggio('saved');
