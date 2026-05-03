@@ -16,7 +16,6 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <style>
-    /* Utility personalizzata per nascondere la scrollbar mantenendo la funzionalità */
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
     }
@@ -28,12 +27,10 @@
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
   
-  <!-- Div contenitore per l'app React -->
   <div id="root"></div>
 
-  <!-- Script principale dell'applicazione -->
   <script type="text/babel">
-    const { useState, useEffect, useCallback, useMemo, useRef } = React;
+    const { useState, useEffect, useMemo, useRef } = React;
 
     // --- COMPONENTI ICONE ---
     const Icon = ({ children, size = 24, className = "" }) => (
@@ -45,7 +42,6 @@
     const UploadIcon = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Icon>;
     const Trash2Icon = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
     const InfoIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
-    const EraserIcon = (p) => <Icon {...p}><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></Icon>;
     const ClockIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
     const CloudIcon = (p) => <Icon {...p}><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></Icon>;
     const CheckIcon = (p) => <Icon {...p}><polyline points="20 6 9 17 4 12"/></Icon>;
@@ -53,13 +49,12 @@
     const LockIcon = (p) => <Icon {...p}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
     const LogOutIcon = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
     const XIcon = (p) => <Icon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
-    const TimerIcon = (p) => <Icon {...p}><line x1="10" y1="2" x2="14" y2="2"/><line x1="12" y1="14" x2="15" y2="11"/><circle cx="12" cy="14" r="8"/></Icon>;
     const PlusIcon = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
 
     // --- CONFIGURAZIONE INIZIALE ---
     const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
-    const ORE_INIZIO = 8;  // 08:00
-    const ORE_FINE = 22;   // 22:00
+    const ORE_INIZIO = 8;  
+    const ORE_FINE = 22;   
     const CORSIE = ['1A', '1B', '2', '3', '4', '5', '6'];
 
     const ATTIVITA_DI_BASE = [
@@ -90,7 +85,6 @@
       { id: 'privato', name: 'Lez. Privata', color: 'bg-yellow-300 text-yellow-900', border: 'border-yellow-400' },
     ];
 
-    // Funzione helper per stabilire se due celle appartengono allo stesso identico corso
     const isSameCourse = (c1, c2) => {
         if (!c1 && !c2) return true;
         if (!c1 || !c2) return false;
@@ -100,10 +94,10 @@
     function App() {
       // --- STATO DELL'APPLICAZIONE ---
       const [giornoSelezionato, setGiornoSelezionato] = useState(0);
-      const [piano, setPiano] = useState({}); // Mappa: "giorno-ora-corsia" -> {id, istruttore, livello, durata}
+      const [piano, setPiano] = useState({}); 
       const [attivita, setAttivita] = useState(ATTIVITA_DI_BASE);
       const [intervallo, setIntervallo] = useState(30); 
-      const [editModal, setEditModal] = useState(null); // Gestisce la finestra modale per inserire livello/istruttore/durata
+      const [editModal, setEditModal] = useState(null); 
 
       // --- STATI AGGIUNTA CORSO ---
       const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -133,9 +127,8 @@
         const setupFirebase = async () => {
             try {
                 const dynamicImport = new Function('url', 'return import(url)');
-
                 const { initializeApp } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-                const { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                const { getAuth, signInWithCustomToken, onAuthStateChanged, signInWithEmailAndPassword, signOut } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
                 const { getFirestore, doc, setDoc, onSnapshot } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
                 const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
@@ -151,8 +144,7 @@
                         projectId: "pianovasca-2d757",
                         storageBucket: "pianovasca-2d757.firebasestorage.app",
                         messagingSenderId: "564777055604",
-                        appId: "1:564777055604:web:a8ad7e71b50fb4ce82e821",
-                        measurementId: "G-H09SXCR983"
+                        appId: "1:564777055604:web:a8ad7e71b50fb4ce82e821"
                     };
                     
                     if (mioFirebaseConfig.apiKey) {
@@ -177,24 +169,18 @@
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } 
             } catch (err) {
-                console.error("Errore inizializzazione Firebase:", err);
+                console.error("Errore Firebase:", err);
                 setIsAuthLoading(false);
             }
         };
         setupFirebase();
       }, []);
 
-      // Funzione di migrazione per convertire i vecchi dati ai nuovi formati
       const formatCellData = (data) => {
           if (!data) return null;
           let cell = typeof data === 'string' ? { id: data, istruttore: '', livello: '', durata: null } : { ...data };
-          
-          if (cell.id.startsWith('scuola_adulti_')) {
-              return { ...cell, id: 'scuola_adulti', livello: cell.id.split('_')[2] };
-          }
-          if (cell.id.startsWith('scuola_bambini_')) {
-              return { ...cell, id: 'scuola_bambini', livello: cell.id.split('_')[2] };
-          }
+          if (cell.id.startsWith('scuola_adulti_')) return { ...cell, id: 'scuola_adulti', livello: cell.id.split('_')[2] };
+          if (cell.id.startsWith('scuola_bambini_')) return { ...cell, id: 'scuola_bambini', livello: cell.id.split('_')[2] };
           return cell;
       };
 
@@ -209,15 +195,12 @@
             const data = docSnap.data();
             if (data.piano) {
               const pianoMigrato = {};
-              for (const key in data.piano) {
-                pianoMigrato[key] = formatCellData(data.piano[key]);
-              }
+              for (const key in data.piano) pianoMigrato[key] = formatCellData(data.piano[key]);
               lastSavedPiano.current = JSON.stringify(pianoMigrato);
               setPiano(pianoMigrato);
             }
           }
-        }, (error) => console.error("Errore sincronizzazione Cloud:", error));
-        
+        }, (error) => console.error("Errore sync Cloud:", error));
         return () => unsubscribe();
       }, [user, firebaseInstances]);
 
@@ -232,32 +215,37 @@
         try {
             const { db, appId, doc, setDoc } = firebaseInstances;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
-            
-            // Rimosso { merge: true } per far sì che le eliminazioni (chiavi rimosse) 
-            // vengano propagate correttamente anche sul database
             await setDoc(docRef, { piano: pianoDaSalvare, updatedAt: new Date().toISOString() });
-            
             lastSavedPiano.current = JSON.stringify(pianoDaSalvare); 
             setStatoSalvataggio('saved');
             setTimeout(() => setStatoSalvataggio('idle'), 3000);
         } catch (error) {
-            console.error("Errore salvataggio:", error);
             setStatoSalvataggio('error');
             setTimeout(() => setStatoSalvataggio('idle'), 3000);
         }
       };
 
-      // --- AUTOSALVATAGGIO ---
       useEffect(() => {
         if (!user || !firebaseInstances) return;
         const currentPianoStr = JSON.stringify(piano);
         if (currentPianoStr === lastSavedPiano.current) return; 
-
         const timer = setTimeout(() => salvaInCloud(piano), 1500);
         return () => clearTimeout(timer);
       }, [piano, user, firebaseInstances]);
 
-      // Array di supporto per griglia generati dinamicamente
+      // --- CALCOLATORI DI TEMPO E VISTE ---
+      const TIME_OPTIONS = useMemo(() => {
+        const opts = [];
+        let h = ORE_INIZIO;
+        let m = 0;
+        while (h < ORE_FINE) {
+          opts.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+          m += 15;
+          if (m >= 60) { h += 1; m = 0; }
+        }
+        return opts;
+      }, []);
+
       const fasceOrarie = useMemo(() => {
         const fasce = [];
         let h = ORE_INIZIO;
@@ -267,20 +255,98 @@
           let nextM = m + intervallo;
           let nextH = h + Math.floor(nextM / 60);
           nextM = nextM % 60;
-
           let endH = nextH >= ORE_FINE ? ORE_FINE : nextH;
           let endM = nextH >= ORE_FINE ? 0 : nextM;
-
           const end = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
           fasce.push({ id: start, label: `${start} - ${end}` });
-
-          h = nextH;
-          m = nextM;
-
+          h = nextH; m = nextM;
           if (h >= ORE_FINE) break;
         }
         return fasce;
       }, [intervallo]);
+
+      // --- LOGICA RICOSTRUZIONE ASSOLUTA CORSI ---
+      // Estrapola dal DB i blocchi "reali" per posizionarli graficamente in modo assoluto
+      const corsiOggi = useMemo(() => {
+          const corsi = [];
+          
+          CORSIE.forEach(corsia => {
+              const keys = Object.keys(piano).filter(k => k.startsWith(`${giornoSelezionato}-`) && k.endsWith(`-${corsia}`));
+              keys.sort((a, b) => a.split('-')[1].localeCompare(b.split('-')[1]));
+
+              let currentCourseEndMin = -1;
+              let currentCourse = null;
+
+              keys.forEach(k => {
+                  const timeStr = k.split('-')[1];
+                  const [h, m] = timeStr.split(':').map(Number);
+                  const startMin = h * 60 + m;
+                  const cell = piano[k];
+                  const durata = cell.durata || 45; 
+                  
+                  // Gestisce blocchi legacy contigui
+                  if (startMin < currentCourseEndMin && isSameCourse(cell, currentCourse.data)) {
+                      currentCourse.keys.push(k);
+                      currentCourseEndMin = Math.max(currentCourseEndMin, startMin + durata);
+                      return;
+                  }
+
+                  currentCourse = {
+                      oraInizio: timeStr,
+                      startMin: startMin,
+                      durata: durata,
+                      corsia: corsia,
+                      data: cell,
+                      keys: [k]
+                  };
+                  corsi.push(currentCourse);
+                  currentCourseEndMin = startMin + durata;
+              });
+          });
+
+          // Unisci le corsie contigue in un unico grande box
+          const corsiUnici = [];
+          const byStartMin = {};
+          corsi.forEach(c => {
+              if (!byStartMin[c.startMin]) byStartMin[c.startMin] = [];
+              byStartMin[c.startMin].push(c);
+          });
+
+          Object.keys(byStartMin).forEach(startMin => {
+              const corsiAtTime = byStartMin[startMin];
+              corsiAtTime.sort((a, b) => CORSIE.indexOf(a.corsia) - CORSIE.indexOf(b.corsia));
+              
+              const grouped = [];
+              corsiAtTime.forEach(c => {
+                  let placed = false;
+                  for (let g of grouped) {
+                      if (isSameCourse(g.data, c.data) && g.durata === c.durata) {
+                          const lastCorsiaIdx = CORSIE.indexOf(g.corsie[g.corsie.length - 1]);
+                          const myCorsiaIdx = CORSIE.indexOf(c.corsia);
+                          if (myCorsiaIdx === lastCorsiaIdx + 1) { // Verifica la contiguità
+                              g.corsie.push(c.corsia);
+                              g.keys.push(...c.keys);
+                              placed = true;
+                              break;
+                          }
+                      }
+                  }
+                  if (!placed) {
+                      grouped.push({
+                          oraInizio: c.oraInizio,
+                          startMin: c.startMin,
+                          durata: c.durata,
+                          data: c.data,
+                          corsie: [c.corsia],
+                          keys: [...c.keys]
+                      });
+                  }
+              });
+              corsiUnici.push(...grouped);
+          });
+
+          return corsiUnici;
+      }, [piano, giornoSelezionato]);
 
       // --- LOGICA AGGIUNTA NUOVO CORSO ---
       const salvaNuovoCorso = (e) => {
@@ -291,129 +357,56 @@
         }
         setPiano(prev => {
             const nuovoPiano = { ...prev };
-            const startIndex = fasceOrarie.findIndex(f => f.id === nuovoCorso.oraInizio);
-            if (startIndex === -1) return prev;
-
-            let slotsToPaint = Math.max(1, Math.round(nuovoCorso.durata / intervallo));
-
+            // Salviamo solo la prima chiave per corsia. La grafica e il ricostruttore faranno il resto!
             nuovoCorso.corsie.forEach(c => {
-                for(let i=0; i < slotsToPaint; i++) {
-                    if (startIndex + i < fasceOrarie.length) {
-                        const fId = fasceOrarie[startIndex + i].id;
-                        nuovoPiano[`${nuovoCorso.giorno}-${fId}-${c}`] = { 
-                            id: nuovoCorso.attivitaId, 
-                            istruttore: nuovoCorso.istruttore.trim(), 
-                            livello: nuovoCorso.livello,
-                            durata: Number(nuovoCorso.durata)
-                        };
-                    }
-                }
+                nuovoPiano[`${nuovoCorso.giorno}-${nuovoCorso.oraInizio}-${c}`] = { 
+                    id: nuovoCorso.attivitaId, 
+                    istruttore: nuovoCorso.istruttore.trim(), 
+                    livello: nuovoCorso.livello,
+                    durata: Number(nuovoCorso.durata)
+                };
             });
             return nuovoPiano;
         });
         setIsAddModalOpen(false);
-        // Resetta leggermente il form mantenendo alcune scelte per un rapido inserimento successivo
         setNuovoCorso(prev => ({...prev, corsie: [], istruttore: '', livello: ''}));
       };
 
-      const handleDoubleClicCella = (fasciaId, corsiaBase) => {
-        const cellaBase = piano[`${giornoSelezionato}-${fasciaId}-${corsiaBase}`];
-        if (!cellaBase) return; 
-        const info = attivita.find(a => a.id === cellaBase.id);
-
+      // --- LOGICA MODIFICA/ELIMINA CORSO ---
+      const handleDoubleClickCorso = (e, corso) => {
+        e.stopPropagation();
+        const info = attivita.find(a => a.id === corso.data.id);
         setEditModal({
-          fasciaId,
-          corsiaBase,
-          originalId: cellaBase.id,
-          originalIstruttore: cellaBase.istruttore || '',
-          originalLivello: cellaBase.livello || '',
-          originalDurata: cellaBase.durata || null,
-          istruttore: cellaBase.istruttore || '',
-          livello: cellaBase.livello || '',
-          durata: cellaBase.durata || '',
+          corsoOriginale: corso,
+          attivitaId: corso.data.id,
+          giorno: giornoSelezionato,
+          oraInizio: corso.oraInizio,
+          durata: corso.durata,
+          corsie: [...corso.corsie],
+          istruttore: corso.data.istruttore || '',
+          livello: corso.data.livello || '',
           infoAttivita: info
         });
       };
 
       const salvaModificheModal = (e) => {
         e.preventDefault();
+        if (editModal.corsie.length === 0) return alert("Seleziona almeno una corsia!");
+        
         setPiano(prev => {
           const nuovoPiano = { ...prev };
+          // 1. Elimina le chiavi vecchie/legacy associate a questo corso
+          editModal.corsoOriginale.keys.forEach(k => delete nuovoPiano[k]);
           
-          // 1. Trova l'intero blocco orizzontale
-          let corsieDaModificare = [editModal.corsiaBase];
-          let idx = CORSIE.indexOf(editModal.corsiaBase);
-          
-          let leftIdx = idx - 1;
-          const origMatch = {id: editModal.originalId, istruttore: editModal.originalIstruttore, livello: editModal.originalLivello, durata: editModal.originalDurata};
-          while(leftIdx >= 0) {
-              const c = prev[`${giornoSelezionato}-${editModal.fasciaId}-${CORSIE[leftIdx]}`];
-              if (isSameCourse(c, origMatch)) {
-                  corsieDaModificare.push(CORSIE[leftIdx]);
-                  leftIdx--;
-              } else break;
-          }
-          let rightIdx = idx + 1;
-          while(rightIdx < CORSIE.length) {
-              const c = prev[`${giornoSelezionato}-${editModal.fasciaId}-${CORSIE[rightIdx]}`];
-              if (isSameCourse(c, origMatch)) {
-                  corsieDaModificare.push(CORSIE[rightIdx]);
-                  rightIdx++;
-              } else break;
-          }
-
-          // 2. Trova l'intero blocco verticale vecchio
-          const startIndex = fasceOrarie.findIndex(f => f.id === editModal.fasciaId);
-          let fasceDaModificareVecchie = [editModal.fasciaId];
-          
-          let upIdx = startIndex - 1;
-          while(upIdx >= 0) {
-              const c = prev[`${giornoSelezionato}-${fasceOrarie[upIdx].id}-${editModal.corsiaBase}`];
-              if (isSameCourse(c, origMatch)) {
-                  fasceDaModificareVecchie.push(fasceOrarie[upIdx].id);
-                  upIdx--;
-              } else break;
-          }
-          let downIdx = startIndex + 1;
-          while(downIdx < fasceOrarie.length) {
-              const c = prev[`${giornoSelezionato}-${fasceOrarie[downIdx].id}-${editModal.corsiaBase}`];
-              if (isSameCourse(c, origMatch)) {
-                  fasceDaModificareVecchie.push(fasceOrarie[downIdx].id);
-                  downIdx++;
-              } else break;
-          }
-
-          // 3. Cancella il vecchio blocco
-          corsieDaModificare.forEach(c => {
-              fasceDaModificareVecchie.forEach(fId => {
-                  delete nuovoPiano[`${giornoSelezionato}-${fId}-${c}`];
-              });
+          // 2. Crea il corso con i nuovi dati
+          editModal.corsie.forEach(c => {
+              nuovoPiano[`${editModal.giorno}-${editModal.oraInizio}-${c}`] = { 
+                  id: editModal.attivitaId, 
+                  istruttore: editModal.istruttore.trim(), 
+                  livello: editModal.livello,
+                  durata: Number(editModal.durata)
+              };
           });
-
-          // 4. Calcola quanti slot disegnare per la nuova durata (partendo dall'orario più in alto)
-          fasceDaModificareVecchie.sort();
-          const realStartIndex = fasceOrarie.findIndex(f => f.id === fasceDaModificareVecchie[0]);
-
-          let slotsToPaint = fasceDaModificareVecchie.length; 
-          if (editModal.durata > 0) {
-              slotsToPaint = Math.max(1, Math.round(editModal.durata / intervallo));
-          }
-
-          // 5. Applica il nuovo blocco
-          corsieDaModificare.forEach(c => {
-             for(let i=0; i < slotsToPaint; i++) {
-                 if (realStartIndex + i < fasceOrarie.length) {
-                     const fId = fasceOrarie[realStartIndex + i].id;
-                     nuovoPiano[`${giornoSelezionato}-${fId}-${c}`] = { 
-                         id: editModal.originalId, 
-                         istruttore: editModal.istruttore.trim(), 
-                         livello: editModal.livello,
-                         durata: editModal.durata ? Number(editModal.durata) : null
-                     };
-                 }
-             }
-          });
-
           return nuovoPiano;
         });
         setEditModal(null);
@@ -422,140 +415,19 @@
       const eliminaCorsoModal = () => {
         setPiano(prev => {
           const nuovoPiano = { ...prev };
-          
-          let corsieDaModificare = [editModal.corsiaBase];
-          let idx = CORSIE.indexOf(editModal.corsiaBase);
-          
-          let leftIdx = idx - 1;
-          const origMatch = {id: editModal.originalId, istruttore: editModal.originalIstruttore, livello: editModal.originalLivello, durata: editModal.originalDurata};
-          while(leftIdx >= 0) {
-              const c = prev[`${giornoSelezionato}-${editModal.fasciaId}-${CORSIE[leftIdx]}`];
-              if (isSameCourse(c, origMatch)) {
-                  corsieDaModificare.push(CORSIE[leftIdx]);
-                  leftIdx--;
-              } else break;
-          }
-          let rightIdx = idx + 1;
-          while(rightIdx < CORSIE.length) {
-              const c = prev[`${giornoSelezionato}-${editModal.fasciaId}-${CORSIE[rightIdx]}`];
-              if (isSameCourse(c, origMatch)) {
-                  corsieDaModificare.push(CORSIE[rightIdx]);
-                  rightIdx++;
-              } else break;
-          }
-
-          const startIndex = fasceOrarie.findIndex(f => f.id === editModal.fasciaId);
-          let fasceDaModificareVecchie = [editModal.fasciaId];
-          
-          let upIdx = startIndex - 1;
-          while(upIdx >= 0) {
-              const c = prev[`${giornoSelezionato}-${fasceOrarie[upIdx].id}-${editModal.corsiaBase}`];
-              if (isSameCourse(c, origMatch)) {
-                  fasceDaModificareVecchie.push(fasceOrarie[upIdx].id);
-                  upIdx--;
-              } else break;
-          }
-          let downIdx = startIndex + 1;
-          while(downIdx < fasceOrarie.length) {
-              const c = prev[`${giornoSelezionato}-${fasceOrarie[downIdx].id}-${editModal.corsiaBase}`];
-              if (isSameCourse(c, origMatch)) {
-                  fasceDaModificareVecchie.push(fasceOrarie[downIdx].id);
-                  downIdx++;
-              } else break;
-          }
-
-          corsieDaModificare.forEach(c => {
-              fasceDaModificareVecchie.forEach(fId => {
-                  delete nuovoPiano[`${giornoSelezionato}-${fId}-${c}`];
-              });
-          });
-
+          editModal.corsoOriginale.keys.forEach(k => delete nuovoPiano[k]);
           return nuovoPiano;
         });
         setEditModal(null);
       };
 
-      // --- LOGICA DI RENDERING (Spanning Orizzontale e Verticale) ---
-      // Calcola in anticipo quali celle vanno saltate perché assorbite da un blocco più grande
-      const renderMatrix = useMemo(() => {
-          const matrix = fasceOrarie.map(() => CORSIE.map(() => ({ skip: false, rowSpan: 1, colSpan: 1 })));
-
-          for (let r = 0; r < fasceOrarie.length; r++) {
-              for (let c = 0; c < CORSIE.length; c++) {
-                  if (matrix[r][c].skip) continue;
-
-                  const cellCurrent = piano[`${giornoSelezionato}-${fasceOrarie[r].id}-${CORSIE[c]}`];
-                  if (!cellCurrent) continue;
-
-                  // Span Orizzontale
-                  let colSpan = 1;
-                  while (c + colSpan < CORSIE.length && !matrix[r][c + colSpan].skip) {
-                      const nextC = piano[`${giornoSelezionato}-${fasceOrarie[r].id}-${CORSIE[c + colSpan]}`];
-                      if (isSameCourse(cellCurrent, nextC)) colSpan++;
-                      else break;
-                  }
-
-                  // Span Verticale
-                  let rowSpan = 1;
-                  
-                  if (cellCurrent.durata && cellCurrent.durata > 0) {
-                      // Forza l'unione verticale del box in base alla sua durata effettiva
-                      rowSpan = Math.max(1, Math.round(cellCurrent.durata / intervallo));
-                      // Assicuriamoci che non esca dai limiti inferiori della griglia
-                      if (r + rowSpan > fasceOrarie.length) {
-                          rowSpan = fasceOrarie.length - r;
-                      }
-                  } else {
-                      // Logica standard: unisce le celle se sono consecutive e identiche
-                      while (r + rowSpan < fasceOrarie.length) {
-                          let match = true;
-                          for (let i = 0; i < colSpan; i++) {
-                              if (matrix[r + rowSpan][c + i].skip) { match = false; break; }
-                              const nextR = piano[`${giornoSelezionato}-${fasceOrarie[r + rowSpan].id}-${CORSIE[c + i]}`];
-                              if (!isSameCourse(cellCurrent, nextR)) { match = false; break; }
-                          }
-                          // Controllo bordi per blocchi perfetti
-                          if (match) {
-                              if (c > 0) {
-                                  const left = piano[`${giornoSelezionato}-${fasceOrarie[r + rowSpan].id}-${CORSIE[c - 1]}`];
-                                  if (isSameCourse(cellCurrent, left)) match = false;
-                              }
-                              if (c + colSpan < CORSIE.length) {
-                                  const right = piano[`${giornoSelezionato}-${fasceOrarie[r + rowSpan].id}-${CORSIE[c + colSpan]}`];
-                                  if (isSameCourse(cellCurrent, right)) match = false;
-                              }
-                          }
-                          if (match) rowSpan++;
-                          else break;
-                      }
-                  }
-
-                  matrix[r][c].colSpan = colSpan;
-                  matrix[r][c].rowSpan = rowSpan;
-
-                  // Contrassegna le celle assorbite dal blocco per saltarle
-                  for (let i = 0; i < rowSpan; i++) {
-                      for (let j = 0; j < colSpan; j++) {
-                          if (i === 0 && j === 0) continue;
-                          if (r + i < fasceOrarie.length && c + j < CORSIE.length) {
-                              matrix[r + i][c + j].skip = true;
-                          }
-                      }
-                  }
-              }
-          }
-          return matrix;
-      }, [fasceOrarie, CORSIE, piano, giornoSelezionato, intervallo]);
-
-      // --- FUNZIONI DI SALVATAGGIO / CARICAMENTO (JSON) ---
+      // --- FUNZIONI CARICAMENTO FILE ---
       const esportaDati = () => {
         const dataStr = JSON.stringify({ piano, attivita: ATTIVITA_DI_BASE }, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = url;
-        link.download = "mio_piano_vasca.json";
-        link.click();
+        link.href = url; link.download = "mio_piano_vasca.json"; link.click();
         URL.revokeObjectURL(url);
       };
 
@@ -568,16 +440,10 @@
             const dati = JSON.parse(e.target.result);
             if (dati.piano) {
               const pianoMigrato = {};
-              for (const key in dati.piano) {
-                pianoMigrato[key] = formatCellData(dati.piano[key]);
-              }
+              for (const key in dati.piano) pianoMigrato[key] = formatCellData(dati.piano[key]);
               setPiano(pianoMigrato);
             }
-          } catch (error) {
-            console.error("Errore nell'importazione:", error);
-            setStatoSalvataggio('error');
-            setTimeout(() => setStatoSalvataggio('idle'), 3000);
-          }
+          } catch (error) { console.error("Errore importazione:", error); }
         };
         reader.readAsText(file);
         event.target.value = null;
@@ -593,54 +459,32 @@
         setConfermaSvuota(false);
       };
 
+      // --- GESTIONE ACCESSO ---
       const handleLogin = async (e) => {
         e.preventDefault();
         setLoginError('');
         try {
-            const { auth, signInWithEmailAndPassword } = firebaseInstances;
-            await signInWithEmailAndPassword(auth, email, password);
-        } catch (error) {
-            setLoginError("Email o password non validi. Riprova.");
-        }
+            await firebaseInstances.signInWithEmailAndPassword(firebaseInstances.auth, email, password);
+        } catch (error) { setLoginError("Email o password errati."); }
       };
-
       const handleLogout = async () => {
-        if (firebaseInstances && firebaseInstances.auth) {
-            await firebaseInstances.signOut(firebaseInstances.auth);
-            setPiano({});
-        }
+        if (firebaseInstances?.auth) { await firebaseInstances.signOut(firebaseInstances.auth); setPiano({}); }
       };
 
-      // --- SCHERMATA DI LOGIN SE NON AUTENTICATO ---
-      if (isAuthLoading) {
-         return <div className="min-h-screen flex items-center justify-center bg-slate-50"><LoaderIcon size={48} className="text-blue-500" /></div>;
-      }
+      if (isAuthLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><LoaderIcon size={48} className="text-blue-500" /></div>;
 
-      if (!user && firebaseInstances && firebaseInstances.appId === 'gestionale-vasca-personale') {
+      if (!user && firebaseInstances?.appId === 'gestionale-vasca-personale') {
          return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
                <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md border border-slate-100">
-                  <div className="flex justify-center mb-6">
-                     <div className="bg-blue-100 p-3 rounded-full text-blue-600">
-                        <LockIcon size={32} />
-                     </div>
-                  </div>
+                  <div className="flex justify-center mb-6"><div className="bg-blue-100 p-3 rounded-full text-blue-600"><LockIcon size={32} /></div></div>
                   <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">Area Riservata</h2>
                   <p className="text-slate-500 text-center mb-8 text-sm">Inserisci le credenziali amministratore per accedere al Piano Vasca.</p>
-                  
                   <form onSubmit={handleLogin} className="flex flex-col gap-4">
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="admin@pianovasca.it" />
-                     </div>
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                        <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="••••••••" />
-                     </div>
+                     <div><label className="block text-sm font-medium text-slate-700 mb-1">Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                     <div><label className="block text-sm font-medium text-slate-700 mb-1">Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
                      {loginError && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{loginError}</div>}
-                     <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg transition-colors mt-2 shadow-sm">
-                        Accedi
-                     </button>
+                     <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg mt-2 shadow-sm transition-colors">Accedi</button>
                   </form>
                </div>
             </div>
@@ -660,14 +504,9 @@
                 </div>
                 <div className="overflow-y-auto p-6">
                   <form id="addCourseForm" onSubmit={salvaNuovoCorso}>
-                    
                     <div className="mb-5">
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">Attività</label>
-                      <select 
-                        value={nuovoCorso.attivitaId} 
-                        onChange={e => setNuovoCorso({...nuovoCorso, attivitaId: e.target.value, livello: ''})}
-                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                      >
+                      <select value={nuovoCorso.attivitaId} onChange={e => setNuovoCorso({...nuovoCorso, attivitaId: e.target.value, livello: ''})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
                         {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                       </select>
                     </div>
@@ -675,15 +514,9 @@
                     {attivita.find(a => a.id === nuovoCorso.attivitaId)?.hasLevels && (
                       <div className="mb-5">
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Livello</label>
-                        <select 
-                          value={nuovoCorso.livello} 
-                          onChange={e => setNuovoCorso({...nuovoCorso, livello: e.target.value})}
-                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                        >
+                        <select value={nuovoCorso.livello} onChange={e => setNuovoCorso({...nuovoCorso, livello: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
                           <option value="">Nessun livello</option>
-                          {attivita.find(a => a.id === nuovoCorso.attivitaId).levels.map(l => (
-                             <option key={l.val} value={l.val}>{l.name}</option>
-                          ))}
+                          {attivita.find(a => a.id === nuovoCorso.attivitaId).levels.map(l => <option key={l.val} value={l.val}>{l.name}</option>)}
                         </select>
                       </div>
                     )}
@@ -691,39 +524,22 @@
                     <div className="grid grid-cols-2 gap-4 mb-5">
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Giorno</label>
-                        <select 
-                          value={nuovoCorso.giorno} 
-                          onChange={e => setNuovoCorso({...nuovoCorso, giorno: Number(e.target.value)})}
-                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                        >
+                        <select value={nuovoCorso.giorno} onChange={e => setNuovoCorso({...nuovoCorso, giorno: Number(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
                           {GIORNI.map((g, i) => <option key={i} value={i}>{g}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ora Inizio</label>
-                        <select 
-                          value={nuovoCorso.oraInizio} 
-                          onChange={e => setNuovoCorso({...nuovoCorso, oraInizio: e.target.value})}
-                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                        >
-                          {fasceOrarie.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}
+                        <select value={nuovoCorso.oraInizio} onChange={e => setNuovoCorso({...nuovoCorso, oraInizio: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
+                          {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </div>
                     </div>
 
                     <div className="mb-5">
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">Durata (minuti)</label>
-                      <select 
-                        value={nuovoCorso.durata} 
-                        onChange={e => setNuovoCorso({...nuovoCorso, durata: Number(e.target.value)})}
-                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                      >
-                        <option value={15}>15 min</option>
-                        <option value={30}>30 min</option>
-                        <option value={45}>45 min</option>
-                        <option value={60}>60 min</option>
-                        <option value={90}>90 min</option>
-                        <option value={120}>120 min</option>
+                      <select value={nuovoCorso.durata} onChange={e => setNuovoCorso({...nuovoCorso, durata: Number(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
+                        <option value={15}>15 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option><option value={90}>90 min</option><option value={120}>120 min</option>
                       </select>
                     </div>
 
@@ -732,15 +548,7 @@
                       <div className="grid grid-cols-4 gap-2">
                         {CORSIE.map(c => (
                            <label key={c} className={`flex items-center justify-center gap-1 border-2 rounded-xl py-2.5 cursor-pointer transition-all ${nuovoCorso.corsie.includes(c) ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                              <input 
-                                type="checkbox" 
-                                className="hidden"
-                                checked={nuovoCorso.corsie.includes(c)}
-                                onChange={(e) => {
-                                   if(e.target.checked) setNuovoCorso({...nuovoCorso, corsie: [...nuovoCorso.corsie, c]});
-                                   else setNuovoCorso({...nuovoCorso, corsie: nuovoCorso.corsie.filter(x => x !== c)});
-                                }} 
-                              />
+                              <input type="checkbox" className="hidden" checked={nuovoCorso.corsie.includes(c)} onChange={(e) => { if(e.target.checked) setNuovoCorso({...nuovoCorso, corsie: [...nuovoCorso.corsie, c]}); else setNuovoCorso({...nuovoCorso, corsie: nuovoCorso.corsie.filter(x => x !== c)}); }} />
                               {c}
                            </label>
                         ))}
@@ -749,24 +557,14 @@
 
                     <div className="mb-2">
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">Istruttore</label>
-                      <input 
-                        type="text" 
-                        value={nuovoCorso.istruttore} 
-                        onChange={e => setNuovoCorso({...nuovoCorso, istruttore: e.target.value})}
-                        placeholder="Nome istruttore (opzionale)"
-                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                      />
+                      <input type="text" value={nuovoCorso.istruttore} onChange={e => setNuovoCorso({...nuovoCorso, istruttore: e.target.value})} placeholder="Nome istruttore (opzionale)" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
                     </div>
                   </form>
                 </div>
                 
                 <div className="px-6 py-4 border-t border-slate-200 flex gap-3 justify-end bg-slate-50 rounded-b-2xl">
-                  <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">
-                    Annulla
-                  </button>
-                  <button type="submit" form="addCourseForm" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2">
-                    <CheckIcon size={18} /> Aggiungi in griglia
-                  </button>
+                  <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">Annulla</button>
+                  <button type="submit" form="addCourseForm" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><CheckIcon size={18} /> Aggiungi in griglia</button>
                 </div>
               </div>
             </div>
@@ -782,14 +580,9 @@
                 </div>
                 <div className="overflow-y-auto p-6">
                   <form id="editCourseForm" onSubmit={salvaModificheModal}>
-                    
                     <div className="mb-5">
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">Attività</label>
-                      <select 
-                        value={editModal.attivitaId} 
-                        onChange={e => setEditModal({...editModal, attivitaId: e.target.value, livello: ''})}
-                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                      >
+                      <select value={editModal.attivitaId} onChange={e => setEditModal({...editModal, attivitaId: e.target.value, livello: ''})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
                         {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                       </select>
                     </div>
@@ -797,15 +590,9 @@
                     {attivita.find(a => a.id === editModal.attivitaId)?.hasLevels && (
                       <div className="mb-5">
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Livello</label>
-                        <select 
-                          value={editModal.livello} 
-                          onChange={e => setEditModal({...editModal, livello: e.target.value})}
-                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                        >
+                        <select value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
                           <option value="">Nessun livello</option>
-                          {attivita.find(a => a.id === editModal.attivitaId).levels.map(l => (
-                             <option key={l.val} value={l.val}>{l.name}</option>
-                          ))}
+                          {attivita.find(a => a.id === editModal.attivitaId).levels.map(l => <option key={l.val} value={l.val}>{l.name}</option>)}
                         </select>
                       </div>
                     )}
@@ -813,39 +600,22 @@
                     <div className="grid grid-cols-2 gap-4 mb-5">
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Giorno</label>
-                        <select 
-                          value={editModal.giorno} 
-                          onChange={e => setEditModal({...editModal, giorno: Number(e.target.value)})}
-                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                        >
+                        <select value={editModal.giorno} onChange={e => setEditModal({...editModal, giorno: Number(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
                           {GIORNI.map((g, i) => <option key={i} value={i}>{g}</option>)}
                         </select>
                       </div>
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ora Inizio</label>
-                        <select 
-                          value={editModal.oraInizio} 
-                          onChange={e => setEditModal({...editModal, oraInizio: e.target.value})}
-                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                        >
-                          {fasceOrarie.map(f => <option key={f.id} value={f.id}>{f.id}</option>)}
+                        <select value={editModal.oraInizio} onChange={e => setEditModal({...editModal, oraInizio: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
+                          {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </div>
                     </div>
 
                     <div className="mb-5">
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">Durata (minuti)</label>
-                      <select 
-                        value={editModal.durata} 
-                        onChange={e => setEditModal({...editModal, durata: Number(e.target.value)})}
-                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                      >
-                        <option value={15}>15 min</option>
-                        <option value={30}>30 min</option>
-                        <option value={45}>45 min</option>
-                        <option value={60}>60 min</option>
-                        <option value={90}>90 min</option>
-                        <option value={120}>120 min</option>
+                      <select value={editModal.durata} onChange={e => setEditModal({...editModal, durata: Number(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
+                        <option value={15}>15 min</option><option value={30}>30 min</option><option value={45}>45 min</option><option value={60}>60 min</option><option value={90}>90 min</option><option value={120}>120 min</option>
                       </select>
                     </div>
 
@@ -854,15 +624,7 @@
                       <div className="grid grid-cols-4 gap-2">
                         {CORSIE.map(c => (
                            <label key={c} className={`flex items-center justify-center gap-1 border-2 rounded-xl py-2.5 cursor-pointer transition-all ${editModal.corsie.includes(c) ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                              <input 
-                                type="checkbox" 
-                                className="hidden"
-                                checked={editModal.corsie.includes(c)}
-                                onChange={(e) => {
-                                   if(e.target.checked) setEditModal({...editModal, corsie: [...editModal.corsie, c]});
-                                   else setEditModal({...editModal, corsie: editModal.corsie.filter(x => x !== c)});
-                                }} 
-                              />
+                              <input type="checkbox" className="hidden" checked={editModal.corsie.includes(c)} onChange={(e) => { if(e.target.checked) setEditModal({...editModal, corsie: [...editModal.corsie, c]}); else setEditModal({...editModal, corsie: editModal.corsie.filter(x => x !== c)}); }} />
                               {c}
                            </label>
                         ))}
@@ -871,28 +633,16 @@
 
                     <div className="mb-2">
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">Istruttore</label>
-                      <input 
-                        type="text" 
-                        value={editModal.istruttore} 
-                        onChange={e => setEditModal({...editModal, istruttore: e.target.value})}
-                        placeholder="Nome istruttore (opzionale)"
-                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50"
-                      />
+                      <input type="text" value={editModal.istruttore} onChange={e => setEditModal({...editModal, istruttore: e.target.value})} placeholder="Nome istruttore (opzionale)" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
                     </div>
                   </form>
                 </div>
                 
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-between bg-slate-50 rounded-b-2xl">
-                  <button type="button" onClick={eliminaCorsoModal} className="px-4 py-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-bold transition-colors flex items-center gap-2">
-                    <Trash2Icon size={18} /> Elimina
-                  </button>
+                  <button type="button" onClick={eliminaCorsoModal} className="px-4 py-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-bold transition-colors flex items-center gap-2"><Trash2Icon size={18} /> Elimina</button>
                   <div className="flex gap-3">
-                    <button type="button" onClick={() => setEditModal(null)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">
-                      Annulla
-                    </button>
-                    <button type="submit" form="editCourseForm" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2">
-                      <CheckIcon size={18} /> Salva
-                    </button>
+                    <button type="button" onClick={() => setEditModal(null)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">Annulla</button>
+                    <button type="submit" form="editCourseForm" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><CheckIcon size={18} /> Salva</button>
                   </div>
                 </div>
               </div>
@@ -900,17 +650,16 @@
           )}
 
           {/* HEADER E CONTROLLI */}
-          <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm p-4">
+          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm p-4">
             <div className="max-w-7xl mx-auto">
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 shrink-0">
                   🌊 Gestione Piano Vasca
                 </h1>
                 
-                {/* BOTTONE PRINCIPALE AGGIUNGI CORSO */}
                 <button 
                   onClick={() => {
-                    setNuovoCorso(prev => ({...prev, giorno: giornoSelezionato, oraInizio: fasceOrarie[0]?.id || '08:00'}));
+                    setNuovoCorso(prev => ({...prev, giorno: giornoSelezionato, oraInizio: '08:00'}));
                     setIsAddModalOpen(true);
                   }}
                   className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-lg transform hover:scale-105"
@@ -919,169 +668,124 @@
                 </button>
 
                 <div className="flex flex-wrap justify-center items-center gap-2">
-                  <div 
-                    title="Il salvataggio avviene automaticamente ad ogni modifica"
-                    className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      statoSalvataggio === 'error' ? 'bg-red-100 text-red-700' :
-                      statoSalvataggio === 'saved' ? 'bg-green-100 text-green-700' :
-                      statoSalvataggio === 'saving' ? 'bg-blue-100 text-blue-700' :
-                      'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {statoSalvataggio === 'saving' ? <LoaderIcon size={16} /> : 
-                     statoSalvataggio === 'saved' ? <CheckIcon size={16} /> : 
-                     statoSalvataggio === 'error' ? <InfoIcon size={16} /> :
-                     <CloudIcon size={16} />}
-                    <span className="hidden sm:inline">{statoSalvataggio === 'saving' ? 'Salvataggio...' : 
-                     statoSalvataggio === 'saved' ? 'Salvato!' : 
-                     statoSalvataggio === 'error' ? 'Errore Sync' :
-                     'In Sync'}</span>
+                  <div title="Il salvataggio avviene automaticamente ad ogni modifica" className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${statoSalvataggio === 'error' ? 'bg-red-100 text-red-700' : statoSalvataggio === 'saved' ? 'bg-green-100 text-green-700' : statoSalvataggio === 'saving' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                    {statoSalvataggio === 'saving' ? <LoaderIcon size={16} /> : statoSalvataggio === 'saved' ? <CheckIcon size={16} /> : statoSalvataggio === 'error' ? <InfoIcon size={16} /> : <CloudIcon size={16} />}
+                    <span className="hidden sm:inline">{statoSalvataggio === 'saving' ? 'Salvataggio...' : statoSalvataggio === 'saved' ? 'Salvato!' : statoSalvataggio === 'error' ? 'Errore Sync' : 'In Sync'}</span>
                   </div>
                   <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
-                  <button onClick={esportaDati} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors">
-                    <DownloadIcon size={16} /> <span className="hidden sm:inline">Esporta</span>
-                  </button>
-                  <label className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium cursor-pointer transition-colors">
-                    <UploadIcon size={16} /> <span className="hidden sm:inline">Importa</span>
-                    <input type="file" accept=".json" onChange={importaDati} className="hidden" />
-                  </label>
-                  <button onClick={svuotaPiano} className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-medium transition-colors min-w-[100px] justify-center">
-                    <Trash2Icon size={16} /> {confermaSvuota ? "Sicuro?" : "Svuota"}
-                  </button>
+                  <button onClick={esportaDati} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors"><DownloadIcon size={16} /> <span className="hidden sm:inline">Esporta</span></button>
+                  <label className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium cursor-pointer transition-colors"><UploadIcon size={16} /> <span className="hidden sm:inline">Importa</span><input type="file" accept=".json" onChange={importaDati} className="hidden" /></label>
+                  <button onClick={svuotaPiano} className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-medium transition-colors min-w-[100px] justify-center"><Trash2Icon size={16} /> {confermaSvuota ? "Sicuro?" : "Svuota"}</button>
                   <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
-                  <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci">
-                    <LogOutIcon size={16} />
-                  </button>
+                  <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci"><LogOutIcon size={16} /></button>
                 </div>
               </div>
             </div>
           </header>
 
-          {/* MAIN CONTENT */}
           <main className="flex-1 max-w-7xl mx-auto w-full p-4 flex flex-col gap-6">
-            
-            {/* SELEZIONE GIORNO E ORARI */}
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full md:w-auto">
                 {GIORNI.map((giorno, idx) => (
-                  <button
-                    key={giorno}
-                    onClick={() => setGiornoSelezionato(idx)}
-                    className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${
-                      giornoSelezionato === idx
-                        ? 'bg-slate-800 text-white shadow-md'
-                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                    }`}
-                  >
+                  <button key={giorno} onClick={() => setGiornoSelezionato(idx)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === idx ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
                     {giorno}
                   </button>
                 ))}
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                {/* SELETTORE FLESSIBILITA' ORARI DELLA GRIGLIA */}
-                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm shrink-0">
-                  <ClockIcon size={16} className="text-slate-500" />
-                  <span className="text-sm font-medium text-slate-600 hidden sm:inline">Vista Griglia:</span>
-                  <select
-                    value={intervallo}
-                    onChange={(e) => setIntervallo(Number(e.target.value))}
-                    className="text-sm font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer"
-                  >
-                    <option value={60}>Ogni 60 min</option>
-                    <option value={45}>Ogni 45 min</option>
-                    <option value={30}>Ogni 30 min</option>
-                    <option value={15}>Ogni 15 min</option>
-                  </select>
-                </div>
+              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm shrink-0">
+                <ClockIcon size={16} className="text-slate-500" />
+                <span className="text-sm font-medium text-slate-600 hidden sm:inline">Vista Griglia:</span>
+                <select value={intervallo} onChange={(e) => setIntervallo(Number(e.target.value))} className="text-sm font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
+                  <option value={60}>Ogni 60 min</option>
+                  <option value={45}>Ogni 45 min</option>
+                  <option value={30}>Ogni 30 min</option>
+                  <option value={15}>Ogni 15 min</option>
+                </select>
               </div>
             </div>
 
-            {/* ISTRUZIONI RAPIDE */}
             <div className="bg-blue-50 text-blue-800 p-3 rounded-lg flex items-center gap-3 text-sm border border-blue-100">
               <InfoIcon size={18} className="text-blue-500 shrink-0" />
-              <p>
-                Stai visualizzando il piano vasca di <strong>{GIORNI[giornoSelezionato]}</strong>. 
-                Clicca su <strong className="bg-blue-600 text-white px-2 py-0.5 rounded shadow-sm">➕ Aggiungi Corso</strong> per inserire una nuova attività. 
-                Fai <strong>doppio clic</strong> su un corso esistente in griglia per modificarlo o eliminarlo.
-              </p>
+              <p>Stai visualizzando <strong>{GIORNI[giornoSelezionato]}</strong>. Clicca <strong>Aggiungi Corso</strong> per inserire una nuova attività o fai <strong>doppio clic</strong> su una cella vuota della griglia. Fai doppio clic su un corso per modificarlo.</p>
             </div>
 
-            {/* GRIGLIA PIANO Vasca */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* GRIGLIA ASSOLUTA */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse select-none">
                   <thead>
                     <tr>
-                      <th className="sticky left-0 z-10 bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        Orario
-                      </th>
-                      {CORSIE.map(corsia => (
-                        <th key={corsia} className="bg-slate-50 border-b border-r border-slate-200 p-3 min-w-[120px] text-center text-sm font-bold text-slate-700">
-                          Corsia {corsia}
-                        </th>
-                      ))}
+                      <th className="sticky left-0 z-20 bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Orario</th>
+                      {CORSIE.map(corsia => <th key={corsia} className="bg-slate-50 border-b border-r border-slate-200 p-3 min-w-[120px] text-center text-sm font-bold text-slate-700">Corsia {corsia}</th>)}
                     </tr>
                   </thead>
                   <tbody>
                     {fasceOrarie.map((fascia, r) => {
-                      const cells = [];
-
-                      CORSIE.forEach((corsia, c) => {
-                        const cellMeta = renderMatrix[r][c];
-                        if (cellMeta.skip) return;
-
-                        const cellCurrent = piano[`${giornoSelezionato}-${fascia.id}-${corsia}`];
-                        const infoAttivita = cellCurrent ? attivita.find(a => a.id === cellCurrent.id) : null;
-                        const nomeLivello = infoAttivita?.levels?.find(l => l.val === cellCurrent?.livello)?.name;
-
-                        cells.push(
-                          <td 
-                            key={corsia} 
-                            colSpan={cellMeta.colSpan}
-                            rowSpan={cellMeta.rowSpan}
-                            className={`border-b border-r border-slate-200 p-1 transition-colors duration-75 relative group ${!cellCurrent ? 'h-14' : 'cursor-pointer hover:brightness-95'}`}
-                            onDoubleClick={() => handleDoubleClicCella(fascia.id, corsia)}
-                          >
-                            <div className={`w-full h-full min-h-[48px] rounded flex flex-col items-center justify-center p-1 text-center transition-all shadow-sm ${
-                              infoAttivita ? infoAttivita.color : 'bg-transparent shadow-none'
-                            }`}>
-                              {nomeLivello ? (
-                                <>
-                                  <span className="text-xs font-bold leading-tight">Liv. {cellCurrent.livello} - {nomeLivello}</span>
-                                  <span className="text-[10px] font-bold bg-white/30 px-1.5 py-0.5 rounded-full mt-1">
-                                    {infoAttivita ? infoAttivita.name : ''}
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-xs font-bold">{infoAttivita ? infoAttivita.name : ''}</span>
-                              )}
-
-                              {cellCurrent?.durata && (
-                                <span className="text-[10px] font-bold bg-white/30 px-1.5 py-0.5 rounded-full mt-1 flex items-center gap-1">
-                                  ⏱ {cellCurrent.durata} min
-                                </span>
-                              )}
-
-                              {cellCurrent?.istruttore && (
-                                <span className="text-[10px] font-medium opacity-90 truncate w-full max-w-full px-1 mt-0.5">
-                                  {cellCurrent.istruttore}
-                                </span>
-                              )}
-                            </div>
-                            {infoAttivita && (
-                               <div className="absolute inset-1 rounded bg-black opacity-0 group-hover:opacity-5 pointer-events-none transition-opacity"></div>
-                            )}
-                          </td>
-                        );
-                      });
-
+                      const fasciaStartMin = ORE_INIZIO * 60 + (r * intervallo);
                       return (
-                        <tr key={fascia.id} className="hover:bg-slate-50/20">
-                          <td className="sticky left-0 z-10 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]">
+                        <tr key={fascia.id} className="hover:bg-slate-50/50 group">
+                          
+                          <td className="sticky left-0 z-20 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]"
+                              style={{ height: `${intervallo * 2}px` }}>
                             {fascia.label}
                           </td>
-                          {cells}
+
+                          {CORSIE.map(corsia => {
+                            // Cerca se c'è un corso che INIZIA in questa cella per renderizzarlo in assoluto
+                            const corsiInCella = corsiOggi.filter(c => {
+                                const slotIndex = Math.floor((c.startMin - ORE_INIZIO * 60) / intervallo);
+                                return slotIndex === r && c.corsie[0] === corsia;
+                            });
+
+                            return (
+                                <td 
+                                    key={corsia} 
+                                    className="border-b border-r border-slate-200 relative p-0 cursor-pointer hover:bg-blue-50/30 transition-colors" 
+                                    style={{ minWidth: '120px' }}
+                                    onDoubleClick={() => {
+                                        setNuovoCorso(prev => ({...prev, giorno: giornoSelezionato, oraInizio: fascia.id, corsie: [corsia]}));
+                                        setIsAddModalOpen(true);
+                                    }}
+                                >
+                                    {corsiInCella.map((corso, i) => {
+                                        const infoAttivita = attivita.find(a => a.id === corso.data.id);
+                                        const nomeLivello = infoAttivita?.levels?.find(l => l.val === corso.data.livello)?.name;
+                                        
+                                        // Posizionamento al Pixel (1 minuto = 2 pixel)
+                                        const topOffset = (corso.startMin - fasciaStartMin) * 2;
+                                        const altezzaPX = corso.durata * 2;
+                                        const larghezzaCalc = `calc(${corso.corsie.length * 100}% + ${corso.corsie.length - 1}px)`;
+
+                                        return (
+                                            <div 
+                                                key={i}
+                                                onDoubleClick={(e) => handleDoubleClickCorso(e, corso)}
+                                                className={`absolute z-10 left-0 rounded-lg p-1.5 flex flex-col items-center justify-center text-center shadow-md cursor-pointer hover:brightness-95 hover:shadow-lg transition-all overflow-hidden border border-white/20 ${infoAttivita?.color || 'bg-slate-500 text-white'}`}
+                                                style={{ top: `${topOffset}px`, height: `${altezzaPX}px`, width: larghezzaCalc, minHeight: '24px' }}
+                                            >
+                                              {nomeLivello ? (
+                                                <>
+                                                  <span className="text-xs font-bold leading-tight truncate w-full px-1">Liv. {corso.data.livello} - {nomeLivello}</span>
+                                                  <span className="text-[10px] font-bold bg-white/30 px-1.5 py-0.5 rounded-full mt-0.5 truncate max-w-full">{infoAttivita ? infoAttivita.name : ''}</span>
+                                                </>
+                                              ) : (
+                                                <span className="text-xs font-bold truncate w-full">{infoAttivita ? infoAttivita.name : ''}</span>
+                                              )}
+
+                                              {corso.durata >= 20 && (
+                                                <span className="text-[10px] font-bold bg-white/30 px-1.5 py-0.5 rounded-full mt-0.5 flex items-center gap-1">⏱ {corso.durata} min</span>
+                                              )}
+
+                                              {corso.data.istruttore && (
+                                                <span className="text-[10px] font-medium opacity-90 truncate w-full mt-auto pt-0.5">{corso.data.istruttore}</span>
+                                              )}
+                                            </div>
+                                        )
+                                    })}
+                                </td>
+                            );
+                          })}
                         </tr>
                       );
                     })}
@@ -1094,7 +798,6 @@
       );
     }
 
-    // Inizializzazione dell'app React nel DOM
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
   </script>
