@@ -98,32 +98,99 @@
       }, [intervallo]);
 
       // --- LOGICA DI DISEGNO (PENNELATURA) ---
-      const applicaStrumento = useCallback((fasciaId, corsia) => {
+      const applicaStrumento = useCallback((fasciaId, corsiaBase) => {
         setPiano(prev => {
           const nuovoPiano = { ...prev };
-          const key = `${giornoSelezionato}-${fasciaId}-${corsia}`;
+          const cellaBase = prev[`${giornoSelezionato}-${fasciaId}-${corsiaBase}`];
           
-          // Controlla se la corsia 1 è attualmente unita (stessa attività su 1A e 1B)
-          const isCorsia1Merged = 
-            prev[`${giornoSelezionato}-${fasciaId}-1A`] && 
-            prev[`${giornoSelezionato}-${fasciaId}-1A`] === prev[`${giornoSelezionato}-${fasciaId}-1B`];
+          // Trova tutte le corsie unite (stessa attività contigua) per agire sull'intero blocco
+          let corsieDaModificare = [corsiaBase];
           
-          if (strumentoAttivo === 'gomma') {
-            delete nuovoPiano[key];
-            // Se stiamo cancellando una corsia 1 unita, puliamo entrambe per dividerle di nuovo
-            if (isCorsia1Merged && corsia === '1A') {
-              delete nuovoPiano[`${giornoSelezionato}-${fasciaId}-1B`];
-            }
-          } else {
-            nuovoPiano[key] = strumentoAttivo;
-            // Se stiamo colorando una corsia 1 unita, manteniamo l'unione applicando il colore a entrambe
-            if (isCorsia1Merged && corsia === '1A') {
-              nuovoPiano[`${giornoSelezionato}-${fasciaId}-1B`] = strumentoAttivo;
-            }
+          if (cellaBase) {
+             let idx = CORSIE.indexOf(corsiaBase);
+             // Controlla a sinistra
+             let leftIdx = idx - 1;
+             while(leftIdx >= 0) {
+                 const currentCella = prev[`${giornoSelezionato}-${fasciaId}-${CORSIE[leftIdx]}`];
+                 if (currentCella && currentCella.id === cellaBase.id && currentCella.istruttore === cellaBase.istruttore) {
+                     corsieDaModificare.push(CORSIE[leftIdx]);
+                     leftIdx--;
+                 } else {
+                     break;
+                 }
+             }
+             // Controlla a destra
+             let rightIdx = idx + 1;
+             while(rightIdx < CORSIE.length) {
+                 const currentCella = prev[`${giornoSelezionato}-${fasciaId}-${CORSIE[rightIdx]}`];
+                 if (currentCella && currentCella.id === cellaBase.id && currentCella.istruttore === cellaBase.istruttore) {
+                     corsieDaModificare.push(CORSIE[rightIdx]);
+                     rightIdx++;
+                 } else {
+                     break;
+                 }
+             }
           }
+          
+          corsieDaModificare.forEach(c => {
+             const key = `${giornoSelezionato}-${fasciaId}-${c}`;
+             if (strumentoAttivo === 'gomma') {
+               delete nuovoPiano[key];
+             } else {
+               // Se sto sovrascrivendo con la stessa attività, mantengo l'istruttore. Altrimenti resetto.
+               const existingIstruttore = prev[key] && prev[key].id === strumentoAttivo ? prev[key].istruttore : '';
+               nuovoPiano[key] = { id: strumentoAttivo, istruttore: existingIstruttore };
+             }
+          });
+          
           return nuovoPiano;
         });
       }, [giornoSelezionato, strumentoAttivo]);
+
+      const handleEditIstruttore = (fasciaId, corsiaBase) => {
+        const cellaBase = piano[`${giornoSelezionato}-${fasciaId}-${corsiaBase}`];
+        if (!cellaBase) return; // Cella vuota, non c'è corso
+
+        const nuovoIstruttore = window.prompt("Inserisci o modifica il cognome dell'istruttore per questo corso:", cellaBase.istruttore || '');
+        
+        if (nuovoIstruttore === null) return; // Operazione annullata cliccando su 'Annulla'
+
+        setPiano(prev => {
+          const nuovoPiano = { ...prev };
+          let corsieDaModificare = [corsiaBase];
+          
+          let idx = CORSIE.indexOf(corsiaBase);
+          // Controlla a sinistra (per modificare tutto il blocco unito)
+          let leftIdx = idx - 1;
+          while(leftIdx >= 0) {
+              const currentCella = prev[`${giornoSelezionato}-${fasciaId}-${CORSIE[leftIdx]}`];
+              if (currentCella && currentCella.id === cellaBase.id && currentCella.istruttore === cellaBase.istruttore) {
+                  corsieDaModificare.push(CORSIE[leftIdx]);
+                  leftIdx--;
+              } else {
+                  break;
+              }
+          }
+          // Controlla a destra
+          let rightIdx = idx + 1;
+          while(rightIdx < CORSIE.length) {
+              const currentCella = prev[`${giornoSelezionato}-${fasciaId}-${CORSIE[rightIdx]}`];
+              if (currentCella && currentCella.id === cellaBase.id && currentCella.istruttore === cellaBase.istruttore) {
+                  corsieDaModificare.push(CORSIE[rightIdx]);
+                  rightIdx++;
+              } else {
+                  break;
+              }
+          }
+
+          corsieDaModificare.forEach(c => {
+             const key = `${giornoSelezionato}-${fasciaId}-${c}`;
+             nuovoPiano[key] = { ...nuovoPiano[key], istruttore: nuovoIstruttore.trim() };
+          });
+
+          return nuovoPiano;
+        });
+      };
 
       const handleMouseDown = (fasciaId, corsia) => {
         setIsDisegnando(true);
@@ -162,7 +229,18 @@
         reader.onload = (e) => {
           try {
             const dati = JSON.parse(e.target.result);
-            if (dati.piano) setPiano(dati.piano);
+            if (dati.piano) {
+              // Migrazione per retrocompatibilità: converte i vecchi file JSON al nuovo formato con istruttore
+              const pianoMigrato = {};
+              for (const key in dati.piano) {
+                if (typeof dati.piano[key] === 'string') {
+                  pianoMigrato[key] = { id: dati.piano[key], istruttore: '' };
+                } else {
+                  pianoMigrato[key] = dati.piano[key];
+                }
+              }
+              setPiano(pianoMigrato);
+            }
             if (dati.attivita) setAttivita(dati.attivita);
           } catch (error) {
             alert("Errore nel caricamento del file. Assicurati che sia il file JSON corretto.");
@@ -285,7 +363,7 @@
               <p>
                 Stai modificando <strong>{GIORNI[giornoSelezionato]}</strong>. 
                 Strumento attivo: <strong className="bg-white px-2 py-0.5 rounded shadow-sm">{strumentoAttivo === 'gomma' ? 'Gomma' : attivitaCorrente?.name}</strong>. 
-                Clicca e trascina per colorare. <strong>Novità:</strong> se assegni la stessa attività a 1A e 1B, si fonderanno in un'unica grande corsia! Usa la gomma per separarle di nuovo.
+                Clicca e trascina per colorare. <strong>Doppio clic</strong> su un corso posizionato per aggiungere/modificare l'istruttore.
               </p>
             </div>
 
@@ -306,48 +384,69 @@
                     </tr>
                   </thead>
                   <tbody>
-                    {fasceOrarie.map(fascia => (
-                      <tr key={fascia.id} className="hover:bg-slate-50/50">
-                        <td className="sticky left-0 z-10 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]">
-                          {fascia.label}
-                        </td>
-                        {CORSIE.map(corsia => {
-                          const act1A = piano[`${giornoSelezionato}-${fascia.id}-1A`];
-                          const act1B = piano[`${giornoSelezionato}-${fascia.id}-1B`];
-                          const isMerged = act1A && act1A === act1B;
+                    {fasceOrarie.map(fascia => {
+                      const cells = [];
+                      let skipUntil = -1;
 
-                          // Se la corsia 1 è unita (stessa attività), nascondiamo la cella 1B...
-                          if (corsia === '1B' && isMerged) return null;
+                      CORSIE.forEach((corsia, idx) => {
+                        if (idx <= skipUntil) return;
 
-                          const key = `${giornoSelezionato}-${fascia.id}-${corsia}`;
-                          const attivitaId = piano[key];
-                          const infoAttivita = attivita.find(a => a.id === attivitaId);
-                          
-                          // ...e diciamo alla cella 1A di espandersi per coprire lo spazio di entrambe (colSpan)
-                          const colSpan = (corsia === '1A' && isMerged) ? 2 : 1;
+                        const cellCurrent = piano[`${giornoSelezionato}-${fascia.id}-${corsia}`];
+                        let colSpan = 1;
 
-                          return (
-                            <td 
-                              key={corsia} 
-                              colSpan={colSpan}
-                              className="border-b border-r border-slate-200 p-1 h-10 cursor-crosshair transition-colors duration-75 relative group"
-                              onMouseDown={() => handleMouseDown(fascia.id, corsia)}
-                              onMouseEnter={() => handleMouseEnter(fascia.id, corsia)}
-                            >
-                              <div className={`w-full h-full rounded flex items-center justify-center p-1 text-xs font-semibold text-center transition-all ${
-                                infoAttivita ? infoAttivita.color : 'bg-transparent hover:bg-slate-100'
-                              }`}>
-                                {infoAttivita ? infoAttivita.name : ''}
-                              </div>
-                              {/* Hint visivo al passaggio del mouse se cella vuota */}
-                              {!infoAttivita && strumentoAttivo !== 'gomma' && (
-                                 <div className="absolute inset-1 rounded bg-slate-200 opacity-0 group-hover:opacity-30 pointer-events-none transition-opacity"></div>
+                        if (cellCurrent) {
+                          // Cerca in avanti quante corsie contigue hanno la stessa identica attività E istruttore
+                          let lookAheadIdx = idx + 1;
+                          while (lookAheadIdx < CORSIE.length) {
+                            const cellNext = piano[`${giornoSelezionato}-${fascia.id}-${CORSIE[lookAheadIdx]}`];
+                            if (cellNext && cellNext.id === cellCurrent.id && cellNext.istruttore === cellCurrent.istruttore) {
+                              colSpan++;
+                              lookAheadIdx++;
+                            } else {
+                              break;
+                            }
+                          }
+                          skipUntil = lookAheadIdx - 1; // Salta il rendering delle celle che sono state unite
+                        }
+
+                        const infoAttivita = cellCurrent ? attivita.find(a => a.id === cellCurrent.id) : null;
+
+                        cells.push(
+                          <td 
+                            key={corsia} 
+                            colSpan={colSpan}
+                            className="border-b border-r border-slate-200 p-1 h-12 cursor-crosshair transition-colors duration-75 relative group"
+                            onMouseDown={() => handleMouseDown(fascia.id, corsia)}
+                            onMouseEnter={() => handleMouseEnter(fascia.id, corsia)}
+                            onDoubleClick={() => handleEditIstruttore(fascia.id, corsia)}
+                          >
+                            <div className={`w-full h-full rounded flex flex-col items-center justify-center p-1 text-center transition-all ${
+                              infoAttivita ? infoAttivita.color : 'bg-transparent hover:bg-slate-100'
+                            }`}>
+                              <span className="text-xs font-semibold">{infoAttivita ? infoAttivita.name : ''}</span>
+                              {cellCurrent?.istruttore && (
+                                <span className="text-[10px] font-medium opacity-90 truncate w-full max-w-full px-1 mt-0.5">
+                                  {cellCurrent.istruttore}
+                                </span>
                               )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                            </div>
+                            {/* Hint visivo al passaggio del mouse se cella vuota */}
+                            {!infoAttivita && strumentoAttivo !== 'gomma' && (
+                               <div className="absolute inset-1 rounded bg-slate-200 opacity-0 group-hover:opacity-30 pointer-events-none transition-opacity"></div>
+                            )}
+                          </td>
+                        );
+                      });
+
+                      return (
+                        <tr key={fascia.id} className="hover:bg-slate-50/50">
+                          <td className="sticky left-0 z-10 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]">
+                            {fascia.label}
+                          </td>
+                          {cells}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
