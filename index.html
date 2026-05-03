@@ -496,26 +496,37 @@
 
                   // Span Verticale
                   let rowSpan = 1;
-                  while (r + rowSpan < fasceOrarie.length) {
-                      let match = true;
-                      for (let i = 0; i < colSpan; i++) {
-                          if (matrix[r + rowSpan][c + i].skip) { match = false; break; }
-                          const nextR = piano[`${giornoSelezionato}-${fasceOrarie[r + rowSpan].id}-${CORSIE[c + i]}`];
-                          if (!isSameCourse(cellCurrent, nextR)) { match = false; break; }
+                  
+                  if (cellCurrent.durata && cellCurrent.durata > 0) {
+                      // Forza l'unione verticale del box in base alla sua durata effettiva
+                      rowSpan = Math.max(1, Math.round(cellCurrent.durata / intervallo));
+                      // Assicuriamoci che non esca dai limiti inferiori della griglia
+                      if (r + rowSpan > fasceOrarie.length) {
+                          rowSpan = fasceOrarie.length - r;
                       }
-                      // Controllo bordi per blocchi perfetti
-                      if (match) {
-                          if (c > 0) {
-                              const left = piano[`${giornoSelezionato}-${fasceOrarie[r + rowSpan].id}-${CORSIE[c - 1]}`];
-                              if (isSameCourse(cellCurrent, left)) match = false;
+                  } else {
+                      // Logica standard: unisce le celle se sono consecutive e identiche
+                      while (r + rowSpan < fasceOrarie.length) {
+                          let match = true;
+                          for (let i = 0; i < colSpan; i++) {
+                              if (matrix[r + rowSpan][c + i].skip) { match = false; break; }
+                              const nextR = piano[`${giornoSelezionato}-${fasceOrarie[r + rowSpan].id}-${CORSIE[c + i]}`];
+                              if (!isSameCourse(cellCurrent, nextR)) { match = false; break; }
                           }
-                          if (c + colSpan < CORSIE.length) {
-                              const right = piano[`${giornoSelezionato}-${fasceOrarie[r + rowSpan].id}-${CORSIE[c + colSpan]}`];
-                              if (isSameCourse(cellCurrent, right)) match = false;
+                          // Controllo bordi per blocchi perfetti
+                          if (match) {
+                              if (c > 0) {
+                                  const left = piano[`${giornoSelezionato}-${fasceOrarie[r + rowSpan].id}-${CORSIE[c - 1]}`];
+                                  if (isSameCourse(cellCurrent, left)) match = false;
+                              }
+                              if (c + colSpan < CORSIE.length) {
+                                  const right = piano[`${giornoSelezionato}-${fasceOrarie[r + rowSpan].id}-${CORSIE[c + colSpan]}`];
+                                  if (isSameCourse(cellCurrent, right)) match = false;
+                              }
                           }
+                          if (match) rowSpan++;
+                          else break;
                       }
-                      if (match) rowSpan++;
-                      else break;
                   }
 
                   matrix[r][c].colSpan = colSpan;
@@ -525,13 +536,15 @@
                   for (let i = 0; i < rowSpan; i++) {
                       for (let j = 0; j < colSpan; j++) {
                           if (i === 0 && j === 0) continue;
-                          matrix[r + i][c + j].skip = true;
+                          if (r + i < fasceOrarie.length && c + j < CORSIE.length) {
+                              matrix[r + i][c + j].skip = true;
+                          }
                       }
                   }
               }
           }
           return matrix;
-      }, [fasceOrarie, CORSIE, piano, giornoSelezionato]);
+      }, [fasceOrarie, CORSIE, piano, giornoSelezionato, intervallo]);
 
       // --- FUNZIONI DI SALVATAGGIO / CARICAMENTO (JSON) ---
       const esportaDati = () => {
