@@ -775,19 +775,31 @@
                                                 <div className="flex flex-col items-center justify-center w-full h-full overflow-hidden">
                                                   {nomeLivello ? (
                                                     <>
-                                                      <span className="text-xs font-bold leading-tight truncate w-full px-1">Liv. {corso.data.livello} - {nomeLivello}</span>
-                                                      {corso.durata > 30 && <span className="text-[10px] font-bold bg-white/30 px-1.5 py-0.5 rounded-full mt-0.5 truncate max-w-full leading-none">{infoAttivita ? infoAttivita.name : ''}</span>}
+                                                      <span className={`${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-1`}>
+                                                        Liv. {corso.data.livello} - {nomeLivello}
+                                                      </span>
+                                                      {corso.durata > 30 && (
+                                                        <span className="text-[10px] font-bold bg-white/30 px-2 py-0.5 rounded-full mt-1 truncate max-w-full">
+                                                          {infoAttivita ? infoAttivita.name : ''}
+                                                        </span>
+                                                      )}
                                                     </>
                                                   ) : (
-                                                    <span className="text-xs font-bold truncate w-full px-1">{infoAttivita ? infoAttivita.name : ''}</span>
-                                                  )}
-
-                                                  {corso.durata >= 45 && (
-                                                    <span className="text-[9px] font-bold bg-white/30 px-1.5 py-0.5 rounded-full mt-0.5 flex items-center gap-1 leading-none">⏱ {corso.durata} min</span>
+                                                    <span className={`${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-1`}>
+                                                      {infoAttivita ? infoAttivita.name : ''}
+                                                    </span>
                                                   )}
 
                                                   {corso.data.istruttore && (
-                                                    <span className="text-[10px] font-medium opacity-90 truncate w-full mt-auto pt-0.5 leading-none">{corso.data.istruttore}</span>
+                                                    <span className={`${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-semibold truncate w-full px-1 mt-1 text-white/95`}>
+                                                      {corso.data.istruttore}
+                                                    </span>
+                                                  )}
+
+                                                  {corso.durata >= 45 && (
+                                                    <span className="text-[10px] font-bold bg-white/30 px-2 py-0.5 rounded-full mt-1.5 inline-block truncate max-w-full">
+                                                      ⏱ {corso.durata} min
+                                                    </span>
                                                   )}
                                                 </div>
                                             </div>
