@@ -52,6 +52,7 @@
     const LoaderIcon = (p) => <Icon {...p} className={`animate-spin ${p.className || ''}`}><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></Icon>;
     const LockIcon = (p) => <Icon {...p}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
     const LogOutIcon = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
+    const XIcon = (p) => <Icon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
 
     // --- CONFIGURAZIONE INIZIALE ---
     const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
@@ -61,21 +62,41 @@
 
     const ATTIVITA_DI_BASE = [
       { id: 'libero', name: 'Nuoto Libero', color: 'bg-slate-300 text-slate-800', border: 'border-slate-400' },
-      { id: 'scuola_bambini', name: 'Scuola Nuoto Bambini', color: 'bg-sky-300 text-sky-900', border: 'border-sky-400' },
-      { id: 'scuola_adulti', name: 'Scuola Nuoto Adulti', color: 'bg-green-500 text-white', border: 'border-green-600' },
+      { 
+        id: 'scuola_bambini', 
+        name: 'Scuola Nuoto Bambini', 
+        color: 'bg-sky-400 text-white', 
+        border: 'border-sky-500',
+        hasLevels: true,
+        levels: [
+          {val: '1', name: 'Stella Marina'}, {val: '2', name: 'Granchietto'}, {val: '3', name: 'Tartaruga'}, 
+          {val: '4', name: 'Polipetto'}, {val: '5', name: 'Pesce spada'}, {val: '6', name: 'Delfino'}, {val: '7', name: 'Squalo'}
+        ]
+      },
+      { 
+        id: 'scuola_adulti', 
+        name: 'Scuola Nuoto Adulti', 
+        color: 'bg-green-500 text-white', 
+        border: 'border-green-600',
+        hasLevels: true,
+        levels: [
+          {val: '1', name: 'Principianti'}, {val: '2', name: 'Intermedi'}, {val: '3', name: 'Avanzati'}
+        ]
+      },
       { id: 'acquagym', name: 'Acquagym', color: 'bg-fuchsia-500 text-white', border: 'border-fuchsia-600' },
-      { id: 'propaganda', name: 'Propaganda', color: 'bg-blue-600 text-white', border: 'border-blue-700' },
+      { id: 'propaganda', name: 'Propaganda', color: 'bg-purple-600 text-white', border: 'border-purple-700' },
       { id: 'privato', name: 'Lez. Privata', color: 'bg-yellow-300 text-yellow-900', border: 'border-yellow-400' },
     ];
 
     function App() {
       // --- STATO DELL'APPLICAZIONE ---
       const [giornoSelezionato, setGiornoSelezionato] = useState(0);
-      const [piano, setPiano] = useState({}); // Mappa: "giorno-ora-corsia" -> idAttivita
+      const [piano, setPiano] = useState({}); // Mappa: "giorno-ora-corsia" -> {id, istruttore, livello}
       const [attivita, setAttivita] = useState(ATTIVITA_DI_BASE);
-      const [strumentoAttivo, setStrumentoAttivo] = useState('libero'); // L'attività attualmente selezionata come "pennello"
+      const [strumentoAttivo, setStrumentoAttivo] = useState('libero'); 
       const [isDisegnando, setIsDisegnando] = useState(false);
-      const [intervallo, setIntervallo] = useState(30); // Imposta gli slot di default a 30 minuti
+      const [intervallo, setIntervallo] = useState(30); 
+      const [editModal, setEditModal] = useState(null); // Gestisce la finestra modale per inserire livello/istruttore
 
       // --- STATI FIREBASE E SALVATAGGIO ---
       const [user, setUser] = useState(null);
@@ -86,16 +107,14 @@
       const [statoSalvataggio, setStatoSalvataggio] = useState('idle'); // idle, saving, saved, error
       const [confermaSvuota, setConfermaSvuota] = useState(false);
       const [firebaseInstances, setFirebaseInstances] = useState(null);
-      const lastSavedPiano = useRef(""); // Aggiunto per tracciare le modifiche e non salvare di continuo
+      const lastSavedPiano = useRef(""); 
 
       // --- INIZIALIZZAZIONE FIREBASE DINAMICA ---
       useEffect(() => {
         const setupFirebase = async () => {
             try {
-                // Trucco per evitare che Babel blocchi l'importazione (risolve l'errore 'require is not defined')
                 const dynamicImport = new Function('url', 'return import(url)');
 
-                // Importazione dinamica dei moduli Cloud Database
                 const { initializeApp } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
                 const { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
                 const { getFirestore, doc, setDoc, onSnapshot } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
@@ -107,9 +126,6 @@
                     app = initializeApp(JSON.parse(firebaseConfigStr));
                     appId = typeof __app_id !== 'undefined' ? __app_id : 'gestionale-vasca';
                 } else {
-                    // ATTENZIONE: CONFIGURAZIONE PER GITHUB PAGES
-                    // Se ospiti l'app su Github Pages, inserisci qui le credenziali 
-                    // del tuo progetto Firebase (creabile gratis su console.firebase.google.com)
                     const mioFirebaseConfig = {
                         apiKey: "AIzaSyB6fUMyWtZ3IBFnyIoiFSmNVu_0FeMhW1Y",
                         authDomain: "pianovasca-2d757.firebaseapp.com",
@@ -125,7 +141,7 @@
                         appId = 'gestionale-vasca-personale';
                     } else {
                         setIsAuthLoading(false);
-                        return; // Firebase non configurato, il cloud sarà disabilitato
+                        return;
                     }
                 }
                 
@@ -133,18 +149,14 @@
                 db = getFirestore(app);
                 setFirebaseInstances({ auth, db, appId, doc, setDoc, onSnapshot, signInWithEmailAndPassword, signOut });
 
-                // Gestione stato utente
                 onAuthStateChanged(auth, (u) => {
                     setUser(u);
                     setIsAuthLoading(false);
                 });
 
-                // Autenticazione invisibile per permessi di sicurezza (Solo per ambiente Canvas di test)
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token);
                 } 
-                // Eliminato l'accesso anonimo automatico: l'utente dovrà loggarsi dal form!
-
             } catch (err) {
                 console.error("Errore inizializzazione Firebase:", err);
                 setIsAuthLoading(false);
@@ -152,6 +164,20 @@
         };
         setupFirebase();
       }, []);
+
+      // Funzione di migrazione per convertire i vecchi dati ai nuovi formati
+      const formatCellData = (data) => {
+          if (!data) return null;
+          let cell = typeof data === 'string' ? { id: data, istruttore: '', livello: '' } : { ...data };
+          
+          if (cell.id.startsWith('scuola_adulti_')) {
+              return { ...cell, id: 'scuola_adulti', livello: cell.id.split('_')[2] };
+          }
+          if (cell.id.startsWith('scuola_bambini_')) {
+              return { ...cell, id: 'scuola_bambini', livello: cell.id.split('_')[2] };
+          }
+          return cell;
+      };
 
       // --- LETTURA E SYNC DATI CLOUD ---
       useEffect(() => {
@@ -163,8 +189,12 @@
           if (docSnap.exists()) {
             const data = docSnap.data();
             if (data.piano) {
-              lastSavedPiano.current = JSON.stringify(data.piano); // Registra i dati arrivati dal cloud per evitare loop
-              setPiano(data.piano);
+              const pianoMigrato = {};
+              for (const key in data.piano) {
+                pianoMigrato[key] = formatCellData(data.piano[key]);
+              }
+              lastSavedPiano.current = JSON.stringify(pianoMigrato);
+              setPiano(pianoMigrato);
             }
           }
         }, (error) => console.error("Errore sincronizzazione Cloud:", error));
@@ -185,7 +215,7 @@
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
             await setDoc(docRef, { piano: pianoDaSalvare, updatedAt: new Date().toISOString() }, { merge: true });
             
-            lastSavedPiano.current = JSON.stringify(pianoDaSalvare); // Aggiorna l'ultimo stato salvato
+            lastSavedPiano.current = JSON.stringify(pianoDaSalvare); 
             setStatoSalvataggio('saved');
             setTimeout(() => setStatoSalvataggio('idle'), 3000);
         } catch (error) {
@@ -200,14 +230,9 @@
         if (!user || !firebaseInstances) return;
         
         const currentPianoStr = JSON.stringify(piano);
-        // Se non ci sono modifiche rispetto all'ultimo salvataggio (o caricamento), non fa nulla
         if (currentPianoStr === lastSavedPiano.current) return; 
 
-        // Attende 1.5 secondi dall'ultima modifica prima di salvare per non spammarlo al database
-        const timer = setTimeout(() => {
-          salvaInCloud(piano);
-        }, 1500);
-
+        const timer = setTimeout(() => salvaInCloud(piano), 1500);
         return () => clearTimeout(timer);
       }, [piano, user, firebaseInstances]);
 
@@ -242,7 +267,6 @@
           const nuovoPiano = { ...prev };
           const cellaBase = prev[`${giornoSelezionato}-${fasciaId}-${corsiaBase}`];
           
-          // Trova tutte le corsie unite (stessa attività contigua) per agire sull'intero blocco
           let corsieDaModificare = [corsiaBase];
           
           if (cellaBase) {
@@ -251,23 +275,19 @@
              let leftIdx = idx - 1;
              while(leftIdx >= 0) {
                  const currentCella = prev[`${giornoSelezionato}-${fasciaId}-${CORSIE[leftIdx]}`];
-                 if (currentCella && currentCella.id === cellaBase.id && currentCella.istruttore === cellaBase.istruttore) {
+                 if (currentCella && currentCella.id === cellaBase.id && currentCella.istruttore === cellaBase.istruttore && currentCella.livello === cellaBase.livello) {
                      corsieDaModificare.push(CORSIE[leftIdx]);
                      leftIdx--;
-                 } else {
-                     break;
-                 }
+                 } else break;
              }
              // Controlla a destra
              let rightIdx = idx + 1;
              while(rightIdx < CORSIE.length) {
                  const currentCella = prev[`${giornoSelezionato}-${fasciaId}-${CORSIE[rightIdx]}`];
-                 if (currentCella && currentCella.id === cellaBase.id && currentCella.istruttore === cellaBase.istruttore) {
+                 if (currentCella && currentCella.id === cellaBase.id && currentCella.istruttore === cellaBase.istruttore && currentCella.livello === cellaBase.livello) {
                      corsieDaModificare.push(CORSIE[rightIdx]);
                      rightIdx++;
-                 } else {
-                     break;
-                 }
+                 } else break;
              }
           }
           
@@ -276,9 +296,9 @@
              if (strumentoAttivo === 'gomma') {
                delete nuovoPiano[key];
              } else {
-               // Se sto sovrascrivendo con la stessa attività, mantengo l'istruttore. Altrimenti resetto.
                const existingIstruttore = prev[key] && prev[key].id === strumentoAttivo ? prev[key].istruttore : '';
-               nuovoPiano[key] = { id: strumentoAttivo, istruttore: existingIstruttore };
+               const existingLivello = prev[key] && prev[key].id === strumentoAttivo ? prev[key].livello : '';
+               nuovoPiano[key] = { id: strumentoAttivo, istruttore: existingIstruttore, livello: existingLivello };
              }
           });
           
@@ -286,49 +306,55 @@
         });
       }, [giornoSelezionato, strumentoAttivo]);
 
-      const handleEditIstruttore = (fasciaId, corsiaBase) => {
+      const handleDoubleClicCella = (fasciaId, corsiaBase) => {
         const cellaBase = piano[`${giornoSelezionato}-${fasciaId}-${corsiaBase}`];
-        if (!cellaBase) return; // Cella vuota, non c'è corso
+        if (!cellaBase) return; // Niente da editare
+        const info = attivita.find(a => a.id === cellaBase.id);
 
-        const nuovoIstruttore = window.prompt("Inserisci o modifica il cognome dell'istruttore per questo corso:", cellaBase.istruttore || '');
-        
-        if (nuovoIstruttore === null) return; // Operazione annullata cliccando su 'Annulla'
+        setEditModal({
+          fasciaId,
+          corsiaBase,
+          originalId: cellaBase.id,
+          originalIstruttore: cellaBase.istruttore || '',
+          originalLivello: cellaBase.livello || '',
+          istruttore: cellaBase.istruttore || '',
+          livello: cellaBase.livello || '',
+          infoAttivita: info
+        });
+      };
 
+      const salvaModificheModal = (e) => {
+        e.preventDefault();
         setPiano(prev => {
           const nuovoPiano = { ...prev };
-          let corsieDaModificare = [corsiaBase];
+          let corsieDaModificare = [editModal.corsiaBase];
           
-          let idx = CORSIE.indexOf(corsiaBase);
-          // Controlla a sinistra (per modificare tutto il blocco unito)
+          let idx = CORSIE.indexOf(editModal.corsiaBase);
+          // Trova tutto il blocco con i vecchi valori
           let leftIdx = idx - 1;
           while(leftIdx >= 0) {
-              const currentCella = prev[`${giornoSelezionato}-${fasciaId}-${CORSIE[leftIdx]}`];
-              if (currentCella && currentCella.id === cellaBase.id && currentCella.istruttore === cellaBase.istruttore) {
+              const c = prev[`${giornoSelezionato}-${editModal.fasciaId}-${CORSIE[leftIdx]}`];
+              if (c && c.id === editModal.originalId && c.istruttore === editModal.originalIstruttore && c.livello === editModal.originalLivello) {
                   corsieDaModificare.push(CORSIE[leftIdx]);
                   leftIdx--;
-              } else {
-                  break;
-              }
+              } else break;
           }
-          // Controlla a destra
           let rightIdx = idx + 1;
           while(rightIdx < CORSIE.length) {
-              const currentCella = prev[`${giornoSelezionato}-${fasciaId}-${CORSIE[rightIdx]}`];
-              if (currentCella && currentCella.id === cellaBase.id && currentCella.istruttore === cellaBase.istruttore) {
+              const c = prev[`${giornoSelezionato}-${editModal.fasciaId}-${CORSIE[rightIdx]}`];
+              if (c && c.id === editModal.originalId && c.istruttore === editModal.originalIstruttore && c.livello === editModal.originalLivello) {
                   corsieDaModificare.push(CORSIE[rightIdx]);
                   rightIdx++;
-              } else {
-                  break;
-              }
+              } else break;
           }
 
           corsieDaModificare.forEach(c => {
-             const key = `${giornoSelezionato}-${fasciaId}-${c}`;
-             nuovoPiano[key] = { ...nuovoPiano[key], istruttore: nuovoIstruttore.trim() };
+             const key = `${giornoSelezionato}-${editModal.fasciaId}-${c}`;
+             nuovoPiano[key] = { ...nuovoPiano[key], istruttore: editModal.istruttore.trim(), livello: editModal.livello };
           });
-
           return nuovoPiano;
         });
+        setEditModal(null);
       };
 
       const handleMouseDown = (fasciaId, corsia) => {
@@ -342,7 +368,6 @@
         }
       };
 
-      // Ferma il disegno se il mouse viene rilasciato ovunque nello schermo
       useEffect(() => {
         const handleMouseUp = () => setIsDisegnando(false);
         window.addEventListener('mouseup', handleMouseUp);
@@ -351,7 +376,7 @@
 
       // --- FUNZIONI DI SALVATAGGIO / CARICAMENTO (JSON) ---
       const esportaDati = () => {
-        const dataStr = JSON.stringify({ piano, attivita }, null, 2);
+        const dataStr = JSON.stringify({ piano, attivita: ATTIVITA_DI_BASE }, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -369,18 +394,12 @@
           try {
             const dati = JSON.parse(e.target.result);
             if (dati.piano) {
-              // Migrazione per retrocompatibilità
               const pianoMigrato = {};
               for (const key in dati.piano) {
-                if (typeof dati.piano[key] === 'string') {
-                  pianoMigrato[key] = { id: dati.piano[key], istruttore: '' };
-                } else {
-                  pianoMigrato[key] = dati.piano[key];
-                }
+                pianoMigrato[key] = formatCellData(dati.piano[key]);
               }
               setPiano(pianoMigrato);
             }
-            if (dati.attivita) setAttivita(dati.attivita);
           } catch (error) {
             console.error("Errore nell'importazione:", error);
             setStatoSalvataggio('error');
@@ -388,7 +407,6 @@
           }
         };
         reader.readAsText(file);
-        // Reset dell'input
         event.target.value = null;
       };
 
@@ -416,7 +434,7 @@
       const handleLogout = async () => {
         if (firebaseInstances && firebaseInstances.auth) {
             await firebaseInstances.signOut(firebaseInstances.auth);
-            setPiano({}); // Svuota la vasca alla disconnessione per sicurezza
+            setPiano({});
         }
       };
 
@@ -446,9 +464,7 @@
                         <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
                         <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" placeholder="••••••••" />
                      </div>
-                     
                      {loginError && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{loginError}</div>}
-                     
                      <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg transition-colors mt-2 shadow-sm">
                         Accedi
                      </button>
@@ -458,12 +474,61 @@
          );
       }
 
-      // --- RENDER COMPONENTI ---
       const attivitaCorrente = attivita.find(a => a.id === strumentoAttivo);
 
       return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
           
+          {/* --- MODALE EDIT CORSO --- */}
+          {editModal && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className={`px-4 py-3 flex justify-between items-center text-white ${editModal.infoAttivita?.color.split(' ')[0] || 'bg-slate-500'}`}>
+                  <h3 className="font-bold text-lg">{editModal.infoAttivita?.name}</h3>
+                  <button onClick={() => setEditModal(null)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                </div>
+                <form onSubmit={salvaModificheModal} className="p-5">
+                  
+                  {editModal.infoAttivita?.hasLevels && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Livello del corso</label>
+                      <select 
+                        value={editModal.livello} 
+                        onChange={e => setEditModal({...editModal, livello: e.target.value})}
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      >
+                        <option value="">Nessun livello</option>
+                        {editModal.infoAttivita.levels.map(l => (
+                           <option key={l.val} value={l.val}>Livello {l.val} - {l.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Istruttore</label>
+                    <input 
+                      type="text" 
+                      value={editModal.istruttore} 
+                      onChange={e => setEditModal({...editModal, istruttore: e.target.value})}
+                      placeholder="Cognome istruttore..."
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 justify-end">
+                    <button type="button" onClick={() => setEditModal(null)} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium transition-colors">
+                      Annulla
+                    </button>
+                    <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow-sm transition-colors">
+                      Salva modifiche
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {/* HEADER E CONTROLLI */}
           <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm p-4">
             <div className="max-w-7xl mx-auto">
@@ -471,8 +536,7 @@
                 <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                   🌊 Gestione Piano Vasca
                 </h1>
-                <div className="flex items-center gap-2">
-                  {/* Indicatore visivo di Autosalvataggio */}
+                <div className="flex flex-wrap justify-center items-center gap-2">
                   <div 
                     title="Il salvataggio avviene automaticamente ad ogni modifica"
                     className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -486,26 +550,24 @@
                      statoSalvataggio === 'saved' ? <CheckIcon size={16} /> : 
                      statoSalvataggio === 'error' ? <InfoIcon size={16} /> :
                      <CloudIcon size={16} />}
-                    {statoSalvataggio === 'saving' ? 'Salvataggio...' : 
+                    <span className="hidden sm:inline">{statoSalvataggio === 'saving' ? 'Salvataggio...' : 
                      statoSalvataggio === 'saved' ? 'Salvato!' : 
                      statoSalvataggio === 'error' ? 'Errore Sync' :
-                     'In Sync'}
+                     'In Sync'}</span>
                   </div>
                   <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
                   <button onClick={esportaDati} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors">
-                    <DownloadIcon size={16} /> Esporta
+                    <DownloadIcon size={16} /> <span className="hidden sm:inline">Esporta</span>
                   </button>
                   <label className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium cursor-pointer transition-colors">
-                    <UploadIcon size={16} /> Importa
+                    <UploadIcon size={16} /> <span className="hidden sm:inline">Importa</span>
                     <input type="file" accept=".json" onChange={importaDati} className="hidden" />
                   </label>
                   <button onClick={svuotaPiano} className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-medium transition-colors min-w-[100px] justify-center">
                     <Trash2Icon size={16} /> {confermaSvuota ? "Sicuro?" : "Svuota"}
                   </button>
-
-                  {/* Tasto Logout */}
                   <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
-                  <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci e chiudi sessione">
+                  <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci">
                     <LogOutIcon size={16} />
                   </button>
                 </div>
@@ -513,10 +575,10 @@
 
               {/* BARRA DEGLI STRUMENTI (PENNELI) */}
               <div className="bg-slate-100 p-3 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-4 items-center">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 mr-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-600 mr-2 shrink-0">
                   <span>Tavolozza:</span>
                 </div>
-                <div className="flex flex-wrap gap-2 flex-1">
+                <div className="flex flex-wrap gap-2 flex-1 justify-center md:justify-start">
                   {attivita.map(att => (
                     <button
                       key={att.id}
@@ -530,7 +592,7 @@
                       {att.name}
                     </button>
                   ))}
-                  <div className="w-px h-8 bg-slate-300 mx-2"></div>
+                  <div className="w-px h-8 bg-slate-300 mx-2 hidden sm:block"></div>
                   <button
                     onClick={() => setStrumentoAttivo('gomma')}
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all shadow-sm flex items-center gap-2 border-2 ${
@@ -551,7 +613,7 @@
             
             {/* SELEZIONE GIORNO E ORARI */}
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full sm:w-auto">
                 {GIORNI.map((giorno, idx) => (
                   <button
                     key={giorno}
@@ -590,11 +652,11 @@
               <p>
                 Stai modificando <strong>{GIORNI[giornoSelezionato]}</strong>. 
                 Strumento attivo: <strong className="bg-white px-2 py-0.5 rounded shadow-sm">{strumentoAttivo === 'gomma' ? 'Gomma' : attivitaCorrente?.name}</strong>. 
-                Clicca e trascina per colorare. <strong>Doppio clic</strong> su un corso posizionato per aggiungere/modificare l'istruttore.
+                Clicca e trascina per colorare. <strong>Doppio clic</strong> su un corso per assegnare Istruttore e Livello!
               </p>
             </div>
 
-            {/* GRIGLIA PIANO VASCA */}
+            {/* GRIGLIA PIANO Vasca */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse select-none">
@@ -622,18 +684,17 @@
                         let colSpan = 1;
 
                         if (cellCurrent) {
-                          // Cerca in avanti quante corsie contigue hanno la stessa identica attività E istruttore
                           let lookAheadIdx = idx + 1;
                           while (lookAheadIdx < CORSIE.length) {
                             const cellNext = piano[`${giornoSelezionato}-${fascia.id}-${CORSIE[lookAheadIdx]}`];
-                            if (cellNext && cellNext.id === cellCurrent.id && cellNext.istruttore === cellCurrent.istruttore) {
+                            if (cellNext && cellNext.id === cellCurrent.id && cellNext.istruttore === cellCurrent.istruttore && cellNext.livello === cellCurrent.livello) {
                               colSpan++;
                               lookAheadIdx++;
                             } else {
                               break;
                             }
                           }
-                          skipUntil = lookAheadIdx - 1; // Salta il rendering delle celle che sono state unite
+                          skipUntil = lookAheadIdx - 1;
                         }
 
                         const infoAttivita = cellCurrent ? attivita.find(a => a.id === cellCurrent.id) : null;
@@ -642,22 +703,28 @@
                           <td 
                             key={corsia} 
                             colSpan={colSpan}
-                            className="border-b border-r border-slate-200 p-1 h-12 cursor-crosshair transition-colors duration-75 relative group"
+                            className="border-b border-r border-slate-200 p-1 h-14 cursor-crosshair transition-colors duration-75 relative group"
                             onMouseDown={() => handleMouseDown(fascia.id, corsia)}
                             onMouseEnter={() => handleMouseEnter(fascia.id, corsia)}
-                            onDoubleClick={() => handleEditIstruttore(fascia.id, corsia)}
+                            onDoubleClick={() => handleDoubleClicCella(fascia.id, corsia)}
                           >
                             <div className={`w-full h-full rounded flex flex-col items-center justify-center p-1 text-center transition-all ${
                               infoAttivita ? infoAttivita.color : 'bg-transparent hover:bg-slate-100'
                             }`}>
                               <span className="text-xs font-semibold">{infoAttivita ? infoAttivita.name : ''}</span>
+                              
+                              {cellCurrent?.livello && (
+                                <span className="text-[10px] font-bold bg-white/30 px-1.5 py-0.5 rounded-full mt-1">
+                                  Liv. {cellCurrent.livello}
+                                </span>
+                              )}
+
                               {cellCurrent?.istruttore && (
                                 <span className="text-[10px] font-medium opacity-90 truncate w-full max-w-full px-1 mt-0.5">
                                   {cellCurrent.istruttore}
                                 </span>
                               )}
                             </div>
-                            {/* Hint visivo al passaggio del mouse se cella vuota */}
                             {!infoAttivita && strumentoAttivo !== 'gomma' && (
                                <div className="absolute inset-1 rounded bg-slate-200 opacity-0 group-hover:opacity-30 pointer-events-none transition-opacity"></div>
                             )}
