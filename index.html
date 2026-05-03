@@ -84,7 +84,18 @@
           {val: '1', name: 'Principianti'}, {val: '2', name: 'Intermedi'}, {val: '3', name: 'Avanzati'}
         ]
       },
-      { id: 'acquagym', name: 'Acquagym', color: 'bg-fuchsia-500 text-white', border: 'border-fuchsia-600' },
+      { 
+        id: 'acquagym', 
+        name: 'Aquafitness', 
+        color: 'bg-fuchsia-500 text-white', 
+        border: 'border-fuchsia-600',
+        hasLevels: true,
+        levels: [
+          {val: '1', name: 'Aquagym'}, {val: '2', name: 'Aquabike'}, {val: '3', name: 'Aquacross'}, 
+          {val: '4', name: 'AquaHiit'}, {val: '5', name: 'AquaCircuit'}, {val: '6', name: 'AquaGAG'}, 
+          {val: '7', name: 'AquaThai'}, {val: '8', name: 'AquaFit'}
+        ]
+      },
       { id: 'propaganda', name: 'Propaganda', color: 'bg-purple-600 text-white', border: 'border-purple-700' },
       { id: 'privato', name: 'Lez. Privata', color: 'bg-yellow-300 text-yellow-900', border: 'border-yellow-400' },
     ];
@@ -521,9 +532,11 @@
 
                     {attivita.find(a => a.id === nuovoCorso.attivitaId)?.hasLevels && (
                       <div className="mb-5">
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Livello</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                          {nuovoCorso.attivitaId === 'acquagym' ? 'Sottocategoria' : 'Livello'}
+                        </label>
                         <select value={nuovoCorso.livello} onChange={e => setNuovoCorso({...nuovoCorso, livello: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
-                          <option value="">Nessun livello</option>
+                          <option value="">Nessuna selezione</option>
                           {attivita.find(a => a.id === nuovoCorso.attivitaId).levels.map(l => <option key={l.val} value={l.val}>{l.name}</option>)}
                         </select>
                       </div>
@@ -597,9 +610,11 @@
 
                     {attivita.find(a => a.id === editModal.attivitaId)?.hasLevels && (
                       <div className="mb-5">
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Livello</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                          {editModal.attivitaId === 'acquagym' ? 'Sottocategoria' : 'Livello'}
+                        </label>
                         <select value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
-                          <option value="">Nessun livello</option>
+                          <option value="">Nessuna selezione</option>
                           {attivita.find(a => a.id === editModal.attivitaId).levels.map(l => <option key={l.val} value={l.val}>{l.name}</option>)}
                         </select>
                       </div>
@@ -776,7 +791,7 @@
                                                 <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden p-1 text-center">
                                                   {nomeLivello ? (
                                                     <span className={`${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-1`}>
-                                                      Liv. {corso.data.livello} - {nomeLivello}
+                                                      {corso.data.id === 'acquagym' ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
                                                     </span>
                                                   ) : (
                                                     <span className={`${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-1`}>
