@@ -769,21 +769,15 @@
                                             <div 
                                                 key={i}
                                                 onDoubleClick={(e) => handleDoubleClickCorso(e, corso)}
-                                                className={`absolute z-10 left-0 rounded-lg p-1 flex flex-col items-center justify-center text-center shadow-md cursor-pointer hover:brightness-95 hover:shadow-lg transition-all overflow-hidden border border-white/20 ${infoAttivita?.color || 'bg-slate-500 text-white'}`}
+                                                className={`absolute z-10 left-0 rounded-lg flex flex-col shadow-md cursor-pointer hover:brightness-95 hover:shadow-lg transition-all overflow-hidden border border-white/20 ${infoAttivita?.color || 'bg-slate-500 text-white'}`}
                                                 style={{ top: `${topOffset}px`, height: `${altezzaPX}px`, width: larghezzaCalc, minHeight: '24px' }}
                                             >
-                                                <div className="flex flex-col items-center justify-center w-full h-full overflow-hidden">
+                                                {/* Corpo Centrale (Livello/Nome e Istruttore) */}
+                                                <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden p-1 text-center">
                                                   {nomeLivello ? (
-                                                    <>
-                                                      <span className={`${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-1`}>
-                                                        Liv. {corso.data.livello} - {nomeLivello}
-                                                      </span>
-                                                      {corso.durata > 30 && (
-                                                        <span className="text-[10px] font-bold bg-white/30 px-2 py-0.5 rounded-full mt-1 truncate max-w-full">
-                                                          {infoAttivita ? infoAttivita.name : ''}
-                                                        </span>
-                                                      )}
-                                                    </>
+                                                    <span className={`${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-1`}>
+                                                      Liv. {corso.data.livello} - {nomeLivello}
+                                                    </span>
                                                   ) : (
                                                     <span className={`${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-1`}>
                                                       {infoAttivita ? infoAttivita.name : ''}
@@ -791,17 +785,19 @@
                                                   )}
 
                                                   {corso.data.istruttore && (
-                                                    <span className={`${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-semibold truncate w-full px-1 mt-1 text-white/95`}>
+                                                    <span className={`${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-semibold truncate w-full px-1 mt-0.5 text-white/95`}>
                                                       {corso.data.istruttore}
                                                     </span>
                                                   )}
-
-                                                  {corso.durata >= 45 && (
-                                                    <span className="text-[10px] font-bold bg-white/30 px-2 py-0.5 rounded-full mt-1.5 inline-block truncate max-w-full">
-                                                      ⏱ {corso.durata} min
-                                                    </span>
-                                                  )}
                                                 </div>
+
+                                                {/* Banner Inferiore (Mostrato solo se c'è spazio: > 30 min) */}
+                                                {corso.durata > 30 && (
+                                                  <div className="w-full bg-black/10 border-t border-white/30 py-0.5 px-2 flex justify-between items-center text-[10px] font-medium shrink-0">
+                                                    <span className="truncate pr-1">{nomeLivello ? infoAttivita?.name : ''}</span>
+                                                    <span className="shrink-0">{corso.durata} min</span>
+                                                  </div>
+                                                )}
                                             </div>
                                         )
                                     })}
