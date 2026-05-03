@@ -767,11 +767,11 @@
                                                 <div className="flex flex-col items-center justify-center w-full h-full overflow-hidden">
                                                   {nomeLivello ? (
                                                     <>
-                                                      <span className={`${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-1`}>Liv. {corso.data.livello} - {nomeLivello}</span>
+                                                      <span className="text-xs font-bold leading-tight truncate w-full px-1">Liv. {corso.data.livello} - {nomeLivello}</span>
                                                       {corso.durata > 30 && <span className="text-[10px] font-bold bg-white/30 px-1.5 py-0.5 rounded-full mt-0.5 truncate max-w-full leading-none">{infoAttivita ? infoAttivita.name : ''}</span>}
                                                     </>
                                                   ) : (
-                                                    <span className={`${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold truncate w-full px-1`}>{infoAttivita ? infoAttivita.name : ''}</span>
+                                                    <span className="text-xs font-bold truncate w-full px-1">{infoAttivita ? infoAttivita.name : ''}</span>
                                                   )}
 
                                                   {corso.durata >= 45 && (
