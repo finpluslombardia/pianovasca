@@ -109,6 +109,7 @@
 
     function App() {
       // --- STATO DELL'APPLICAZIONE ---
+      const [vascaSelezionata, setVascaSelezionata] = useState('interna'); // 'interna' o 'esterna'
       const [giornoSelezionato, setGiornoSelezionato] = useState(0);
       const [piano, setPiano] = useState({}); 
       const [attivita, setAttivita] = useState(ATTIVITA_DI_BASE);
@@ -118,6 +119,7 @@
       // --- STATI AGGIUNTA CORSO ---
       const [isAddModalOpen, setIsAddModalOpen] = useState(false);
       const [nuovoCorso, setNuovoCorso] = useState({
+          vasca: 'interna',
           giorno: 0,
           oraInizio: '06:30',
           durata: 40,
@@ -212,7 +214,14 @@
             const data = docSnap.data();
             if (data.piano) {
               const pianoMigrato = {};
-              for (const key in data.piano) pianoMigrato[key] = formatCellData(data.piano[key]);
+              for (const key in data.piano) {
+                let newKey = key;
+                // Migrazione vecchi dati per associarli di default alla vasca interna
+                if (!key.startsWith('interna-') && !key.startsWith('esterna-')) {
+                  newKey = `interna-${key}`;
+                }
+                pianoMigrato[newKey] = formatCellData(data.piano[key]);
+              }
               lastSavedPiano.current = JSON.stringify(pianoMigrato);
               setPiano(pianoMigrato);
             }
@@ -287,25 +296,24 @@
       }, [intervallo]);
 
       // --- LOGICA RICOSTRUZIONE ASSOLUTA CORSI ---
-      // Estrapola dal DB i blocchi "reali" per posizionarli graficamente in modo assoluto
       const corsiOggi = useMemo(() => {
           const corsi = [];
           
           CORSIE.forEach(corsia => {
-              const keys = Object.keys(piano).filter(k => k.startsWith(`${giornoSelezionato}-`) && k.endsWith(`-${corsia}`));
-              keys.sort((a, b) => a.split('-')[1].localeCompare(b.split('-')[1]));
+              // Filtra solo per la vasca selezionata e il giorno selezionato (es: 'interna-0-...')
+              const keys = Object.keys(piano).filter(k => k.startsWith(`${vascaSelezionata}-${giornoSelezionato}-`) && k.endsWith(`-${corsia}`));
+              keys.sort((a, b) => a.split('-')[2].localeCompare(b.split('-')[2])); // timeStr è l'indice 2
 
               let currentCourseEndMin = -1;
               let currentCourse = null;
 
               keys.forEach(k => {
-                  const timeStr = k.split('-')[1];
+                  const timeStr = k.split('-')[2];
                   const [h, m] = timeStr.split(':').map(Number);
                   const startMin = h * 60 + m;
                   const cell = piano[k];
                   const durata = cell.durata || 45; 
                   
-                  // Gestisce blocchi legacy contigui
                   if (startMin < currentCourseEndMin && isSameCourse(cell, currentCourse.data)) {
                       currentCourse.keys.push(k);
                       currentCourseEndMin = Math.max(currentCourseEndMin, startMin + durata);
@@ -325,7 +333,6 @@
               });
           });
 
-          // Unisci le corsie contigue in un unico grande box
           const corsiUnici = [];
           const byStartMin = {};
           corsi.forEach(c => {
@@ -344,7 +351,7 @@
                       if (isSameCourse(g.data, c.data) && g.durata === c.durata) {
                           const lastCorsiaIdx = CORSIE.indexOf(g.corsie[g.corsie.length - 1]);
                           const myCorsiaIdx = CORSIE.indexOf(c.corsia);
-                          if (myCorsiaIdx === lastCorsiaIdx + 1) { // Verifica la contiguità
+                          if (myCorsiaIdx === lastCorsiaIdx + 1) { 
                               g.corsie.push(c.corsia);
                               g.keys.push(...c.keys);
                               placed = true;
@@ -367,7 +374,7 @@
           });
 
           return corsiUnici;
-      }, [piano, giornoSelezionato]);
+      }, [piano, giornoSelezionato, vascaSelezionata]);
 
       // --- LOGICA AGGIUNTA NUOVO CORSO ---
       const salvaNuovoCorso = (e) => {
@@ -378,9 +385,8 @@
         }
         setPiano(prev => {
             const nuovoPiano = { ...prev };
-            // Salviamo solo la prima chiave per corsia. La grafica e il ricostruttore faranno il resto!
             nuovoCorso.corsie.forEach(c => {
-                nuovoPiano[`${nuovoCorso.giorno}-${nuovoCorso.oraInizio}-${c}`] = { 
+                nuovoPiano[`${nuovoCorso.vasca}-${nuovoCorso.giorno}-${nuovoCorso.oraInizio}-${c}`] = { 
                     id: nuovoCorso.attivitaId, 
                     istruttore: nuovoCorso.istruttore.trim(), 
                     livello: nuovoCorso.livello,
@@ -391,15 +397,17 @@
             return nuovoPiano;
         });
         setIsAddModalOpen(false);
-        setNuovoCorso(prev => ({...prev, corsie: [], istruttore: '', livello: '', maxUtenti: ''}));
+        setNuovoCorso(prev => ({...prev, corsie: [], istruttore: '', livello: '', maxUtenti: '', vasca: vascaSelezionata}));
       };
 
       // --- LOGICA MODIFICA/ELIMINA CORSO ---
       const handleDoubleClickCorso = (e, corso) => {
         e.stopPropagation();
         const info = attivita.find(a => a.id === corso.data.id);
+        const vascaOriginale = corso.keys[0].split('-')[0];
         setEditModal({
           corsoOriginale: corso,
+          vasca: vascaOriginale,
           attivitaId: corso.data.id,
           giorno: giornoSelezionato,
           oraInizio: corso.oraInizio,
@@ -423,7 +431,7 @@
           
           // 2. Crea il corso con i nuovi dati
           editModal.corsie.forEach(c => {
-              nuovoPiano[`${editModal.giorno}-${editModal.oraInizio}-${c}`] = { 
+              nuovoPiano[`${editModal.vasca}-${editModal.giorno}-${editModal.oraInizio}-${c}`] = { 
                   id: editModal.attivitaId, 
                   istruttore: editModal.istruttore.trim(), 
                   livello: editModal.livello,
@@ -464,7 +472,13 @@
             const dati = JSON.parse(e.target.result);
             if (dati.piano) {
               const pianoMigrato = {};
-              for (const key in dati.piano) pianoMigrato[key] = formatCellData(dati.piano[key]);
+              for (const key in dati.piano) {
+                let newKey = key;
+                if (!key.startsWith('interna-') && !key.startsWith('esterna-')) {
+                  newKey = `interna-${key}`;
+                }
+                pianoMigrato[newKey] = formatCellData(dati.piano[key]);
+              }
               setPiano(pianoMigrato);
             }
           } catch (error) { console.error("Errore importazione:", error); }
@@ -546,6 +560,14 @@
                         </select>
                       </div>
                     )}
+
+                    <div className="mb-5">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
+                      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                        <button type="button" onClick={() => setNuovoCorso({...nuovoCorso, vasca: 'interna'})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${nuovoCorso.vasca === 'interna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Interna</button>
+                        <button type="button" onClick={() => setNuovoCorso({...nuovoCorso, vasca: 'esterna'})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${nuovoCorso.vasca === 'esterna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Esterna</button>
+                      </div>
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4 mb-5">
                       <div>
@@ -643,6 +665,14 @@
                       </div>
                     )}
 
+                    <div className="mb-5">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
+                      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                        <button type="button" onClick={() => setEditModal({...editModal, vasca: 'interna'})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'interna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Interna</button>
+                        <button type="button" onClick={() => setEditModal({...editModal, vasca: 'esterna'})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'esterna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Esterna</button>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4 mb-5">
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Giorno</label>
@@ -723,7 +753,7 @@
                 
                 <button 
                   onClick={() => {
-                    setNuovoCorso(prev => ({...prev, giorno: giornoSelezionato, oraInizio: '06:30', isCustomDurata: false}));
+                    setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorno: giornoSelezionato, oraInizio: '06:30'}));
                     setIsAddModalOpen(true);
                   }}
                   className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-lg transform hover:scale-105"
@@ -749,12 +779,29 @@
 
           <main className="flex-1 w-full mx-auto p-4 md:p-6 flex flex-col gap-6">
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full md:w-auto">
-                {GIORNI.map((giorno, idx) => (
-                  <button key={giorno} onClick={() => setGiornoSelezionato(idx)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === idx ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
-                    {giorno}
-                  </button>
-                ))}
+              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center w-full md:w-auto overflow-hidden">
+                  <div className="flex bg-slate-200/60 p-1.5 rounded-xl shrink-0">
+                    <button
+                      onClick={() => setVascaSelezionata('interna')}
+                      className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${vascaSelezionata === 'interna' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Vasca Interna
+                    </button>
+                    <button
+                      onClick={() => setVascaSelezionata('esterna')}
+                      className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${vascaSelezionata === 'esterna' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      Vasca Esterna
+                    </button>
+                  </div>
+                  
+                  <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide w-full md:w-auto">
+                    {GIORNI.map((giorno, idx) => (
+                      <button key={giorno} onClick={() => setGiornoSelezionato(idx)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === idx ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
+                        {giorno}
+                      </button>
+                    ))}
+                  </div>
               </div>
 
               <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm shrink-0">
@@ -771,7 +818,7 @@
 
             <div className="bg-blue-50 text-blue-800 p-3 rounded-lg flex items-center gap-3 text-sm border border-blue-100">
               <InfoIcon size={18} className="text-blue-500 shrink-0" />
-              <p>Stai visualizzando <strong>{GIORNI[giornoSelezionato]}</strong>. Clicca <strong>Aggiungi Corso</strong> per inserire una nuova attività o fai <strong>doppio clic</strong> su una cella vuota della griglia. Fai doppio clic su un corso per modificarlo.</p>
+              <p>Stai visualizzando la <strong>Vasca {vascaSelezionata === 'interna' ? 'Interna' : 'Esterna'}</strong> di <strong>{GIORNI[giornoSelezionato]}</strong>. Clicca <strong>Aggiungi Corso</strong> per inserire una nuova attività o fai <strong>doppio clic</strong> su una cella vuota della griglia.</p>
             </div>
 
             {/* GRIGLIA ASSOLUTA */}
@@ -808,7 +855,7 @@
                                     className="border-b border-r border-slate-200 relative p-0 cursor-pointer hover:bg-blue-50/30 transition-colors" 
                                     style={{ minWidth: '120px' }}
                                     onDoubleClick={() => {
-                                        setNuovoCorso(prev => ({...prev, giorno: giornoSelezionato, oraInizio: fascia.id, corsie: [corsia], isCustomDurata: false}));
+                                        setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorno: giornoSelezionato, oraInizio: fascia.id, corsie: [corsia]}));
                                         setIsAddModalOpen(true);
                                     }}
                                 >
