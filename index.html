@@ -111,9 +111,15 @@
 
     function App() {
       // --- STATO DELL'APPLICAZIONE ---
+      const [stagioni, setStagioni] = useState(['2025/2026']);
+      const [stagioneSelezionata, setStagioneSelezionata] = useState('2025/2026');
+      const [tuttiPiani, setTuttiPiani] = useState({ '2025/2026': {} });
+      
+      // Il piano corrente deriva dalla stagione selezionata
+      const piano = tuttiPiani[stagioneSelezionata] || {};
+
       const [vascaSelezionata, setVascaSelezionata] = useState('interna'); // 'interna' o 'esterna'
       const [giornoSelezionato, setGiornoSelezionato] = useState(0);
-      const [piano, setPiano] = useState({}); 
       const [attivita, setAttivita] = useState(ATTIVITA_DI_BASE);
       const [intervallo, setIntervallo] = useState(30); 
       const [editModal, setEditModal] = useState(null); 
@@ -214,18 +220,35 @@
         const unsubscribe = onSnapshot(docRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
-            if (data.piano) {
+            
+            // Nuovo formato con gestione Stagioni multiple
+            if (data.tuttiPiani) {
+              setTuttiPiani(data.tuttiPiani);
+              if (data.stagioni && data.stagioni.length > 0) {
+                 setStagioni(data.stagioni);
+                 // Seleziona la prima stagione caricata solo se non ne abbiamo una attiva
+                 if (!data.stagioni.includes(stagioneSelezionata)) {
+                    setStagioneSelezionata(data.stagioni[0]);
+                 }
+              }
+              lastSavedPiano.current = JSON.stringify(data.tuttiPiani);
+            } 
+            // Migrazione automatica dal vecchio formato singolo a Stagioni
+            else if (data.piano) {
               const pianoMigrato = {};
               for (const key in data.piano) {
                 let newKey = key;
-                // Migrazione vecchi dati per associarli di default alla vasca interna
                 if (!key.startsWith('interna-') && !key.startsWith('esterna-')) {
                   newKey = `interna-${key}`;
                 }
                 pianoMigrato[newKey] = formatCellData(data.piano[key]);
               }
-              lastSavedPiano.current = JSON.stringify(pianoMigrato);
-              setPiano(pianoMigrato);
+              const defaultSeason = '2025/2026';
+              const initialTuttiPiani = { [defaultSeason]: pianoMigrato };
+              setTuttiPiani(initialTuttiPiani);
+              setStagioni([defaultSeason]);
+              setStagioneSelezionata(defaultSeason);
+              lastSavedPiano.current = JSON.stringify(initialTuttiPiani);
             }
           }
         }, (error) => console.error("Errore sync Cloud:", error));
@@ -233,7 +256,7 @@
       }, [user, firebaseInstances]);
 
       // --- FUNZIONE DI SALVATAGGIO CLOUD ---
-      const salvaInCloud = async (pianoDaSalvare) => {
+      const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare) => {
         if (!user || !firebaseInstances) {
             setStatoSalvataggio('error');
             setTimeout(() => setStatoSalvataggio('idle'), 4000);
@@ -243,8 +266,8 @@
         try {
             const { db, appId, doc, setDoc } = firebaseInstances;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
-            await setDoc(docRef, { piano: pianoDaSalvare, updatedAt: new Date().toISOString() });
-            lastSavedPiano.current = JSON.stringify(pianoDaSalvare); 
+            await setDoc(docRef, { tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, updatedAt: new Date().toISOString() });
+            lastSavedPiano.current = JSON.stringify(pianiDaSalvare); 
             setStatoSalvataggio('saved');
             setTimeout(() => setStatoSalvataggio('idle'), 3000);
         } catch (error) {
@@ -255,11 +278,11 @@
 
       useEffect(() => {
         if (!user || !firebaseInstances) return;
-        const currentPianoStr = JSON.stringify(piano);
+        const currentPianoStr = JSON.stringify(tuttiPiani);
         if (currentPianoStr === lastSavedPiano.current) return; 
-        const timer = setTimeout(() => salvaInCloud(piano), 1500);
+        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni), 1500);
         return () => clearTimeout(timer);
-      }, [piano, user, firebaseInstances]);
+      }, [tuttiPiani, stagioni, user, firebaseInstances]);
 
       // --- CALCOLATORI DI TEMPO E VISTE ---
       const TIME_OPTIONS = useMemo(() => {
@@ -303,7 +326,7 @@
           const corsi = [];
           
           activeCorsie.forEach(corsia => {
-              // Filtra solo per la vasca selezionata e il giorno selezionato (es: 'interna-0-...')
+              // Filtra solo per la vasca selezionata e il giorno selezionato
               const keys = Object.keys(piano).filter(k => k.startsWith(`${vascaSelezionata}-${giornoSelezionato}-`) && k.endsWith(`-${corsia}`));
               keys.sort((a, b) => a.split('-')[2].localeCompare(b.split('-')[2])); // timeStr è l'indice 2
 
@@ -386,8 +409,11 @@
             alert("Seleziona almeno una corsia!");
             return;
         }
-        setPiano(prev => {
-            const nuovoPiano = { ...prev };
+        
+        setTuttiPiani(prevTutti => {
+            const prevSeason = prevTutti[stagioneSelezionata] || {};
+            const nuovoPiano = { ...prevSeason };
+            
             nuovoCorso.corsie.forEach(c => {
                 nuovoPiano[`${nuovoCorso.vasca}-${nuovoCorso.giorno}-${nuovoCorso.oraInizio}-${c}`] = { 
                     id: nuovoCorso.attivitaId, 
@@ -397,8 +423,9 @@
                     maxUtenti: nuovoCorso.maxUtenti ? Number(nuovoCorso.maxUtenti) : ''
                 };
             });
-            return nuovoPiano;
+            return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
         });
+
         setIsAddModalOpen(false);
         setNuovoCorso(prev => ({...prev, corsie: [], istruttore: '', livello: '', maxUtenti: '', vasca: vascaSelezionata}));
       };
@@ -427,8 +454,10 @@
         e.preventDefault();
         if (editModal.corsie.length === 0) return alert("Seleziona almeno una corsia!");
         
-        setPiano(prev => {
-          const nuovoPiano = { ...prev };
+        setTuttiPiani(prevTutti => {
+          const prevSeason = prevTutti[stagioneSelezionata] || {};
+          const nuovoPiano = { ...prevSeason };
+          
           // 1. Elimina le chiavi vecchie/legacy associate a questo corso
           editModal.corsoOriginale.keys.forEach(k => delete nuovoPiano[k]);
           
@@ -442,27 +471,28 @@
                   maxUtenti: editModal.maxUtenti ? Number(editModal.maxUtenti) : ''
               };
           });
-          return nuovoPiano;
+          return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
         });
         setEditModal(null);
       };
 
       const eliminaCorsoModal = () => {
-        setPiano(prev => {
-          const nuovoPiano = { ...prev };
+        setTuttiPiani(prevTutti => {
+          const prevSeason = prevTutti[stagioneSelezionata] || {};
+          const nuovoPiano = { ...prevSeason };
           editModal.corsoOriginale.keys.forEach(k => delete nuovoPiano[k]);
-          return nuovoPiano;
+          return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
         });
         setEditModal(null);
       };
 
       // --- FUNZIONI CARICAMENTO FILE ---
       const esportaDati = () => {
-        const dataStr = JSON.stringify({ piano, attivita: ATTIVITA_DI_BASE }, null, 2);
+        const dataStr = JSON.stringify({ tuttiPiani, stagioni, attivita: ATTIVITA_DI_BASE }, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = url; link.download = "mio_piano_vasca.json"; link.click();
+        link.href = url; link.download = `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}.json`; link.click();
         URL.revokeObjectURL(url);
       };
 
@@ -473,7 +503,11 @@
         reader.onload = (e) => {
           try {
             const dati = JSON.parse(e.target.result);
-            if (dati.piano) {
+            if (dati.tuttiPiani) {
+              setTuttiPiani(dati.tuttiPiani);
+              setStagioni(dati.stagioni || Object.keys(dati.tuttiPiani));
+              if (dati.stagioni && dati.stagioni.length > 0) setStagioneSelezionata(dati.stagioni[0]);
+            } else if (dati.piano) {
               const pianoMigrato = {};
               for (const key in dati.piano) {
                 let newKey = key;
@@ -482,7 +516,7 @@
                 }
                 pianoMigrato[newKey] = formatCellData(dati.piano[key]);
               }
-              setPiano(pianoMigrato);
+              setTuttiPiani(prev => ({ ...prev, [stagioneSelezionata]: pianoMigrato }));
             }
           } catch (error) { console.error("Errore importazione:", error); }
         };
@@ -496,7 +530,7 @@
           setTimeout(() => setConfermaSvuota(false), 3000);
           return;
         }
-        setPiano({});
+        setTuttiPiani(prev => ({ ...prev, [stagioneSelezionata]: {} }));
         setConfermaSvuota(false);
       };
 
@@ -509,7 +543,11 @@
         } catch (error) { setLoginError("Email o password errati."); }
       };
       const handleLogout = async () => {
-        if (firebaseInstances?.auth) { await firebaseInstances.signOut(firebaseInstances.auth); setPiano({}); }
+        if (firebaseInstances?.auth) { 
+          await firebaseInstances.signOut(firebaseInstances.auth); 
+          setTuttiPiani({ '2025/2026': {} }); 
+          setStagioni(['2025/2026']);
+        }
       };
 
       if (isAuthLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><LoaderIcon size={48} className="text-blue-500" /></div>;
@@ -750,9 +788,39 @@
           <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm p-4">
             <div className="w-full mx-auto">
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 shrink-0">
-                  🌊 Gestione Piano Vasca
-                </h1>
+                
+                {/* TITOLO E SELETTORE STAGIONE */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 shrink-0 w-full md:w-auto">
+                  <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 shrink-0">
+                    🌊 Gestione Piano Vasca
+                  </h1>
+                  
+                  <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 w-full sm:w-auto">
+                    <span className="text-sm font-semibold text-slate-500">Stagione:</span>
+                    <select
+                      value={stagioneSelezionata}
+                      onChange={(e) => {
+                          if (e.target.value === 'NUOVA') {
+                              const nome = prompt("Inserisci il nome della nuova stagione (es. 2026/2027):");
+                              if (nome && nome.trim() !== '') {
+                                  const cleanName = nome.trim();
+                                  if (!stagioni.includes(cleanName)) {
+                                      setStagioni([...stagioni, cleanName]);
+                                      setTuttiPiani(prev => ({ ...prev, [cleanName]: {} }));
+                                  }
+                                  setStagioneSelezionata(cleanName);
+                              }
+                          } else {
+                              setStagioneSelezionata(e.target.value);
+                          }
+                      }}
+                      className="bg-transparent font-bold text-sm text-blue-600 outline-none cursor-pointer flex-1"
+                    >
+                      {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
+                      <option value="NUOVA" className="font-bold">+ Crea nuova...</option>
+                    </select>
+                  </div>
+                </div>
                 
                 <button 
                   onClick={() => {
@@ -821,7 +889,7 @@
 
             <div className="bg-blue-50 text-blue-800 p-3 rounded-lg flex items-center gap-3 text-sm border border-blue-100">
               <InfoIcon size={18} className="text-blue-500 shrink-0" />
-              <p>Stai visualizzando la <strong>Vasca {vascaSelezionata === 'interna' ? 'Interna' : 'Esterna'}</strong> di <strong>{GIORNI[giornoSelezionato]}</strong>. Clicca <strong>Aggiungi Corso</strong> per inserire una nuova attività o fai <strong>doppio clic</strong> su una cella vuota della griglia.</p>
+              <p>Stai visualizzando la <strong>Stagione {stagioneSelezionata}</strong> (<strong>Vasca {vascaSelezionata === 'interna' ? 'Interna' : 'Esterna'}</strong> - <strong>{GIORNI[giornoSelezionato]}</strong>). Clicca <strong>Aggiungi Corso</strong> per inserire una nuova attività.</p>
             </div>
 
             {/* GRIGLIA ASSOLUTA */}
