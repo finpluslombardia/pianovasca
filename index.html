@@ -820,39 +820,39 @@
                                                                   <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden p-0.5 text-center">
                                                                     {nomeLivello ? (
                                                                       <>
-                                                                        <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                        <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-0.5`}>
                                                                           {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
                                                                         </span>
-                                                                        <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-[11px]'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                        <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[11px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
                                                                           {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? livelloBrev : `L${corso.data.livello}-${livelloBrev}`}
                                                                         </span>
                                                                       </>
                                                                     ) : (
                                                                       <>
-                                                                        <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                        <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-0.5`}>
                                                                           {infoAttivita ? infoAttivita.name : ''}
                                                                         </span>
-                                                                        <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-[11px]'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                        <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[11px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
                                                                           {nomeBrev}
                                                                         </span>
                                                                       </>
                                                                     )}
 
                                                                     {corso.data.istruttore && (
-                                                                      <span className={`${corso.durata <= 30 ? 'text-[9px]' : 'text-[10px]'} font-semibold truncate w-full px-0.5 mt-0.5 text-white/95`}>
+                                                                      <span className={`${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-semibold truncate w-full px-0.5 mt-0.5 text-white/95`}>
                                                                         {corso.data.istruttore}
                                                                       </span>
                                                                     )}
                                                                   </div>
 
                                                                   {corso.durata > 30 && (
-                                                                    <div className="w-full bg-black/10 border-t border-white/30 py-0.5 px-1 flex justify-between items-center text-[9px] font-medium shrink-0">
+                                                                    <div className="w-full bg-black/10 border-t border-white/30 py-0.5 px-1.5 flex justify-between items-center text-[11px] font-medium shrink-0">
                                                                       <span className="truncate pr-1 hide-on-pdf">{nomeLivello ? infoAttivita?.name : ''}</span>
                                                                       <span className="truncate pr-1 show-on-pdf">{nomeLivello ? nomeBrev : ''}</span>
                                                                       <div className="flex items-center gap-1 shrink-0">
                                                                         {corso.data.maxUtenti && (
                                                                           <span className="flex items-center gap-0.5" title={`Max ${corso.data.maxUtenti} utenti`}>
-                                                                            <UsersIcon size={8} /> {corso.data.maxUtenti}
+                                                                            <UsersIcon size={10} /> {corso.data.maxUtenti}
                                                                           </span>
                                                                         )}
                                                                         <span className="shrink-0">{corso.durata}'</span>
