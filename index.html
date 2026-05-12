@@ -100,6 +100,7 @@
         ]
       },
       { id: 'propaganda', name: 'Propaganda', color: 'bg-purple-600 text-white', border: 'border-purple-700' },
+      { id: 'societa', name: 'Società', color: 'bg-orange-500 text-white', border: 'border-orange-600', isFreeTextLevel: true },
       { id: 'privato', name: 'Lez. Privata', color: 'bg-yellow-300 text-yellow-900', border: 'border-yellow-400' },
     ];
 
@@ -601,6 +602,15 @@
                         </select>
                       </div>
                     )}
+                    
+                    {attivita.find(a => a.id === nuovoCorso.attivitaId)?.isFreeTextLevel && (
+                      <div className="mb-5">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                          Nome Società
+                        </label>
+                        <input type="text" value={nuovoCorso.livello} onChange={e => setNuovoCorso({...nuovoCorso, livello: e.target.value})} placeholder="Es. Nuoto Club" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
+                      </div>
+                    )}
 
                     <div className="mb-5">
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
@@ -703,6 +713,15 @@
                           <option value="">Nessuna selezione</option>
                           {attivita.find(a => a.id === editModal.attivitaId).levels.map(l => <option key={l.val} value={l.val}>{l.name}</option>)}
                         </select>
+                      </div>
+                    )}
+                    
+                    {attivita.find(a => a.id === editModal.attivitaId)?.isFreeTextLevel && (
+                      <div className="mb-5">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                          Nome Società
+                        </label>
+                        <input type="text" value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} placeholder="Es. Nuoto Club" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
                       </div>
                     )}
 
@@ -933,7 +952,7 @@
                                 >
                                     {corsiInCella.map((corso, i) => {
                                         const infoAttivita = attivita.find(a => a.id === corso.data.id);
-                                        const nomeLivello = infoAttivita?.levels?.find(l => l.val === corso.data.livello)?.name;
+                                        const nomeLivello = infoAttivita?.isFreeTextLevel ? corso.data.livello : infoAttivita?.levels?.find(l => l.val === corso.data.livello)?.name;
                                         
                                         // Posizionamento al Pixel (1 minuto = 2 pixel)
                                         const topOffset = (corso.startMin - fasciaStartMin) * 2;
@@ -951,7 +970,7 @@
                                                 <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden p-1 text-center">
                                                   {nomeLivello ? (
                                                     <span className={`${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-1`}>
-                                                      {corso.data.id === 'acquagym' ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
+                                                      {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
                                                     </span>
                                                   ) : (
                                                     <span className={`${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-1`}>
