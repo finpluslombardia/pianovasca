@@ -33,7 +33,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useEffect, useMemo, useRef } = React;
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
     // --- COMPONENTI ICONE ---
     const Icon = ({ children, size = 24, className = "" }) => (
@@ -326,13 +326,13 @@
       }, [intervallo]);
 
       // --- LOGICA RICOSTRUZIONE ASSOLUTA CORSI ---
-      const corsiOggi = useMemo(() => {
+      const getCorsiForDay = useCallback((giornoIdx) => {
           const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
           const corsi = [];
           
           activeCorsie.forEach(corsia => {
               // Filtra solo per la vasca selezionata e il giorno selezionato
-              const keys = Object.keys(piano).filter(k => k.startsWith(`${vascaSelezionata}-${giornoSelezionato}-`) && k.endsWith(`-${corsia}`));
+              const keys = Object.keys(piano).filter(k => k.startsWith(`${vascaSelezionata}-${giornoIdx}-`) && k.endsWith(`-${corsia}`));
               keys.sort((a, b) => a.split('-')[2].localeCompare(b.split('-')[2])); // timeStr è l'indice 2
 
               let currentCourseEndMin = -1;
@@ -405,7 +405,11 @@
           });
 
           return corsiUnici;
-      }, [piano, giornoSelezionato, vascaSelezionata]);
+      }, [piano, vascaSelezionata]);
+
+      const corsiOggi = useMemo(() => {
+          return getCorsiForDay(giornoSelezionato);
+      }, [getCorsiForDay, giornoSelezionato]);
 
       // --- LOGICA AGGIUNTA NUOVO CORSO ---
       const salvaNuovoCorso = (e) => {
@@ -502,57 +506,120 @@
         setIsExportMenuOpen(false);
       };
 
-      const esportaCSV = () => {
-        let csv = "Stagione,Vasca,Giorno,Ora Inizio,Durata (min),Corsie,Attivita,Livello/Societa,Istruttore,Max Utenti\n";
-        const pianoCorrente = tuttiPiani[stagioneSelezionata] || {};
-        
-        // Raggruppiamo i corsi che occupano più corsie contemporaneamente
-        const corsiRaggruppati = {};
-        Object.keys(pianoCorrente).forEach(key => {
-            const parts = key.split('-');
-            if(parts.length === 4) {
-                const vasca = parts[0];
-                const giorno = parts[1]; 
-                const ora = parts[2];
-                const corsia = parts[3];
-                const cell = pianoCorrente[key];
-                
-                const groupKey = `${vasca}-${giorno}-${ora}-${cell.id}-${cell.istruttore}-${cell.livello}-${cell.durata}-${cell.maxUtenti}`;
-                if(!corsiRaggruppati[groupKey]) {
-                    corsiRaggruppati[groupKey] = {
-                        vasca, giorno: GIORNI[giorno], ora, 
-                        durata: cell.durata || 45,
-                        corsie: [corsia],
-                        id: cell.id,
-                        livello: cell.livello || '',
-                        istruttore: cell.istruttore || '',
-                        maxUtenti: cell.maxUtenti || ''
-                    };
-                } else {
-                    corsiRaggruppati[groupKey].corsie.push(corsia);
-                }
-            }
+      const esportaExcel = () => {
+        let htmlContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+          <head>
+            <meta charset="utf-8">
+            <style>
+              table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+              th, td { border: 1px solid #ccc; padding: 8px; text-align: center; vertical-align: middle; }
+              th { background-color: #f8fafc; font-weight: bold; }
+            </style>
+          </head>
+          <body>
+        `;
+
+        const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
+
+        const getColor = (colorClass) => {
+            if(colorClass.includes('bg-sky-400')) return '#38bdf8';
+            if(colorClass.includes('bg-green-500')) return '#22c55e';
+            if(colorClass.includes('bg-fuchsia-500')) return '#d946ef';
+            if(colorClass.includes('bg-purple-600')) return '#9333ea';
+            if(colorClass.includes('bg-orange-500')) return '#f97316';
+            if(colorClass.includes('bg-yellow-300')) return '#fde047';
+            if(colorClass.includes('bg-slate-300')) return '#cbd5e1';
+            return '#e2e8f0';
+        };
+
+        const getTextColor = (colorClass) => {
+            if(colorClass.includes('text-white')) return '#ffffff';
+            if(colorClass.includes('text-slate-800')) return '#1e293b';
+            if(colorClass.includes('text-yellow-900')) return '#713f12';
+            return '#000000';
+        };
+
+        GIORNI.forEach((giorno, gIdx) => {
+            const corsiDelGiorno = getCorsiForDay(gIdx);
+            const matrix = Array(fasceOrarie.length).fill(null).map(() => Array(activeCorsie.length).fill(null));
+
+            corsiDelGiorno.forEach(corso => {
+               const startRow = Math.floor((corso.startMin - START_MIN_TOTAL) / intervallo);
+               const rowSpan = Math.max(1, Math.round(corso.durata / intervallo));
+               const colStart = activeCorsie.indexOf(corso.corsie[0]);
+               const colSpan = corso.corsie.length;
+               
+               for(let r=0; r<rowSpan; r++){
+                   for(let c=0; c<colSpan; c++){
+                       if(startRow+r < fasceOrarie.length && colStart+c < activeCorsie.length){
+                           matrix[startRow+r][colStart+c] = { 
+                               corso, 
+                               isTopLeft: (r===0 && c===0),
+                               rowSpan,
+                               colSpan
+                           };
+                       }
+                   }
+               }
+            });
+
+            htmlContent += `
+              <h2>Stagione ${stagioneSelezionata} - Vasca ${vascaSelezionata === 'interna' ? 'Interna' : 'Esterna'} - ${giorno}</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Orario</th>
+                    ${activeCorsie.map(c => `<th>Corsia ${c}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+            `;
+
+            fasceOrarie.forEach((fascia, r) => {
+                htmlContent += `<tr><td>${fascia.label}</td>`;
+                activeCorsie.forEach((corsia, c) => {
+                    const cell = matrix[r][c];
+                    if(!cell) {
+                        htmlContent += `<td></td>`;
+                    } else if(cell.isTopLeft) {
+                        const info = attivita.find(a => a.id === cell.corso.data.id);
+                        const bgColor = getColor(info ? info.color : '');
+                        const textColor = getTextColor(info ? info.color : '');
+                        const nomeLivello = info?.isFreeTextLevel ? cell.corso.data.livello : info?.levels?.find(l => l.val === cell.corso.data.livello)?.name;
+                        
+                        let testoSfondo = '';
+                        if (nomeLivello) testoSfondo += `<b>${(info.id === 'acquagym' || info.isFreeTextLevel) ? nomeLivello : `Liv. ${cell.corso.data.livello} - ${nomeLivello}`}</b><br>`;
+                        else testoSfondo += `<b>${info ? info.name : ''}</b><br>`;
+                        
+                        if(cell.corso.data.istruttore) testoSfondo += `<i>${cell.corso.data.istruttore}</i><br>`;
+                        testoSfondo += `⏱ ${cell.corso.durata} min`;
+                        if(cell.corso.data.maxUtenti) testoSfondo += ` (Max ${cell.corso.data.maxUtenti})`;
+                        
+                        htmlContent += `<td rowspan="${cell.rowSpan}" colspan="${cell.colSpan}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid #ccc;">${testoSfondo}</td>`;
+                    }
+                });
+                htmlContent += `</tr>`;
+            });
+
+            htmlContent += `
+                </tbody>
+              </table>
+              <br><br>
+            `;
         });
 
-        Object.values(corsiRaggruppati).forEach(c => {
-            const attivitaObj = attivita.find(a => a.id === c.id);
-            const nomeAttivita = attivitaObj ? attivitaObj.name : c.id;
-            let livello = c.livello;
-            if(attivitaObj && attivitaObj.levels && !attivitaObj.isFreeTextLevel) {
-                const lvlObj = attivitaObj.levels.find(l => l.val === c.livello);
-                if(lvlObj) livello = lvlObj.name;
-            }
-            const corsieStr = c.corsie.sort().join(' e ');
-            
-            // Fuga dei caratteri per compatibilità con i fogli di calcolo
-            const escape = (str) => `"${String(str).replace(/"/g, '""')}"`;
-            csv += `${escape(stagioneSelezionata)},${escape(c.vasca)},${escape(c.giorno)},${escape(c.ora)},${escape(c.durata)},${escape(corsieStr)},${escape(nomeAttivita)},${escape(livello)},${escape(c.istruttore)},${escape(c.maxUtenti)}\n`;
-        });
+        htmlContent += `
+          </body>
+        </html>
+        `;
 
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = url; link.download = `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}.csv`; link.click();
+        link.href = url; 
+        link.download = `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}_${vascaSelezionata}.xls`; 
+        link.click();
         URL.revokeObjectURL(url);
         setIsExportMenuOpen(false);
       };
@@ -942,7 +1009,7 @@
                     {isExportMenuOpen && (
                       <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 min-w-[220px] flex flex-col">
                         <button onClick={esportaPDF} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📄 Esporta in PDF</button>
-                        <button onClick={esportaCSV} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📊 Esporta in Google Fogli</button>
+                        <button onClick={esportaExcel} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📊 Esporta in Excel / Fogli</button>
                         <div className="h-px bg-slate-200 my-1"></div>
                         <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
                       </div>
