@@ -30,6 +30,10 @@
     .show-on-pdf { display: none !important; }
     .pdf-mode .show-on-pdf { display: inline-block !important; }
     .pdf-mode .hide-on-pdf { display: none !important; }
+    
+    /* Regola aggiuntiva per i blocchi strutturali del PDF */
+    .show-block-on-pdf { display: none !important; }
+    .pdf-mode .show-block-on-pdf { display: block !important; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
@@ -641,33 +645,32 @@
       };
 
       const esportaPDF = () => {
-        const element = document.getElementById('griglia-piano-vasca');
+        const element = document.getElementById('export-wrapper');
         if (!element) return;
         
-        // Aggiungiamo la classe per attivare le abbreviazioni SOLO per il PDF
+        // Aggiungiamo la classe per attivare le abbreviazioni e i layout SOLO per il PDF
         element.classList.add('pdf-mode');
 
         // Salviamo gli stili originali
         const originalWidth = element.style.width;
         const originalMaxWidth = element.style.maxWidth;
         
-        // Impostiamo una larghezza fissa proporzionata a un foglio A4 verticale.
-        // 800px garantisce che tutto entri orizzontalmente, e scalando in altezza rientrerà in max 2 pagine.
-        element.style.width = '800px';
+        // Impostiamo una larghezza fissa proporzionata a un foglio A4 orizzontale
+        element.style.width = '1150px';
         element.style.maxWidth = 'none';
         
         const opt = {
-            margin:       0.3,
+            margin:       0.2, // Margini ridotti per sfruttare tutto il foglio
             filename:     `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}_${vascaSelezionata}_${GIORNI[giornoSelezionato]}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 800 },
-            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
-            // Evita che i box dei corsi vengano tagliati esattamente a metà tra una pagina e l'altra
-            pagebreak:    { mode: 'avoid-all' }
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: 1150 },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }, // Forzato Orizzontale
+            // Abilita la lettura delle classi CSS per le interruzioni di pagina
+            pagebreak:    { mode: ['css', 'legacy'] } 
         };
         
         window.html2pdf().set(opt).from(element).save().then(() => {
-            // Ripristiniamo la larghezza normale e togliamo la modalità PDF per rivedere i testi estesi sul sito
+            // Ripristiniamo la larghezza normale e togliamo la modalità PDF per rivedere i testi e la tabella estesa sul sito
             element.classList.remove('pdf-mode');
             element.style.width = originalWidth;
             element.style.maxWidth = originalMaxWidth;
@@ -758,10 +761,12 @@
           const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
           
           return (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 relative mb-6" style={{ pageBreakInside: 'avoid' }}>
-                  <div className="bg-slate-700 text-white font-bold p-2 text-center text-sm rounded-t-xl uppercase tracking-wider">
-                      {titolo}
-                  </div>
+              <div className={`bg-white rounded-xl shadow-sm border border-slate-200 relative ${titolo ? 'mb-6' : ''}`} style={{ pageBreakInside: 'avoid' }}>
+                  {titolo && (
+                      <div className="bg-slate-700 text-white font-bold p-2 text-center text-sm rounded-t-xl uppercase tracking-wider">
+                          {titolo}
+                      </div>
+                  )}
                   <div className="overflow-x-auto pb-4">
                       <table className="w-full border-collapse select-none">
                           <thead>
@@ -1225,17 +1230,23 @@
               <p>Stai visualizzando la <strong>Stagione {stagioneSelezionata}</strong> (<strong>Vasca {vascaSelezionata === 'interna' ? 'Interna' : 'Esterna'}</strong> - <strong>{GIORNI[giornoSelezionato]}</strong>). Clicca <strong>Aggiungi Corso</strong> per inserire una nuova attività.</p>
             </div>
 
-            {/* GRIGLIA ASSOLUTA DIVISA IN DUE PARTI */}
-            <div id="griglia-piano-vasca" className="bg-transparent relative">
+            {/* WRAPPER PER L'ESPORTAZIONE */}
+            <div id="export-wrapper" className="bg-transparent relative w-full">
               
-              {/* TABELLA MATTINA */}
-              {renderGriglia(fasceMattina, "Mattina (06:30 - 14:00)")}
+              {/* VISTA SITO: TABELLA UNICA */}
+              <div className="hide-on-pdf">
+                {renderGriglia(fasceOrarie, null)}
+              </div>
 
-              {/* INTERRUZIONE DI PAGINA PER IL PDF */}
-              <div className="html2pdf__page-break"></div>
+              {/* VISTA PDF: TABELLA SPEZZATA IN DUE */}
+              <div className="show-block-on-pdf w-full">
+                {renderGriglia(fasceMattina, "Mattina (06:30 - 14:00)")}
 
-              {/* TABELLA POMERIGGIO */}
-              {renderGriglia(fascePomeriggio, "Pomeriggio (14:00 - 22:30)")}
+                {/* INTERRUZIONE DI PAGINA PER IL PDF */}
+                <div className="html2pdf__page-break"></div>
+
+                {renderGriglia(fascePomeriggio, "Pomeriggio (14:00 - 22:30)")}
+              </div>
 
             </div>
           </main>
