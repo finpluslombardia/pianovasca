@@ -753,6 +753,8 @@
       // Funzione riutilizzabile per renderizzare ogni singola tabella
       const renderGriglia = (fasce, titolo) => {
           const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
+          const ROW_HEIGHT = 60; // Altezza fissa di base per ogni riga (in px)
+          const pixelsPerMin = ROW_HEIGHT / intervallo; // Calcolo dinamico dello zoom in base all'intervallo
           
           return (
               <div className={`bg-white rounded-xl shadow-sm border border-slate-200 relative ${titolo ? 'mb-6' : ''}`} style={{ pageBreakInside: 'avoid' }}>
@@ -777,7 +779,7 @@
                                   return (
                                       <tr key={fascia.id} className="hover:bg-slate-50/50 group">
                                           <td className="sticky left-0 z-20 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]"
-                                              style={{ height: `${intervallo * 2}px` }}>
+                                              style={{ height: `${ROW_HEIGHT}px` }}>
                                               {fascia.label}
                                           </td>
                                           {activeCorsie.map(corsia => {
@@ -800,8 +802,9 @@
                                                           const nomeBrev = abbrevia(infoAttivita ? infoAttivita.name : '');
                                                           const livelloBrev = abbrevia(nomeLivello);
 
-                                                          const topOffset = (corso.startMin - fasciaStartMin) * 2;
-                                                          const altezzaPX = corso.durata * 2;
+                                                          // Applicazione dello zoom dinamico sui box
+                                                          const topOffset = (corso.startMin - fasciaStartMin) * pixelsPerMin;
+                                                          const altezzaPX = corso.durata * pixelsPerMin;
                                                           const larghezzaCalc = `calc(${corso.corsie.length * 100}% + ${corso.corsie.length - 1}px)`;
 
                                                           return (
