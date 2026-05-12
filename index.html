@@ -26,6 +26,10 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
     }
+    /* Regole per le abbreviazioni riservate al PDF */
+    .show-on-pdf { display: none !important; }
+    .pdf-mode .show-on-pdf { display: inline-block !important; }
+    .pdf-mode .hide-on-pdf { display: none !important; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
@@ -640,6 +644,9 @@
         const element = document.getElementById('griglia-piano-vasca');
         if (!element) return;
         
+        // Aggiungiamo la classe per attivare le abbreviazioni SOLO per il PDF
+        element.classList.add('pdf-mode');
+
         // Salviamo gli stili originali
         const originalWidth = element.style.width;
         const originalMaxWidth = element.style.maxWidth;
@@ -660,7 +667,8 @@
         };
         
         window.html2pdf().set(opt).from(element).save().then(() => {
-            // Ripristiniamo la larghezza normale a download terminato
+            // Ripristiniamo la larghezza normale e togliamo la modalità PDF per rivedere i testi estesi sul sito
+            element.classList.remove('pdf-mode');
             element.style.width = originalWidth;
             element.style.maxWidth = originalMaxWidth;
         });
@@ -1157,13 +1165,23 @@
                                                 {/* Corpo Centrale (Livello/Nome e Istruttore) */}
                                                 <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden p-0.5 text-center">
                                                   {nomeLivello ? (
-                                                    <span className={`${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
-                                                      {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? livelloBrev : `L${corso.data.livello}-${livelloBrev}`}
-                                                    </span>
+                                                    <>
+                                                      <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                        {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
+                                                      </span>
+                                                      <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-[11px]'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                        {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? livelloBrev : `L${corso.data.livello}-${livelloBrev}`}
+                                                      </span>
+                                                    </>
                                                   ) : (
-                                                    <span className={`${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
-                                                      {nomeBrev}
-                                                    </span>
+                                                    <>
+                                                      <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                        {infoAttivita ? infoAttivita.name : ''}
+                                                      </span>
+                                                      <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-[11px]'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                        {nomeBrev}
+                                                      </span>
+                                                    </>
                                                   )}
 
                                                   {corso.data.istruttore && (
@@ -1176,7 +1194,8 @@
                                                 {/* Banner Inferiore (Mostrato solo se c'è spazio: > 30 min) */}
                                                 {corso.durata > 30 && (
                                                   <div className="w-full bg-black/10 border-t border-white/30 py-0.5 px-1 flex justify-between items-center text-[9px] font-medium shrink-0">
-                                                    <span className="truncate pr-1">{nomeLivello ? nomeBrev : ''}</span>
+                                                    <span className="truncate pr-1 hide-on-pdf">{nomeLivello ? infoAttivita?.name : ''}</span>
+                                                    <span className="truncate pr-1 show-on-pdf">{nomeLivello ? nomeBrev : ''}</span>
                                                     <div className="flex items-center gap-1 shrink-0">
                                                       {corso.data.maxUtenti && (
                                                         <span className="flex items-center gap-0.5" title={`Max ${corso.data.maxUtenti} utenti`}>
