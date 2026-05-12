@@ -143,7 +143,8 @@
       const piano = tuttiPiani[stagioneSelezionata] || {};
 
       const [vascaSelezionata, setVascaSelezionata] = useState('interna'); // 'interna' o 'esterna'
-      const [giornoSelezionato, setGiornoSelezionato] = useState(0);
+      // Calcola automaticamente il giorno corrente (0 = Lunedì, 6 = Domenica)
+      const [giornoSelezionato, setGiornoSelezionato] = useState((new Date().getDay() + 6) % 7);
       const [attivita, setAttivita] = useState(ATTIVITA_DI_BASE);
       const [intervallo, setIntervallo] = useState(30); 
       const [editModal, setEditModal] = useState(null); 
@@ -171,6 +172,7 @@
       const [loginError, setLoginError] = useState('');
       const [statoSalvataggio, setStatoSalvataggio] = useState('idle');
       const [confermaSvuota, setConfermaSvuota] = useState(false);
+      const [confermaEliminaStagione, setConfermaEliminaStagione] = useState(false);
       const [firebaseInstances, setFirebaseInstances] = useState(null);
       const lastSavedPiano = useRef(""); 
 
@@ -716,6 +718,26 @@
         setConfermaSvuota(false);
       };
 
+      const eliminaStagione = () => {
+        if (stagioni.length === 1) return; // Non elimina se c'è una sola stagione
+        
+        if (!confermaEliminaStagione) {
+          setConfermaEliminaStagione(true);
+          setTimeout(() => setConfermaEliminaStagione(false), 3000);
+          return;
+        }
+        
+        const nuoveStagioni = stagioni.filter(s => s !== stagioneSelezionata);
+        setStagioni(nuoveStagioni);
+        setTuttiPiani(prev => {
+          const nuovoTutti = { ...prev };
+          delete nuovoTutti[stagioneSelezionata];
+          return nuovoTutti;
+        });
+        setStagioneSelezionata(nuoveStagioni[0]);
+        setConfermaEliminaStagione(false);
+      };
+
       // --- GESTIONE ACCESSO ---
       const handleLogin = async (e) => {
         e.preventDefault();
@@ -1142,6 +1164,15 @@
                       {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
                       <option value="NUOVA" className="font-bold">+ Crea nuova...</option>
                     </select>
+                    {stagioni.length > 1 && (
+                      <button 
+                        onClick={eliminaStagione} 
+                        className={`p-1 rounded-md transition-colors ml-1 ${confermaEliminaStagione ? 'bg-red-500 text-white' : 'text-red-500 hover:bg-red-100'}`} 
+                        title={confermaEliminaStagione ? "Clicca di nuovo per eliminare" : "Elimina Stagione"}
+                      >
+                        <Trash2Icon size={16} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 
