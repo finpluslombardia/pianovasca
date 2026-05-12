@@ -15,6 +15,9 @@
   <!-- Babel per compilare JSX nel browser -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+  <!-- Libreria per generare il PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
   <style>
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
@@ -124,6 +127,7 @@
       const [attivita, setAttivita] = useState(ATTIVITA_DI_BASE);
       const [intervallo, setIntervallo] = useState(30); 
       const [editModal, setEditModal] = useState(null); 
+      const [isExportMenuOpen, setIsExportMenuOpen] = useState(false); // Menu esportazione
 
       // --- STATI AGGIUNTA CORSO ---
       const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -493,8 +497,80 @@
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = url; link.download = `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}.json`; link.click();
+        link.href = url; link.download = `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}_backup.json`; link.click();
         URL.revokeObjectURL(url);
+        setIsExportMenuOpen(false);
+      };
+
+      const esportaCSV = () => {
+        let csv = "Stagione,Vasca,Giorno,Ora Inizio,Durata (min),Corsie,Attivita,Livello/Societa,Istruttore,Max Utenti\n";
+        const pianoCorrente = tuttiPiani[stagioneSelezionata] || {};
+        
+        // Raggruppiamo i corsi che occupano più corsie contemporaneamente
+        const corsiRaggruppati = {};
+        Object.keys(pianoCorrente).forEach(key => {
+            const parts = key.split('-');
+            if(parts.length === 4) {
+                const vasca = parts[0];
+                const giorno = parts[1]; 
+                const ora = parts[2];
+                const corsia = parts[3];
+                const cell = pianoCorrente[key];
+                
+                const groupKey = `${vasca}-${giorno}-${ora}-${cell.id}-${cell.istruttore}-${cell.livello}-${cell.durata}-${cell.maxUtenti}`;
+                if(!corsiRaggruppati[groupKey]) {
+                    corsiRaggruppati[groupKey] = {
+                        vasca, giorno: GIORNI[giorno], ora, 
+                        durata: cell.durata || 45,
+                        corsie: [corsia],
+                        id: cell.id,
+                        livello: cell.livello || '',
+                        istruttore: cell.istruttore || '',
+                        maxUtenti: cell.maxUtenti || ''
+                    };
+                } else {
+                    corsiRaggruppati[groupKey].corsie.push(corsia);
+                }
+            }
+        });
+
+        Object.values(corsiRaggruppati).forEach(c => {
+            const attivitaObj = attivita.find(a => a.id === c.id);
+            const nomeAttivita = attivitaObj ? attivitaObj.name : c.id;
+            let livello = c.livello;
+            if(attivitaObj && attivitaObj.levels && !attivitaObj.isFreeTextLevel) {
+                const lvlObj = attivitaObj.levels.find(l => l.val === c.livello);
+                if(lvlObj) livello = lvlObj.name;
+            }
+            const corsieStr = c.corsie.sort().join(' e ');
+            
+            // Fuga dei caratteri per compatibilità con i fogli di calcolo
+            const escape = (str) => `"${String(str).replace(/"/g, '""')}"`;
+            csv += `${escape(stagioneSelezionata)},${escape(c.vasca)},${escape(c.giorno)},${escape(c.ora)},${escape(c.durata)},${escape(corsieStr)},${escape(nomeAttivita)},${escape(livello)},${escape(c.istruttore)},${escape(c.maxUtenti)}\n`;
+        });
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}.csv`; link.click();
+        URL.revokeObjectURL(url);
+        setIsExportMenuOpen(false);
+      };
+
+      const esportaPDF = () => {
+        const element = document.getElementById('griglia-piano-vasca');
+        if (!element) return;
+        
+        const opt = {
+            margin:       0.3,
+            filename:     `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}_${vascaSelezionata}_${GIORNI[giornoSelezionato]}.pdf`,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
+        };
+        
+        window.html2pdf().set(opt).from(element).save();
+        setIsExportMenuOpen(false);
       };
 
       const importaDati = (event) => {
@@ -857,7 +933,22 @@
                     <span className="hidden sm:inline">{statoSalvataggio === 'saving' ? 'Salvataggio...' : statoSalvataggio === 'saved' ? 'Salvato!' : statoSalvataggio === 'error' ? 'Errore Sync' : 'In Sync'}</span>
                   </div>
                   <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
-                  <button onClick={esportaDati} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors"><DownloadIcon size={16} /> <span className="hidden sm:inline">Esporta</span></button>
+                  
+                  {/* NUOVO MENU ESPORTAZIONE */}
+                  <div className="relative">
+                    <button onClick={() => setIsExportMenuOpen(!isExportMenuOpen)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors">
+                      <DownloadIcon size={16} /> <span className="hidden sm:inline">Esporta</span>
+                    </button>
+                    {isExportMenuOpen && (
+                      <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 min-w-[220px] flex flex-col">
+                        <button onClick={esportaPDF} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📄 Esporta in PDF</button>
+                        <button onClick={esportaCSV} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📊 Esporta in Google Fogli</button>
+                        <div className="h-px bg-slate-200 my-1"></div>
+                        <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
+                      </div>
+                    )}
+                  </div>
+
                   <label className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium cursor-pointer transition-colors"><UploadIcon size={16} /> <span className="hidden sm:inline">Importa</span><input type="file" accept=".json" onChange={importaDati} className="hidden" /></label>
                   <button onClick={svuotaPiano} className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-medium transition-colors min-w-[100px] justify-center"><Trash2Icon size={16} /> {confermaSvuota ? "Sicuro?" : "Svuota"}</button>
                   <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
@@ -912,7 +1003,7 @@
             </div>
 
             {/* GRIGLIA ASSOLUTA */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
+            <div id="griglia-piano-vasca" className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse select-none">
                   <thead>
