@@ -645,7 +645,7 @@
       };
 
       const esportaPDF = () => {
-        const element = document.getElementById('export-wrapper');
+        const element = document.getElementById('griglia-piano-vasca');
         if (!element) return;
         
         // Aggiungiamo la classe per attivare le abbreviazioni e i layout SOLO per il PDF
@@ -655,18 +655,18 @@
         const originalWidth = element.style.width;
         const originalMaxWidth = element.style.maxWidth;
         
-        // Impostiamo una larghezza fissa proporzionata a un foglio A4 orizzontale
-        element.style.width = '1150px';
+        // Impostiamo una larghezza fissa molto ampia (1900px).
+        // Scalando questa larghezza per farla rientrare nel foglio A4 orizzontale,
+        // l'altezza si ridurrà proporzionalmente, facendo entrare TUTTA LA TABELLA IN UN SOLO FOGLIO.
+        element.style.width = '1900px';
         element.style.maxWidth = 'none';
         
         const opt = {
-            margin:       0.2, // Margini ridotti per sfruttare tutto il foglio
+            margin:       0.1, // Margini ridotti per sfruttare tutto il foglio
             filename:     `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}_${vascaSelezionata}_${GIORNI[giornoSelezionato]}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true, windowWidth: 1150 },
-            jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }, // Forzato Orizzontale
-            // Abilita la lettura delle classi CSS per le interruzioni di pagina
-            pagebreak:    { mode: ['css', 'legacy'] } 
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: 1900 },
+            jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' } 
         };
         
         window.html2pdf().set(opt).from(element).save().then(() => {
