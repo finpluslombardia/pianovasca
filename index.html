@@ -1230,25 +1230,11 @@
               <p>Stai visualizzando la <strong>Stagione {stagioneSelezionata}</strong> (<strong>Vasca {vascaSelezionata === 'interna' ? 'Interna' : 'Esterna'}</strong> - <strong>{GIORNI[giornoSelezionato]}</strong>). Clicca <strong>Aggiungi Corso</strong> per inserire una nuova attività.</p>
             </div>
 
-            {/* WRAPPER PER L'ESPORTAZIONE */}
-            <div id="export-wrapper" className="bg-transparent relative w-full">
-              
-              {/* VISTA SITO: TABELLA UNICA */}
-              <div className="hide-on-pdf">
-                {renderGriglia(fasceOrarie, null)}
-              </div>
-
-              {/* VISTA PDF: TABELLA SPEZZATA IN DUE */}
-              <div className="show-block-on-pdf w-full">
-                {renderGriglia(fasceMattina, "Mattina (06:30 - 14:00)")}
-
-                {/* INTERRUZIONE DI PAGINA PER IL PDF */}
-                <div className="html2pdf__page-break"></div>
-
-                {renderGriglia(fascePomeriggio, "Pomeriggio (14:00 - 22:30)")}
-              </div>
-
+            {/* TABELLA UNICA - Esportata intera in un singolo foglio PDF */}
+            <div id="griglia-piano-vasca" className="bg-transparent relative w-full">
+              {renderGriglia(fasceOrarie, null)}
             </div>
+
           </main>
         </div>
       );
