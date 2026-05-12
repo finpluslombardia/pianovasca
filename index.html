@@ -783,7 +783,13 @@
                                               {fascia.label}
                                           </td>
                                           {activeCorsie.map(corsia => {
-                                              const corsiInCella = corsiOggi.filter(c => c.startMin === fasciaStartMin && c.corsie[0] === corsia);
+                                              // NUOVA LOGICA: Cerca i corsi che iniziano ALL'INTERNO di questa fascia oraria,
+                                              // indipendentemente dall'intervallo della griglia (es. dalle 8:00 alle 8:59)
+                                              const corsiInCella = corsiOggi.filter(c => 
+                                                  c.corsie[0] === corsia && 
+                                                  c.startMin >= fasciaStartMin && 
+                                                  c.startMin < (fasciaStartMin + intervallo)
+                                              );
 
                                               return (
                                                   <td 
