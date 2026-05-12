@@ -628,15 +628,29 @@
         const element = document.getElementById('griglia-piano-vasca');
         if (!element) return;
         
+        // Salviamo gli stili originali
+        const originalWidth = element.style.width;
+        const originalMaxWidth = element.style.maxWidth;
+        
+        // Forziamo una larghezza fissa molto ampia. 
+        // Quando html2pdf restringerà l'immagine per farla entrare nella larghezza di un foglio A4 in orizzontale,
+        // l'altezza si ridurrà proporzionalmente, rientrando perfettamente in massimo 2 pagine!
+        element.style.width = '1800px';
+        element.style.maxWidth = 'none';
+        
         const opt = {
-            margin:       0.3,
+            margin:       0.2,
             filename:     `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}_${vascaSelezionata}_${GIORNI[giornoSelezionato]}.pdf`,
             image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true },
+            html2canvas:  { scale: 2, useCORS: true, windowWidth: 1800 },
             jsPDF:        { unit: 'in', format: 'a4', orientation: 'landscape' }
         };
         
-        window.html2pdf().set(opt).from(element).save();
+        window.html2pdf().set(opt).from(element).save().then(() => {
+            // Ripristiniamo la larghezza normale a download terminato
+            element.style.width = originalWidth;
+            element.style.maxWidth = originalMaxWidth;
+        });
         setIsExportMenuOpen(false);
       };
 
