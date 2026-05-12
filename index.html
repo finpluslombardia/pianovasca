@@ -749,6 +749,127 @@
          );
       }
 
+      // Separiamo le fasce orarie
+      const fasceMattina = fasceOrarie.filter(f => Number(f.id.split(':')[0]) < 14);
+      const fascePomeriggio = fasceOrarie.filter(f => Number(f.id.split(':')[0]) >= 14);
+
+      // Funzione riutilizzabile per renderizzare ogni singola tabella
+      const renderGriglia = (fasce, titolo) => {
+          const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
+          
+          return (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 relative mb-6" style={{ pageBreakInside: 'avoid' }}>
+                  <div className="bg-slate-700 text-white font-bold p-2 text-center text-sm rounded-t-xl uppercase tracking-wider">
+                      {titolo}
+                  </div>
+                  <div className="overflow-x-auto pb-4">
+                      <table className="w-full border-collapse select-none">
+                          <thead>
+                              <tr>
+                                  <th className="sticky left-0 z-20 bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Orario</th>
+                                  {activeCorsie.map(corsia => <th key={corsia} className="bg-slate-50 border-b border-r border-slate-200 p-2 min-w-[80px] text-center text-xs font-bold text-slate-700">Corsia {corsia}</th>)}
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {fasce.map((fascia) => {
+                                  const [h, m] = fascia.id.split(':').map(Number);
+                                  const fasciaStartMin = h * 60 + m;
+                                  
+                                  return (
+                                      <tr key={fascia.id} className="hover:bg-slate-50/50 group">
+                                          <td className="sticky left-0 z-20 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]"
+                                              style={{ height: `${intervallo * 2}px` }}>
+                                              {fascia.label}
+                                          </td>
+                                          {activeCorsie.map(corsia => {
+                                              const corsiInCella = corsiOggi.filter(c => c.startMin === fasciaStartMin && c.corsie[0] === corsia);
+
+                                              return (
+                                                  <td 
+                                                      key={corsia} 
+                                                      className="border-b border-r border-slate-200 relative p-0 cursor-pointer hover:bg-blue-50/30 transition-colors" 
+                                                      style={{ minWidth: '80px' }}
+                                                      onDoubleClick={() => {
+                                                          setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorno: giornoSelezionato, oraInizio: fascia.id, corsie: [corsia]}));
+                                                          setIsAddModalOpen(true);
+                                                      }}
+                                                  >
+                                                      {corsiInCella.map((corso, i) => {
+                                                          const infoAttivita = attivita.find(a => a.id === corso.data.id);
+                                                          const nomeLivello = infoAttivita?.isFreeTextLevel ? corso.data.livello : infoAttivita?.levels?.find(l => l.val === corso.data.livello)?.name;
+                                                          
+                                                          const nomeBrev = abbrevia(infoAttivita ? infoAttivita.name : '');
+                                                          const livelloBrev = abbrevia(nomeLivello);
+
+                                                          const topOffset = (corso.startMin - fasciaStartMin) * 2;
+                                                          const altezzaPX = corso.durata * 2;
+                                                          const larghezzaCalc = `calc(${corso.corsie.length * 100}% + ${corso.corsie.length - 1}px)`;
+
+                                                          return (
+                                                              <div 
+                                                                  key={i}
+                                                                  onDoubleClick={(e) => handleDoubleClickCorso(e, corso)}
+                                                                  className={`absolute z-10 left-0 rounded-lg flex flex-col shadow-md cursor-pointer hover:brightness-95 hover:shadow-lg transition-all overflow-hidden border border-white/20 ${infoAttivita?.color || 'bg-slate-500 text-white'}`}
+                                                                  style={{ top: `${topOffset}px`, height: `${altezzaPX}px`, width: larghezzaCalc, minHeight: '24px' }}
+                                                              >
+                                                                  <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden p-0.5 text-center">
+                                                                    {nomeLivello ? (
+                                                                      <>
+                                                                        <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                          {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
+                                                                        </span>
+                                                                        <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-[11px]'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                          {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? livelloBrev : `L${corso.data.livello}-${livelloBrev}`}
+                                                                        </span>
+                                                                      </>
+                                                                    ) : (
+                                                                      <>
+                                                                        <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                          {infoAttivita ? infoAttivita.name : ''}
+                                                                        </span>
+                                                                        <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-[11px]'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                          {nomeBrev}
+                                                                        </span>
+                                                                      </>
+                                                                    )}
+
+                                                                    {corso.data.istruttore && (
+                                                                      <span className={`${corso.durata <= 30 ? 'text-[9px]' : 'text-[10px]'} font-semibold truncate w-full px-0.5 mt-0.5 text-white/95`}>
+                                                                        {corso.data.istruttore}
+                                                                      </span>
+                                                                    )}
+                                                                  </div>
+
+                                                                  {corso.durata > 30 && (
+                                                                    <div className="w-full bg-black/10 border-t border-white/30 py-0.5 px-1 flex justify-between items-center text-[9px] font-medium shrink-0">
+                                                                      <span className="truncate pr-1 hide-on-pdf">{nomeLivello ? infoAttivita?.name : ''}</span>
+                                                                      <span className="truncate pr-1 show-on-pdf">{nomeLivello ? nomeBrev : ''}</span>
+                                                                      <div className="flex items-center gap-1 shrink-0">
+                                                                        {corso.data.maxUtenti && (
+                                                                          <span className="flex items-center gap-0.5" title={`Max ${corso.data.maxUtenti} utenti`}>
+                                                                            <UsersIcon size={8} /> {corso.data.maxUtenti}
+                                                                          </span>
+                                                                        )}
+                                                                        <span className="shrink-0">{corso.durata}'</span>
+                                                                      </div>
+                                                                    </div>
+                                                                  )}
+                                                              </div>
+                                                          )
+                                                      })}
+                                                  </td>
+                                              );
+                                          })}
+                                      </tr>
+                                  );
+                              })}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          );
+      };
+
       return (
         <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
           
@@ -1104,120 +1225,18 @@
               <p>Stai visualizzando la <strong>Stagione {stagioneSelezionata}</strong> (<strong>Vasca {vascaSelezionata === 'interna' ? 'Interna' : 'Esterna'}</strong> - <strong>{GIORNI[giornoSelezionato]}</strong>). Clicca <strong>Aggiungi Corso</strong> per inserire una nuova attività.</p>
             </div>
 
-            {/* GRIGLIA ASSOLUTA */}
-            <div id="griglia-piano-vasca" className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse select-none">
-                  <thead>
-                    <tr>
-                      <th className="sticky left-0 z-20 bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Orario</th>
-                      {(vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA).map(corsia => <th key={corsia} className="bg-slate-50 border-b border-r border-slate-200 p-2 min-w-[80px] text-center text-xs font-bold text-slate-700">Corsia {corsia}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fasceOrarie.map((fascia, r) => {
-                      const fasciaStartMin = START_MIN_TOTAL + (r * intervallo);
-                      const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
-                      return (
-                        <tr key={fascia.id} className="hover:bg-slate-50/50 group">
-                          
-                          <td className="sticky left-0 z-20 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]"
-                              style={{ height: `${intervallo * 2}px` }}>
-                            {fascia.label}
-                          </td>
+            {/* GRIGLIA ASSOLUTA DIVISA IN DUE PARTI */}
+            <div id="griglia-piano-vasca" className="bg-transparent relative">
+              
+              {/* TABELLA MATTINA */}
+              {renderGriglia(fasceMattina, "Mattina (06:30 - 14:00)")}
 
-                          {activeCorsie.map(corsia => {
-                            // Cerca se c'è un corso che INIZIA in questa cella per renderizzarlo in assoluto
-                            const corsiInCella = corsiOggi.filter(c => {
-                                const slotIndex = Math.floor((c.startMin - START_MIN_TOTAL) / intervallo);
-                                return slotIndex === r && c.corsie[0] === corsia;
-                            });
+              {/* INTERRUZIONE DI PAGINA PER IL PDF */}
+              <div className="html2pdf__page-break"></div>
 
-                            return (
-                                <td 
-                                    key={corsia} 
-                                    className="border-b border-r border-slate-200 relative p-0 cursor-pointer hover:bg-blue-50/30 transition-colors" 
-                                    style={{ minWidth: '80px' }}
-                                    onDoubleClick={() => {
-                                        setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorno: giornoSelezionato, oraInizio: fascia.id, corsie: [corsia]}));
-                                        setIsAddModalOpen(true);
-                                    }}
-                                >
-                                    {corsiInCella.map((corso, i) => {
-                                        const infoAttivita = attivita.find(a => a.id === corso.data.id);
-                                        const nomeLivello = infoAttivita?.isFreeTextLevel ? corso.data.livello : infoAttivita?.levels?.find(l => l.val === corso.data.livello)?.name;
-                                        
-                                        const nomeBrev = abbrevia(infoAttivita ? infoAttivita.name : '');
-                                        const livelloBrev = abbrevia(nomeLivello);
+              {/* TABELLA POMERIGGIO */}
+              {renderGriglia(fascePomeriggio, "Pomeriggio (14:00 - 22:30)")}
 
-                                        // Posizionamento al Pixel (1 minuto = 2 pixel)
-                                        const topOffset = (corso.startMin - fasciaStartMin) * 2;
-                                        const altezzaPX = corso.durata * 2;
-                                        const larghezzaCalc = `calc(${corso.corsie.length * 100}% + ${corso.corsie.length - 1}px)`;
-
-                                        return (
-                                            <div 
-                                                key={i}
-                                                onDoubleClick={(e) => handleDoubleClickCorso(e, corso)}
-                                                className={`absolute z-10 left-0 rounded-lg flex flex-col shadow-md cursor-pointer hover:brightness-95 hover:shadow-lg transition-all overflow-hidden border border-white/20 ${infoAttivita?.color || 'bg-slate-500 text-white'}`}
-                                                style={{ top: `${topOffset}px`, height: `${altezzaPX}px`, width: larghezzaCalc, minHeight: '24px' }}
-                                            >
-                                                {/* Corpo Centrale (Livello/Nome e Istruttore) */}
-                                                <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden p-0.5 text-center">
-                                                  {nomeLivello ? (
-                                                    <>
-                                                      <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
-                                                        {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
-                                                      </span>
-                                                      <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-[11px]'} font-bold leading-tight truncate w-full px-0.5`}>
-                                                        {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? livelloBrev : `L${corso.data.livello}-${livelloBrev}`}
-                                                      </span>
-                                                    </>
-                                                  ) : (
-                                                    <>
-                                                      <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
-                                                        {infoAttivita ? infoAttivita.name : ''}
-                                                      </span>
-                                                      <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[10px]' : 'text-[11px]'} font-bold leading-tight truncate w-full px-0.5`}>
-                                                        {nomeBrev}
-                                                      </span>
-                                                    </>
-                                                  )}
-
-                                                  {corso.data.istruttore && (
-                                                    <span className={`${corso.durata <= 30 ? 'text-[9px]' : 'text-[10px]'} font-semibold truncate w-full px-0.5 mt-0.5 text-white/95`}>
-                                                      {corso.data.istruttore}
-                                                    </span>
-                                                  )}
-                                                </div>
-
-                                                {/* Banner Inferiore (Mostrato solo se c'è spazio: > 30 min) */}
-                                                {corso.durata > 30 && (
-                                                  <div className="w-full bg-black/10 border-t border-white/30 py-0.5 px-1 flex justify-between items-center text-[9px] font-medium shrink-0">
-                                                    <span className="truncate pr-1 hide-on-pdf">{nomeLivello ? infoAttivita?.name : ''}</span>
-                                                    <span className="truncate pr-1 show-on-pdf">{nomeLivello ? nomeBrev : ''}</span>
-                                                    <div className="flex items-center gap-1 shrink-0">
-                                                      {corso.data.maxUtenti && (
-                                                        <span className="flex items-center gap-0.5" title={`Max ${corso.data.maxUtenti} utenti`}>
-                                                          <UsersIcon size={8} /> {corso.data.maxUtenti}
-                                                        </span>
-                                                      )}
-                                                      <span className="shrink-0">{corso.durata}'</span>
-                                                    </div>
-                                                  </div>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                </td>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
             </div>
           </main>
         </div>
