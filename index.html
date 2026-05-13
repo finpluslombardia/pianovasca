@@ -820,6 +820,9 @@
                                                                   className={`absolute z-10 left-0 rounded-lg flex flex-col shadow-md cursor-pointer hover:brightness-95 hover:shadow-lg transition-all overflow-hidden border border-white/20 ${infoAttivita?.color || 'bg-slate-500 text-white'}`}
                                                                   style={{ top: `${topOffset}px`, height: `${altezzaPX}px`, width: larghezzaCalc, minHeight: '24px' }}
                                                               >
+                                                                  <span className="absolute top-1 left-1.5 text-[9px] font-bold opacity-80 leading-none tracking-tight">
+                                                                    {corso.oraInizio}
+                                                                  </span>
                                                                   <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden p-0.5 text-center">
                                                                     {nomeLivello ? (
                                                                       <>
