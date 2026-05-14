@@ -1512,6 +1512,11 @@
                                setInizioSettimana(getStartOfWeek(new Date(e.target.value)));
                              }
                            }}
+                           onClick={(e) => {
+                             try {
+                               if (e.target.showPicker) e.target.showPicker();
+                             } catch(err) {}
+                           }}
                          />
                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-blue-600 transition-colors"><CalendarIcon size={10}/> Settimana Attiva</span>
                          <span className="text-sm font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
