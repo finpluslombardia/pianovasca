@@ -1237,7 +1237,10 @@
                     <div className="flex flex-col h-full gap-5">
                       {/* ADD FORM */}
                       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><PlusIcon size={18}/> Inserisci Nuovo Partecipante</h4>
+                        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                          {editingPartecipanteIndex !== null ? <EditIcon size={18}/> : <PlusIcon size={18}/>} 
+                          {editingPartecipanteIndex !== null ? 'Modifica Partecipante' : 'Inserisci Nuovo Partecipante'}
+                        </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                           <div>
                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Nome e Cognome</label>
@@ -1256,7 +1259,14 @@
                              <input type="date" value={nuovoPartecipante.scadIscrizione} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadIscrizione: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1 cursor-pointer" />
                           </div>
                         </div>
-                        <button type="button" onClick={aggiungiPartecipante} className="mt-4 w-full sm:w-auto sm:px-6 bg-slate-800 hover:bg-slate-900 transition-colors text-white font-bold py-2 rounded-lg text-sm shadow-sm float-right">Aggiungi alla lista</button>
+                        <div className="mt-4 flex gap-2 justify-end float-right">
+                          {editingPartecipanteIndex !== null && (
+                            <button type="button" onClick={annullaModificaPartecipante} className="px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded-lg text-sm shadow-sm transition-colors">Annulla</button>
+                          )}
+                          <button type="button" onClick={aggiungiPartecipante} className="px-6 bg-slate-800 hover:bg-slate-900 transition-colors text-white font-bold py-2 rounded-lg text-sm shadow-sm">
+                            {editingPartecipanteIndex !== null ? 'Salva Modifica' : 'Aggiungi alla lista'}
+                          </button>
+                        </div>
                         <div className="clear-both"></div>
                       </div>
 
@@ -1269,12 +1279,12 @@
                               <th className="p-3 font-semibold text-center text-slate-700">Anno</th>
                               <th className="p-3 font-semibold text-center text-slate-700">Scad. Certificato</th>
                               <th className="p-3 font-semibold text-center text-slate-700">Scad. Iscrizione</th>
-                              <th className="p-3 text-center w-12"></th>
+                              <th className="p-3 text-center w-20"></th>
                             </tr>
                           </thead>
                           <tbody>
                             {editModal.partecipanti.map((p, i) => (
-                              <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                              <tr key={i} className={`border-b border-slate-100 transition-colors ${editingPartecipanteIndex === i ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
                                 <td className="p-3 font-medium text-slate-800">{p.nome}</td>
                                 <td className="p-3 text-center text-slate-600">{p.anno || '-'}</td>
                                 <td className={`p-3 text-center font-bold ${isScaduto(p.scadCertificato) ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
@@ -1285,7 +1295,8 @@
                                   {formatDate(p.scadIscrizione)}
                                   {isScaduto(p.scadIscrizione) && <span className="ml-1 text-[10px] uppercase block leading-none">Scaduta</span>}
                                 </td>
-                                <td className="p-3 text-center">
+                                <td className="p-3 flex items-center justify-center gap-2">
+                                  <button type="button" onClick={() => avviaModificaPartecipante(i)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
                                   <button type="button" onClick={() => rimuoviPartecipante(i)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
                                 </td>
                               </tr>
