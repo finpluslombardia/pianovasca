@@ -492,6 +492,10 @@
         e.stopPropagation();
         const info = attivita.find(a => a.id === corso.data.id);
         const vascaOriginale = corso.keys[0].split('-')[0];
+        
+        // Ordina alfabeticamente all'apertura per sicurezza
+        const partecipantiOrdinati = [...(corso.data.partecipanti || [])].sort((a, b) => a.nome.localeCompare(b.nome));
+
         setEditModal({
           corsoOriginale: corso,
           vasca: vascaOriginale,
@@ -504,18 +508,42 @@
           istruttore: corso.data.istruttore || '',
           livello: corso.data.livello || '',
           infoAttivita: info,
-          partecipanti: corso.data.partecipanti || [], // Carica i partecipanti
+          partecipanti: partecipantiOrdinati,
           tab: 'iscritti' // Apre di default la scheda degli iscritti
         });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+        setEditingPartecipanteIndex(null);
       };
 
       const aggiungiPartecipante = () => {
         if (!nuovoPartecipante.nome.trim()) return;
-        setEditModal(prev => ({
-          ...prev,
-          partecipanti: [...prev.partecipanti, { ...nuovoPartecipante }]
-        }));
+        
+        setEditModal(prev => {
+          let nuoviPartecipanti = [...prev.partecipanti];
+          if (editingPartecipanteIndex !== null) {
+            nuoviPartecipanti[editingPartecipanteIndex] = { ...nuovoPartecipante };
+          } else {
+            nuoviPartecipanti.push({ ...nuovoPartecipante });
+          }
+          
+          // Mantiene l'ordine alfabetico
+          nuoviPartecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
+          
+          return { ...prev, partecipanti: nuoviPartecipanti };
+        });
+        
         setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+        setEditingPartecipanteIndex(null);
+      };
+
+      const avviaModificaPartecipante = (idx) => {
+        setNuovoPartecipante({ ...editModal.partecipanti[idx] });
+        setEditingPartecipanteIndex(idx);
+      };
+
+      const annullaModificaPartecipante = () => {
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+        setEditingPartecipanteIndex(null);
       };
 
       const rimuoviPartecipante = (idx) => {
@@ -523,6 +551,11 @@
           ...prev,
           partecipanti: prev.partecipanti.filter((_, i) => i !== idx)
         }));
+        if (editingPartecipanteIndex === idx) {
+          annullaModificaPartecipante();
+        } else if (editingPartecipanteIndex > idx) {
+          setEditingPartecipanteIndex(prev => prev - 1);
+        }
       };
 
       const salvaModificheModal = (e) => {
