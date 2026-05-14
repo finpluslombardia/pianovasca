@@ -616,7 +616,7 @@
               <table>
                 <thead>
                   <tr>
-                    <th style="width: 30%;">Nome Cognome</th>
+                    <th style="width: 30%;">Cognome e Nome</th>
                     <th style="text-align:center; width: 10%;">Anno</th>
                     <th style="text-align:center; width: 15%;">Certificato</th>
                     <th style="text-align:center; width: 15%;">Iscrizione</th>
@@ -1243,8 +1243,8 @@
                         </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                           <div>
-                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Nome e Cognome</label>
-                             <input type="text" value={nuovoPartecipante.nome} onChange={e => setNuovoPartecipante({...nuovoPartecipante, nome: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1" placeholder="Es. Mario Rossi" />
+                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Cognome e Nome</label>
+                             <input type="text" value={nuovoPartecipante.nome} onChange={e => setNuovoPartecipante({...nuovoPartecipante, nome: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1" placeholder="Es. Rossi Mario" />
                           </div>
                           <div>
                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Anno di Nascita</label>
@@ -1275,7 +1275,7 @@
                         <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
                           <thead className="bg-slate-100 border-b border-slate-200 sticky top-0 z-10">
                             <tr>
-                              <th className="p-3 font-semibold text-slate-700">Nome e Cognome</th>
+                              <th className="p-3 font-semibold text-slate-700">Cognome e Nome</th>
                               <th className="p-3 font-semibold text-center text-slate-700">Anno</th>
                               <th className="p-3 font-semibold text-center text-slate-700">Scad. Certificato</th>
                               <th className="p-3 font-semibold text-center text-slate-700">Scad. Iscrizione</th>
