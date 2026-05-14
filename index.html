@@ -63,6 +63,18 @@
     const PlusIcon = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
     const UsersIcon = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
     const FilterIcon = (p) => <Icon {...p}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></Icon>;
+    const PrinterIcon = (p) => <Icon {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></Icon>;
+
+    // --- UTILITY DATE PER PARTECIPANTI ---
+    const isScaduto = (dateStr) => {
+      if (!dateStr) return false;
+      return new Date(dateStr) < new Date();
+    };
+    const formatDate = (dateStr) => {
+      if (!dateStr) return '-';
+      const [y, m, d] = dateStr.split('-');
+      return `${d}/${m}/${y}`;
+    };
 
     // --- CONFIGURAZIONE INIZIALE ---
     const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
@@ -144,7 +156,6 @@
       const piano = tuttiPiani[stagioneSelezionata] || {};
 
       const [vascaSelezionata, setVascaSelezionata] = useState('interna'); // 'interna' o 'esterna'
-      // Calcola automaticamente il giorno corrente (0 = Lunedì, 6 = Domenica)
       const [giornoSelezionato, setGiornoSelezionato] = useState((new Date().getDay() + 6) % 7);
       const [attivita, setAttivita] = useState(ATTIVITA_DI_BASE);
       const [intervallo, setIntervallo] = useState(30); 
@@ -166,6 +177,9 @@
           istruttore: '',
           livello: ''
       });
+
+      // --- STATO NUOVO PARTECIPANTE ---
+      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
 
       // --- STATI FIREBASE E SALVATAGGIO ---
       const [user, setUser] = useState(null);
@@ -356,9 +370,8 @@
           const corsi = [];
           
           activeCorsie.forEach(corsia => {
-              // Filtra solo per la vasca selezionata e il giorno selezionato
               const keys = Object.keys(piano).filter(k => k.startsWith(`${vascaSelezionata}-${giornoIdx}-`) && k.endsWith(`-${corsia}`));
-              keys.sort((a, b) => a.split('-')[2].localeCompare(b.split('-')[2])); // timeStr è l'indice 2
+              keys.sort((a, b) => a.split('-')[2].localeCompare(b.split('-')[2])); 
 
               let currentCourseEndMin = -1;
               let currentCourse = null;
@@ -369,7 +382,6 @@
                   const startMin = h * 60 + m;
                   const cell = piano[k];
                   
-                  // --- NUOVA LOGICA: Filtro Attività ---
                   if (!filtriAttivita.includes(cell.id)) return;
 
                   const durata = cell.durata || 45; 
@@ -463,7 +475,8 @@
                         istruttore: nuovoCorso.istruttore.trim(), 
                         livello: nuovoCorso.livello,
                         durata: Number(nuovoCorso.durata),
-                        maxUtenti: nuovoCorso.maxUtenti ? Number(nuovoCorso.maxUtenti) : ''
+                        maxUtenti: nuovoCorso.maxUtenti ? Number(nuovoCorso.maxUtenti) : '',
+                        partecipanti: [] // Inizializza array vuoto
                     };
                 });
             });
@@ -474,7 +487,7 @@
         setNuovoCorso(prev => ({...prev, corsie: [], giorni: [], istruttore: '', livello: '', maxUtenti: '', vasca: vascaSelezionata}));
       };
 
-      // --- LOGICA MODIFICA/ELIMINA CORSO ---
+      // --- LOGICA MODIFICA/ELIMINA CORSO E PARTECIPANTI ---
       const handleDoubleClickCorso = (e, corso) => {
         e.stopPropagation();
         const info = attivita.find(a => a.id === corso.data.id);
@@ -490,29 +503,48 @@
           corsie: [...corso.corsie],
           istruttore: corso.data.istruttore || '',
           livello: corso.data.livello || '',
-          infoAttivita: info
+          infoAttivita: info,
+          partecipanti: corso.data.partecipanti || [], // Carica i partecipanti
+          tab: 'dettagli' // Apre di default la scheda dettagli
         });
       };
 
+      const aggiungiPartecipante = () => {
+        if (!nuovoPartecipante.nome.trim()) return;
+        setEditModal(prev => ({
+          ...prev,
+          partecipanti: [...prev.partecipanti, { ...nuovoPartecipante }]
+        }));
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+      };
+
+      const rimuoviPartecipante = (idx) => {
+        setEditModal(prev => ({
+          ...prev,
+          partecipanti: prev.partecipanti.filter((_, i) => i !== idx)
+        }));
+      };
+
       const salvaModificheModal = (e) => {
-        e.preventDefault();
+        if (e && e.preventDefault) e.preventDefault();
         if (editModal.corsie.length === 0) return alert("Seleziona almeno una corsia!");
         
         setTuttiPiani(prevTutti => {
           const prevSeason = prevTutti[stagioneSelezionata] || {};
           const nuovoPiano = { ...prevSeason };
           
-          // 1. Elimina le chiavi vecchie/legacy associate a questo corso
+          // Elimina chiavi vecchie
           editModal.corsoOriginale.keys.forEach(k => delete nuovoPiano[k]);
           
-          // 2. Crea il corso con i nuovi dati
+          // Crea con nuovi dati
           editModal.corsie.forEach(c => {
               nuovoPiano[`${editModal.vasca}-${editModal.giorno}-${editModal.oraInizio}-${c}`] = { 
                   id: editModal.attivitaId, 
                   istruttore: editModal.istruttore.trim(), 
                   livello: editModal.livello,
                   durata: Number(editModal.durata),
-                  maxUtenti: editModal.maxUtenti ? Number(editModal.maxUtenti) : ''
+                  maxUtenti: editModal.maxUtenti ? Number(editModal.maxUtenti) : '',
+                  partecipanti: editModal.partecipanti // Salva la lista aggiornata
               };
           });
           return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
@@ -528,6 +560,81 @@
           return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
         });
         setEditModal(null);
+      };
+
+      // --- STAMPA REGISTRO PRESENZE ---
+      const stampaRegistro = () => {
+        const infoAttivita = attivita.find(a => a.id === editModal.attivitaId);
+        const nomeLivello = infoAttivita?.isFreeTextLevel ? editModal.livello : infoAttivita?.levels?.find(l => l.val === editModal.livello)?.name;
+        const titoloCorso = nomeLivello ? `${infoAttivita.name} - ${nomeLivello}` : infoAttivita.name;
+        const giornoNome = GIORNI[editModal.giorno];
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+           alert("Attenzione: Abilita i popup nel browser per visualizzare e stampare il registro.");
+           return;
+        }
+        
+        let tableRows = editModal.partecipanti.map(p => `
+          <tr>
+            <td>${p.nome}</td>
+            <td style="text-align:center;">${p.anno || '-'}</td>
+            <td style="text-align:center; ${isScaduto(p.scadCertificato) ? 'color:#dc2626; font-weight:bold;' : ''}">${formatDate(p.scadCertificato)}</td>
+            <td style="text-align:center; ${isScaduto(p.scadIscrizione) ? 'color:#dc2626; font-weight:bold;' : ''}">${formatDate(p.scadIscrizione)}</td>
+            <td></td>
+            <td></td>
+          </tr>
+        `).join('');
+
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Registro - ${titoloCorso}</title>
+              <style>
+                @page { size: A4 portrait; margin: 15mm; }
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; }
+                h1 { margin: 0 0 5px 0; font-size: 24px; color: #0f172a; }
+                h3 { margin: 0 0 20px 0; color: #64748b; font-weight: 500; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+                table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                th, td { border: 1px solid #cbd5e1; padding: 12px 8px; text-align: left; }
+                th { background-color: #f8fafc; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 11px; }
+                td { color: #334155; }
+                .print-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 20px; }
+              </style>
+            </head>
+            <body>
+              <div class="print-header">
+                <div>
+                  <h1>${titoloCorso}</h1>
+                  <h3>${giornoNome} - Ore ${editModal.oraInizio} | Istruttore: ${editModal.istruttore || 'Non assegnato'}</h3>
+                </div>
+                <div style="text-align: right; color: #64748b; font-size: 12px;">
+                  Vasca ${editModal.vasca === 'interna' ? 'Interna' : 'Esterna'} - Corsie: ${editModal.corsie.join(', ')}<br>
+                  Data Stampa: ${new Date().toLocaleDateString('it-IT')}
+                </div>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 30%;">Nome Cognome</th>
+                    <th style="text-align:center; width: 10%;">Anno</th>
+                    <th style="text-align:center; width: 15%;">Certificato</th>
+                    <th style="text-align:center; width: 15%;">Iscrizione</th>
+                    <th style="width: 15%;">Presenza</th>
+                    <th style="width: 15%;">Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRows}
+                </tbody>
+              </table>
+              <script>
+                window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }
+              <\/script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
       };
 
       // --- FUNZIONI CARICAMENTO FILE ---
@@ -790,8 +897,7 @@
                                               {fascia.label}
                                           </td>
                                           {activeCorsie.map(corsia => {
-                                              // NUOVA LOGICA: Cerca i corsi che iniziano ALL'INTERNO di questa fascia oraria,
-                                              // indipendentemente dall'intervallo della griglia (es. dalle 8:00 alle 8:59)
+                                              // NUOVA LOGICA: Cerca i corsi che iniziano ALL'INTERNO di questa fascia oraria
                                               const corsiInCella = corsiOggi.filter(c => 
                                                   c.corsie[0] === corsia && 
                                                   c.startMin >= fasciaStartMin && 
@@ -1008,116 +1114,204 @@
             </div>
           )}
 
-          {/* --- MODALE EDIT CORSO --- */}
+          {/* --- MODALE EDIT CORSO (CON TAB PARTECIPANTI) --- */}
           {editModal && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                <div className={`px-5 py-4 text-white flex justify-between items-center ${attivita.find(a => a.id === editModal.attivitaId)?.color.split(' ')[0] || 'bg-blue-600'}`}>
-                  <h3 className="font-bold text-xl flex items-center gap-2">Modifica Corso</h3>
-                  <button onClick={() => setEditModal(null)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh] max-h-[800px]">
+                
+                {/* Header Tabulato */}
+                <div className={`px-2 pt-2 flex flex-col border-b border-white/20 text-white ${attivita.find(a => a.id === editModal.attivitaId)?.color.split(' ')[0] || 'bg-blue-600'}`}>
+                  <div className="flex justify-between items-center px-3 pb-2 pt-1">
+                    <h3 className="font-bold text-xl flex items-center gap-2">Gestione Corso</h3>
+                    <button onClick={() => setEditModal(null)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                  </div>
+                  <div className="flex">
+                    <button onClick={() => setEditModal({...editModal, tab: 'dettagli'})} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 ${editModal.tab === 'dettagli' ? 'border-white bg-white/10' : 'border-transparent hover:bg-white/5 opacity-80'}`}>Impostazioni Corso</button>
+                    <button onClick={() => setEditModal({...editModal, tab: 'iscritti'})} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 ${editModal.tab === 'iscritti' ? 'border-white bg-white/10' : 'border-transparent hover:bg-white/5 opacity-80'}`}>Lista Iscritti ({editModal.partecipanti?.length || 0}{editModal.maxUtenti ? `/${editModal.maxUtenti}` : ''})</button>
+                  </div>
                 </div>
-                <div className="overflow-y-auto p-6">
-                  <form id="editCourseForm" onSubmit={salvaModificheModal}>
-                    <div className="mb-5">
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Attività</label>
-                      <select value={editModal.attivitaId} onChange={e => setEditModal({...editModal, attivitaId: e.target.value, livello: ''})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
-                        {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      </select>
-                    </div>
 
-                    {attivita.find(a => a.id === editModal.attivitaId)?.hasLevels && (
+                {/* Corpo del Modale */}
+                <div className="flex-1 overflow-y-auto p-6 bg-slate-50 relative">
+                  
+                  {/* TAB 1: IMPOSTAZIONI DEL CORSO */}
+                  {editModal.tab === 'dettagli' && (
+                    <form id="editCourseForm" onSubmit={salvaModificheModal}>
                       <div className="mb-5">
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                          {editModal.attivitaId === 'acquagym' ? 'Sottocategoria' : 'Livello'}
-                        </label>
-                        <select value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
-                          <option value="">Nessuna selezione</option>
-                          {attivita.find(a => a.id === editModal.attivitaId).levels.map(l => <option key={l.val} value={l.val}>{l.name}</option>)}
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Attività</label>
+                        <select value={editModal.attivitaId} onChange={e => setEditModal({...editModal, attivitaId: e.target.value, livello: ''})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
+                          {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
                       </div>
-                    )}
-                    
-                    {attivita.find(a => a.id === editModal.attivitaId)?.isFreeTextLevel && (
+
+                      {attivita.find(a => a.id === editModal.attivitaId)?.hasLevels && (
+                        <div className="mb-5">
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                            {editModal.attivitaId === 'acquagym' ? 'Sottocategoria' : 'Livello'}
+                          </label>
+                          <select value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
+                            <option value="">Nessuna selezione</option>
+                            {attivita.find(a => a.id === editModal.attivitaId).levels.map(l => <option key={l.val} value={l.val}>{l.name}</option>)}
+                          </select>
+                        </div>
+                      )}
+                      
+                      {attivita.find(a => a.id === editModal.attivitaId)?.isFreeTextLevel && (
+                        <div className="mb-5">
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                            Nome Società
+                          </label>
+                          <input type="text" value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} placeholder="Es. Nuoto Club" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm" />
+                        </div>
+                      )}
+
                       <div className="mb-5">
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                          Nome Società
-                        </label>
-                        <input type="text" value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} placeholder="Es. Nuoto Club" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
+                        <div className="flex gap-2 p-1 bg-slate-200 rounded-lg border border-slate-300 shadow-inner">
+                          <button type="button" onClick={() => setEditModal({...editModal, vasca: 'interna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'interna' ? 'bg-white shadow text-blue-600' : 'text-slate-600 hover:text-slate-800'}`}>Vasca Interna</button>
+                          <button type="button" onClick={() => setEditModal({...editModal, vasca: 'esterna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'esterna' ? 'bg-white shadow text-blue-600' : 'text-slate-600 hover:text-slate-800'}`}>Vasca Esterna</button>
+                        </div>
                       </div>
-                    )}
 
-                    <div className="mb-5">
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
-                      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200">
-                        <button type="button" onClick={() => setEditModal({...editModal, vasca: 'interna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'interna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Interna</button>
-                        <button type="button" onClick={() => setEditModal({...editModal, vasca: 'esterna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'esterna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Esterna</button>
+                      <div className="grid grid-cols-2 gap-4 mb-5">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Giorno</label>
+                          <select value={editModal.giorno} onChange={e => setEditModal({...editModal, giorno: Number(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
+                            {GIORNI.map((g, i) => <option key={i} value={i}>{g}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ora Inizio</label>
+                          <select value={editModal.oraInizio} onChange={e => setEditModal({...editModal, oraInizio: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
+                            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-5">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Durata (minuti)</label>
+                          <input 
+                            type="number" 
+                            value={editModal.durata} 
+                            onChange={e => setEditModal({...editModal, durata: Number(e.target.value)})}
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm"
+                            min="1"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Max Utenti (opz.)</label>
+                          <input 
+                            type="number" 
+                            value={editModal.maxUtenti} 
+                            onChange={e => setEditModal({...editModal, maxUtenti: e.target.value})}
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm"
+                            min="1"
+                            placeholder="Es. 15"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mb-5">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Corsie</label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {(editModal.vasca === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA).map(c => (
+                             <label key={c} className={`flex items-center justify-center gap-1 border-2 rounded-xl py-2.5 cursor-pointer transition-all ${editModal.corsie.includes(c) ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                                <input type="checkbox" className="hidden" checked={editModal.corsie.includes(c)} onChange={(e) => { if(e.target.checked) setEditModal({...editModal, corsie: [...editModal.corsie, c]}); else setEditModal({...editModal, corsie: editModal.corsie.filter(x => x !== c)}); }} />
+                                {c}
+                             </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="mb-2">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Istruttore</label>
+                        <input type="text" value={editModal.istruttore} onChange={e => setEditModal({...editModal, istruttore: e.target.value})} placeholder="Nome istruttore (opzionale)" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm" />
+                      </div>
+                    </form>
+                  )}
+
+                  {/* TAB 2: GESTIONE ISCRITTI */}
+                  {editModal.tab === 'iscritti' && (
+                    <div className="flex flex-col h-full gap-5">
+                      {/* ADD FORM */}
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2"><PlusIcon size={18}/> Inserisci Nuovo Partecipante</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                          <div>
+                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Nome e Cognome</label>
+                             <input type="text" value={nuovoPartecipante.nome} onChange={e => setNuovoPartecipante({...nuovoPartecipante, nome: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1" placeholder="Es. Mario Rossi" />
+                          </div>
+                          <div>
+                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Anno di Nascita</label>
+                             <input type="number" placeholder="Es. 2015" value={nuovoPartecipante.anno} onChange={e => setNuovoPartecipante({...nuovoPartecipante, anno: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1" />
+                          </div>
+                          <div>
+                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Scadenza Certificato</label>
+                             <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1 cursor-pointer" />
+                          </div>
+                          <div>
+                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Scadenza Iscrizione</label>
+                             <input type="date" value={nuovoPartecipante.scadIscrizione} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadIscrizione: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1 cursor-pointer" />
+                          </div>
+                        </div>
+                        <button type="button" onClick={aggiungiPartecipante} className="mt-4 w-full sm:w-auto sm:px-6 bg-slate-800 hover:bg-slate-900 transition-colors text-white font-bold py-2 rounded-lg text-sm shadow-sm float-right">Aggiungi alla lista</button>
+                        <div className="clear-both"></div>
+                      </div>
+
+                      {/* LIST */}
+                      <div className="flex-1 overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm h-[300px]">
+                        <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+                          <thead className="bg-slate-100 border-b border-slate-200 sticky top-0 z-10">
+                            <tr>
+                              <th className="p-3 font-semibold text-slate-700">Nome e Cognome</th>
+                              <th className="p-3 font-semibold text-center text-slate-700">Anno</th>
+                              <th className="p-3 font-semibold text-center text-slate-700">Scad. Certificato</th>
+                              <th className="p-3 font-semibold text-center text-slate-700">Scad. Iscrizione</th>
+                              <th className="p-3 text-center w-12"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {editModal.partecipanti.map((p, i) => (
+                              <tr key={i} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                                <td className="p-3 font-medium text-slate-800">{p.nome}</td>
+                                <td className="p-3 text-center text-slate-600">{p.anno || '-'}</td>
+                                <td className={`p-3 text-center font-bold ${isScaduto(p.scadCertificato) ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
+                                  {formatDate(p.scadCertificato)}
+                                  {isScaduto(p.scadCertificato) && <span className="ml-1 text-[10px] uppercase block leading-none">Scaduto</span>}
+                                </td>
+                                <td className={`p-3 text-center font-bold ${isScaduto(p.scadIscrizione) ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
+                                  {formatDate(p.scadIscrizione)}
+                                  {isScaduto(p.scadIscrizione) && <span className="ml-1 text-[10px] uppercase block leading-none">Scaduta</span>}
+                                </td>
+                                <td className="p-3 text-center">
+                                  <button type="button" onClick={() => rimuoviPartecipante(i)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
+                                </td>
+                              </tr>
+                            ))}
+                            {editModal.partecipanti.length === 0 && (
+                              <tr><td colSpan="5" className="p-8 text-center text-slate-400 italic">La lista è vuota. Aggiungi il primo partecipante utilizzando il modulo qui sopra.</td></tr>
+                            )}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-5">
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Giorno</label>
-                        <select value={editModal.giorno} onChange={e => setEditModal({...editModal, giorno: Number(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
-                          {GIORNI.map((g, i) => <option key={i} value={i}>{g}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ora Inizio</label>
-                        <select value={editModal.oraInizio} onChange={e => setEditModal({...editModal, oraInizio: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
-                          {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-5">
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Durata (minuti)</label>
-                        <input 
-                          type="number" 
-                          value={editModal.durata} 
-                          onChange={e => setEditModal({...editModal, durata: Number(e.target.value)})}
-                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none"
-                          min="1"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Max Utenti (opz.)</label>
-                        <input 
-                          type="number" 
-                          value={editModal.maxUtenti} 
-                          onChange={e => setEditModal({...editModal, maxUtenti: e.target.value})}
-                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none"
-                          min="1"
-                          placeholder="Es. 15"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mb-5">
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Corsie</label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {(editModal.vasca === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA).map(c => (
-                           <label key={c} className={`flex items-center justify-center gap-1 border-2 rounded-xl py-2.5 cursor-pointer transition-all ${editModal.corsie.includes(c) ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                              <input type="checkbox" className="hidden" checked={editModal.corsie.includes(c)} onChange={(e) => { if(e.target.checked) setEditModal({...editModal, corsie: [...editModal.corsie, c]}); else setEditModal({...editModal, corsie: editModal.corsie.filter(x => x !== c)}); }} />
-                              {c}
-                           </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="mb-2">
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Istruttore</label>
-                      <input type="text" value={editModal.istruttore} onChange={e => setEditModal({...editModal, istruttore: e.target.value})} placeholder="Nome istruttore (opzionale)" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
-                    </div>
-                  </form>
+                  )}
                 </div>
                 
-                <div className="px-6 py-4 border-t border-slate-200 flex justify-between bg-slate-50 rounded-b-2xl">
-                  <button type="button" onClick={eliminaCorsoModal} className="px-4 py-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-bold transition-colors flex items-center gap-2"><Trash2Icon size={18} /> Elimina</button>
+                {/* Footer Modal */}
+                <div className="px-6 py-4 border-t border-slate-200 flex justify-between bg-white rounded-b-2xl shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)] z-20">
+                  {editModal.tab === 'dettagli' ? (
+                    <button type="button" onClick={eliminaCorsoModal} className="px-4 py-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-bold transition-colors flex items-center gap-2"><Trash2Icon size={18} /> <span className="hidden sm:inline">Elimina Corso</span></button>
+                  ) : (
+                    <button type="button" onClick={stampaRegistro} disabled={editModal.partecipanti.length === 0} className={`px-5 py-2.5 rounded-lg font-bold transition-colors flex items-center gap-2 ${editModal.partecipanti.length > 0 ? 'text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm' : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed'}`}><PrinterIcon size={18} /> Stampa Registro</button>
+                  )}
+                  
                   <div className="flex gap-3">
                     <button type="button" onClick={() => setEditModal(null)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">Annulla</button>
-                    <button type="submit" form="editCourseForm" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><CheckIcon size={18} /> Salva</button>
+                    {/* Al click "Salva Tutto", triggera manualmente il salvataggio anche se ci troviamo nella Tab iscritti (dove il <form> non è renderizzato) */}
+                    <button type="button" onClick={(e) => { if(editModal.tab === 'iscritti') { salvaModificheModal(e); } }} form={editModal.tab === 'dettagli' ? "editCourseForm" : undefined} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><CheckIcon size={18} /> Salva Tutto</button>
                   </div>
                 </div>
               </div>
