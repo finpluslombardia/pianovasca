@@ -1435,8 +1435,8 @@
                   
                   <div className="flex gap-3">
                     <button type="button" onClick={() => setEditModal(null)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">Annulla</button>
-                    {/* Al click "Salva Tutto", triggera manualmente il salvataggio anche se ci troviamo nella Tab iscritti (dove il <form> non è renderizzato) */}
-                    <button type="button" onClick={(e) => { if(editModal.tab === 'iscritti') { salvaModificheModal(e); } }} form={editModal.tab === 'dettagli' ? "editCourseForm" : undefined} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><CheckIcon size={18} /> Salva Tutto</button>
+                    {/* Al click "Salva Tutto", salviamo direttamente i dati per qualsiasi scheda */}
+                    <button type="button" onClick={salvaModificheModal} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><CheckIcon size={18} /> Salva Tutto</button>
                   </div>
                 </div>
               </div>
