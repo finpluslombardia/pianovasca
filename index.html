@@ -65,8 +65,11 @@
     const FilterIcon = (p) => <Icon {...p}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></Icon>;
     const PrinterIcon = (p) => <Icon {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></Icon>;
     const EditIcon = (p) => <Icon {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></Icon>;
+    const CalendarIcon = (p) => <Icon {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Icon>;
+    const ChevronLeftIcon = (p) => <Icon {...p}><polyline points="15 18 9 12 15 6"/></Icon>;
+    const ChevronRightIcon = (p) => <Icon {...p}><polyline points="9 18 15 12 9 6"/></Icon>;
 
-    // --- UTILITY DATE PER PARTECIPANTI ---
+    // --- UTILITY DATE PER PARTECIPANTI E CALENDARIO ---
     const isScaduto = (dateStr) => {
       if (!dateStr) return false;
       return new Date(dateStr) < new Date();
@@ -75,6 +78,22 @@
       if (!dateStr) return '-';
       const [y, m, d] = dateStr.split('-');
       return `${d}/${m}/${y}`;
+    };
+
+    const getStartOfWeek = (date) => {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(d.setDate(diff));
+    };
+
+    const formatItalianDate = (date) => {
+      return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+    };
+
+    const toYMD = (date) => {
+      const d = new Date(date);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
 
     // --- CONFIGURAZIONE INIZIALE ---
@@ -132,7 +151,7 @@
     const isSameCourse = (c1, c2) => {
         if (!c1 && !c2) return true;
         if (!c1 || !c2) return false;
-        return c1.id === c2.id && c1.istruttore === c2.istruttore && c1.livello === c2.livello && c1.durata === c2.durata && c1.maxUtenti === c2.maxUtenti;
+        return c1.id === c2.id && c1.istruttore === c2.istruttore && c1.livello === c2.livello && c1.durata === c2.durata && c1.maxUtenti === c2.maxUtenti && c1.dataInizio === c2.dataInizio && c1.dataFine === c2.dataFine;
     };
 
     const abbrevia = (nome) => {
@@ -164,6 +183,7 @@
       const [isExportMenuOpen, setIsExportMenuOpen] = useState(false); // Menu esportazione
       const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
       const [filtriAttivita, setFiltriAttivita] = useState(ATTIVITA_DI_BASE.map(a => a.id));
+      const [inizioSettimana, setInizioSettimana] = useState(getStartOfWeek(new Date()));
 
       // --- STATI AGGIUNTA CORSO ---
       const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -176,7 +196,9 @@
           corsie: [],
           attivitaId: 'libero',
           istruttore: '',
-          livello: ''
+          livello: '',
+          dataInizio: '',
+          dataFine: ''
       });
 
       // --- STATO NUOVO PARTECIPANTE ---
@@ -371,6 +393,10 @@
           const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
           const corsi = [];
           
+          // Data esatta del giorno visualizzato in questa colonna della griglia
+          const dataGiornoEsatto = new Date(inizioSettimana.getTime() + giornoIdx * 24 * 60 * 60 * 1000);
+          const dataGiornoYMD = toYMD(dataGiornoEsatto);
+
           activeCorsie.forEach(corsia => {
               const keys = Object.keys(piano).filter(k => k.startsWith(`${vascaSelezionata}-${giornoIdx}-`) && k.endsWith(`-${corsia}`));
               keys.sort((a, b) => a.split('-')[2].localeCompare(b.split('-')[2])); 
@@ -385,6 +411,11 @@
                   const cell = piano[k];
                   
                   if (!filtriAttivita.includes(cell.id)) return;
+
+                  // --- FILTRO CALENDARIO ---
+                  const isInizioValido = !cell.dataInizio || cell.dataInizio <= dataGiornoYMD;
+                  const isFineValida = !cell.dataFine || cell.dataFine >= dataGiornoYMD;
+                  if (!isInizioValido || !isFineValida) return; // Salta se il corso non è attivo oggi
 
                   const durata = cell.durata || 45; 
                   
@@ -448,7 +479,7 @@
           });
 
           return corsiUnici;
-      }, [piano, vascaSelezionata, filtriAttivita]);
+      }, [piano, vascaSelezionata, filtriAttivita, inizioSettimana]);
 
       const corsiOggi = useMemo(() => {
           return getCorsiForDay(giornoSelezionato);
@@ -478,6 +509,8 @@
                         livello: nuovoCorso.livello,
                         durata: Number(nuovoCorso.durata),
                         maxUtenti: nuovoCorso.maxUtenti ? Number(nuovoCorso.maxUtenti) : '',
+                        dataInizio: nuovoCorso.dataInizio,
+                        dataFine: nuovoCorso.dataFine,
                         partecipanti: [] // Inizializza array vuoto
                     };
                 });
@@ -486,7 +519,7 @@
         });
 
         setIsAddModalOpen(false);
-        setNuovoCorso(prev => ({...prev, corsie: [], giorni: [], istruttore: '', livello: '', maxUtenti: '', vasca: vascaSelezionata}));
+        setNuovoCorso(prev => ({...prev, corsie: [], giorni: [], istruttore: '', livello: '', maxUtenti: '', dataInizio: '', dataFine: '', vasca: vascaSelezionata}));
       };
 
       // --- LOGICA MODIFICA/ELIMINA CORSO E PARTECIPANTI ---
@@ -509,6 +542,8 @@
           corsie: [...corso.corsie],
           istruttore: corso.data.istruttore || '',
           livello: corso.data.livello || '',
+          dataInizio: corso.data.dataInizio || '',
+          dataFine: corso.data.dataFine || '',
           infoAttivita: info,
           partecipanti: partecipantiOrdinati,
           tab: 'iscritti' // Apre di default la scheda degli iscritti
@@ -579,6 +614,8 @@
                   livello: editModal.livello,
                   durata: Number(editModal.durata),
                   maxUtenti: editModal.maxUtenti ? Number(editModal.maxUtenti) : '',
+                  dataInizio: editModal.dataInizio,
+                  dataFine: editModal.dataFine,
                   partecipanti: editModal.partecipanti // Salva la lista aggiornata
               };
           });
@@ -1122,6 +1159,27 @@
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4 mb-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Valido dal (opz.)</label>
+                        <input 
+                          type="date" 
+                          value={nuovoCorso.dataInizio} 
+                          onChange={e => setNuovoCorso({...nuovoCorso, dataInizio: e.target.value})}
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Valido al (opz.)</label>
+                        <input 
+                          type="date" 
+                          value={nuovoCorso.dataFine} 
+                          onChange={e => setNuovoCorso({...nuovoCorso, dataFine: e.target.value})}
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
                     <div className="mb-5">
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Corsie</label>
                       <div className="grid grid-cols-4 gap-2">
@@ -1248,6 +1306,27 @@
                         </div>
                       </div>
 
+                      <div className="grid grid-cols-2 gap-4 mb-5">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Valido dal (opz.)</label>
+                          <input 
+                            type="date" 
+                            value={editModal.dataInizio} 
+                            onChange={e => setEditModal({...editModal, dataInizio: e.target.value})}
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Valido al (opz.)</label>
+                          <input 
+                            type="date" 
+                            value={editModal.dataFine} 
+                            onChange={e => setEditModal({...editModal, dataFine: e.target.value})}
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
                       <div className="mb-5">
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Corsie</label>
                         <div className="grid grid-cols-4 gap-2">
@@ -1370,45 +1449,62 @@
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 
                 {/* TITOLO E SELETTORE STAGIONE */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 shrink-0 w-full md:w-auto">
-                  <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 shrink-0">
-                    🌊 Gestione Piano Vasca
-                  </h1>
-                  
-                  <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 w-full sm:w-auto">
-                    <span className="text-sm font-semibold text-slate-500">Stagione:</span>
-                    <select
-                      value={stagioneSelezionata}
-                      onChange={(e) => {
-                          if (e.target.value === 'NUOVA') {
-                              const nome = prompt("Inserisci il nome della nuova stagione (es. 2026/2027):");
-                              if (nome && nome.trim() !== '') {
-                                  const cleanName = nome.trim();
-                                  if (!stagioni.includes(cleanName)) {
-                                      setStagioni([...stagioni, cleanName]);
-                                      setTuttiPiani(prev => ({ ...prev, [cleanName]: {} }));
-                                  }
-                                  setStagioneSelezionata(cleanName);
-                              }
-                          } else {
-                              setStagioneSelezionata(e.target.value);
-                          }
-                      }}
-                      className="bg-transparent font-bold text-sm text-blue-600 outline-none cursor-pointer flex-1"
-                    >
-                      {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
-                      <option value="NUOVA" className="font-bold">+ Crea nuova...</option>
-                    </select>
-                    {stagioni.length > 1 && (
-                      <button 
-                        onClick={eliminaStagione} 
-                        className={`p-1 rounded-md transition-colors ml-1 ${confermaEliminaStagione ? 'bg-red-500 text-white' : 'text-red-500 hover:bg-red-100'}`} 
-                        title={confermaEliminaStagione ? "Clicca di nuovo per eliminare" : "Elimina Stagione"}
+                <div className="flex flex-col xl:flex-row items-start xl:items-center gap-4 shrink-0 w-full md:w-auto">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 shrink-0">
+                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2 shrink-0">
+                      🌊 Gestione Piano Vasca
+                    </h1>
+                    
+                    <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                      <span className="text-sm font-semibold text-slate-500">Stagione:</span>
+                      <select
+                        value={stagioneSelezionata}
+                        onChange={(e) => {
+                            if (e.target.value === 'NUOVA') {
+                                const nome = prompt("Inserisci il nome della nuova stagione (es. 2026/2027):");
+                                if (nome && nome.trim() !== '') {
+                                    const cleanName = nome.trim();
+                                    if (!stagioni.includes(cleanName)) {
+                                        setStagioni([...stagioni, cleanName]);
+                                        setTuttiPiani(prev => ({ ...prev, [cleanName]: {} }));
+                                    }
+                                    setStagioneSelezionata(cleanName);
+                                }
+                            } else {
+                                setStagioneSelezionata(e.target.value);
+                            }
+                        }}
+                        className="bg-transparent font-bold text-sm text-blue-600 outline-none cursor-pointer"
                       >
-                        <Trash2Icon size={16} />
-                      </button>
-                    )}
+                        {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
+                        <option value="NUOVA" className="font-bold">+ Crea nuova...</option>
+                      </select>
+                      {stagioni.length > 1 && (
+                        <button 
+                          onClick={eliminaStagione} 
+                          className={`p-1 rounded-md transition-colors ml-1 ${confermaEliminaStagione ? 'bg-red-500 text-white' : 'text-red-500 hover:bg-red-100'}`} 
+                          title={confermaEliminaStagione ? "Clicca di nuovo per eliminare" : "Elimina Stagione"}
+                        >
+                          <Trash2Icon size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* CONTROLLO SETTIMANE */}
+                  <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm shrink-0 w-full sm:w-auto">
+                    <button onClick={() => setInizioSettimana(prev => new Date(prev.getTime() - 7 * 24 * 60 * 60 * 1000))} className="p-1.5 hover:bg-slate-100 rounded-md text-slate-600 transition-colors"><ChevronLeftIcon size={18} /></button>
+                    <div className="flex flex-col items-center justify-center px-2 min-w-[200px]">
+                       <span className="text-xs text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1"><CalendarIcon size={12}/> Settimana Attiva</span>
+                       <span className="text-sm font-bold text-slate-800">
+                         {formatItalianDate(inizioSettimana)} - {formatItalianDate(new Date(inizioSettimana.getTime() + 6 * 24 * 60 * 60 * 1000))}
+                       </span>
+                    </div>
+                    <button onClick={() => setInizioSettimana(prev => new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000))} className="p-1.5 hover:bg-slate-100 rounded-md text-slate-600 transition-colors"><ChevronRightIcon size={18} /></button>
+                    <div className="w-px h-6 bg-slate-200 mx-1"></div>
+                    <button onClick={() => setInizioSettimana(getStartOfWeek(new Date()))} className="px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-md transition-colors">Oggi</button>
+                  </div>
+
                 </div>
                 
                 <button 
