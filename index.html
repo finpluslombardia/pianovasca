@@ -62,6 +62,7 @@
     const XIcon = (p) => <Icon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
     const PlusIcon = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
     const UsersIcon = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
+    const FilterIcon = (p) => <Icon {...p}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></Icon>;
 
     // --- CONFIGURAZIONE INIZIALE ---
     const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
@@ -149,6 +150,8 @@
       const [intervallo, setIntervallo] = useState(30); 
       const [editModal, setEditModal] = useState(null); 
       const [isExportMenuOpen, setIsExportMenuOpen] = useState(false); // Menu esportazione
+      const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+      const [filtriAttivita, setFiltriAttivita] = useState(ATTIVITA_DI_BASE.map(a => a.id));
 
       // --- STATI AGGIUNTA CORSO ---
       const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -365,9 +368,13 @@
                   const [h, m] = timeStr.split(':').map(Number);
                   const startMin = h * 60 + m;
                   const cell = piano[k];
+                  
+                  // --- NUOVA LOGICA: Filtro Attività ---
+                  if (!filtriAttivita.includes(cell.id)) return;
+
                   const durata = cell.durata || 45; 
                   
-                  if (startMin < currentCourseEndMin && isSameCourse(cell, currentCourse.data)) {
+                  if (startMin < currentCourseEndMin && isSameCourse(cell, currentCourse?.data)) {
                       currentCourse.keys.push(k);
                       currentCourseEndMin = Math.max(currentCourseEndMin, startMin + durata);
                       return;
@@ -427,7 +434,7 @@
           });
 
           return corsiUnici;
-      }, [piano, vascaSelezionata]);
+      }, [piano, vascaSelezionata, filtriAttivita]);
 
       const corsiOggi = useMemo(() => {
           return getCorsiForDay(giornoSelezionato);
@@ -1232,15 +1239,67 @@
                   </div>
               </div>
 
-              <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm shrink-0">
-                <ClockIcon size={16} className="text-slate-500" />
-                <span className="text-sm font-medium text-slate-600 hidden sm:inline">Vista Griglia:</span>
-                <select value={intervallo} onChange={(e) => setIntervallo(Number(e.target.value))} className="text-sm font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
-                  <option value={60}>Ogni 60 min</option>
-                  <option value={45}>Ogni 45 min</option>
-                  <option value={30}>Ogni 30 min</option>
-                  <option value={15}>Ogni 15 min</option>
-                </select>
+              <div className="flex items-center gap-3 shrink-0">
+                {/* MENU FILTRI */}
+                <div className="relative">
+                  <button 
+                    onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+                    className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
+                  >
+                    <FilterIcon size={16} className={filtriAttivita.length < attivita.length ? "text-blue-500 fill-blue-100" : "text-slate-500"} />
+                    <span className="hidden sm:inline">Filtri:</span>
+                    <span className="font-bold text-slate-800">
+                      {filtriAttivita.length === attivita.length ? 'Tutte' : `${filtriAttivita.length}`}
+                    </span>
+                  </button>
+                  
+                  {isFilterMenuOpen && (
+                    <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 z-50 min-w-[220px] flex flex-col gap-2">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtra Attività</span>
+                        <button 
+                          onClick={() => setFiltriAttivita(attivita.map(a => a.id))}
+                          className="text-xs font-bold text-blue-600 hover:underline"
+                        >
+                          Tutte
+                        </button>
+                      </div>
+                      <div className="h-px bg-slate-200 mb-1"></div>
+                      <div className="max-h-60 overflow-y-auto flex flex-col gap-1.5 pr-1">
+                        {attivita.map(a => (
+                          <label key={a.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-slate-700 hover:bg-slate-50 p-1.5 rounded transition-colors">
+                            <input 
+                              type="checkbox" 
+                              checked={filtriAttivita.includes(a.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setFiltriAttivita([...filtriAttivita, a.id]);
+                                } else {
+                                  setFiltriAttivita(filtriAttivita.filter(id => id !== a.id));
+                                }
+                              }}
+                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <div className={`w-3 h-3 rounded-full ${a.color.split(' ')[0]}`}></div>
+                            {a.name}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* VISTA GRIGLIA */}
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
+                  <ClockIcon size={16} className="text-slate-500" />
+                  <span className="text-sm font-medium text-slate-600 hidden sm:inline">Vista:</span>
+                  <select value={intervallo} onChange={(e) => setIntervallo(Number(e.target.value))} className="text-sm font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
+                    <option value={60}>60 min</option>
+                    <option value={45}>45 min</option>
+                    <option value={30}>30 min</option>
+                    <option value={15}>15 min</option>
+                  </select>
+                </div>
               </div>
             </div>
 
