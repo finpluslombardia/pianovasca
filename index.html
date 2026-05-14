@@ -180,6 +180,7 @@
 
       // --- STATO NUOVO PARTECIPANTE ---
       const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+      const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
 
       // --- STATI FIREBASE E SALVATAGGIO ---
       const [user, setUser] = useState(null);
