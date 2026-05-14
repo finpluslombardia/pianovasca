@@ -488,7 +488,7 @@
       };
 
       // --- LOGICA MODIFICA/ELIMINA CORSO E PARTECIPANTI ---
-      const handleDoubleClickCorso = (e, corso) => {
+      const handleClickCorso = (e, corso) => {
         e.stopPropagation();
         const info = attivita.find(a => a.id === corso.data.id);
         const vascaOriginale = corso.keys[0].split('-')[0];
@@ -929,7 +929,7 @@
                                                           return (
                                                               <div 
                                                                   key={i}
-                                                                  onDoubleClick={(e) => handleDoubleClickCorso(e, corso)}
+                                                                  onClick={(e) => handleClickCorso(e, corso)}
                                                                   className={`absolute z-10 left-0 rounded-lg flex flex-col shadow-md cursor-pointer hover:brightness-95 hover:shadow-lg transition-all overflow-hidden border border-white/20 ${infoAttivita?.color || 'bg-slate-500 text-white'}`}
                                                                   style={{ top: `${topOffset}px`, height: `${altezzaPX}px`, width: larghezzaCalc, minHeight: '24px' }}
                                                               >
@@ -969,9 +969,9 @@
                                                                       <span className="truncate pr-1 hide-on-pdf">{nomeLivello ? infoAttivita?.name : ''}</span>
                                                                       <span className="truncate pr-1 show-on-pdf">{nomeLivello ? nomeBrev : ''}</span>
                                                                       <div className="flex items-center gap-1 shrink-0">
-                                                                        {corso.data.maxUtenti && (
-                                                                          <span className="flex items-center gap-0.5" title={`Max ${corso.data.maxUtenti} utenti`}>
-                                                                            <UsersIcon size={10} /> {corso.data.maxUtenti}
+                                                                        {(corso.data.maxUtenti || (corso.data.partecipanti && corso.data.partecipanti.length > 0)) && (
+                                                                          <span className="flex items-center gap-0.5" title={`Iscritti: ${corso.data.partecipanti?.length || 0}${corso.data.maxUtenti ? ` / Max ${corso.data.maxUtenti}` : ''}`}>
+                                                                            <UsersIcon size={10} /> {corso.data.partecipanti?.length || 0}{corso.data.maxUtenti ? `/${corso.data.maxUtenti}` : ''}
                                                                           </span>
                                                                         )}
                                                                         <span className="shrink-0">{corso.durata}'</span>
@@ -1126,8 +1126,8 @@
                     <button onClick={() => setEditModal(null)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                   </div>
                   <div className="flex">
-                    <button onClick={() => setEditModal({...editModal, tab: 'dettagli'})} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 ${editModal.tab === 'dettagli' ? 'border-white bg-white/10' : 'border-transparent hover:bg-white/5 opacity-80'}`}>Impostazioni Corso</button>
                     <button onClick={() => setEditModal({...editModal, tab: 'iscritti'})} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 ${editModal.tab === 'iscritti' ? 'border-white bg-white/10' : 'border-transparent hover:bg-white/5 opacity-80'}`}>Lista Iscritti ({editModal.partecipanti?.length || 0}{editModal.maxUtenti ? `/${editModal.maxUtenti}` : ''})</button>
+                    <button onClick={() => setEditModal({...editModal, tab: 'dettagli'})} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 ${editModal.tab === 'dettagli' ? 'border-white bg-white/10' : 'border-transparent hover:bg-white/5 opacity-80'}`}>Impostazioni Corso</button>
                   </div>
                 </div>
 
