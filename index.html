@@ -513,6 +513,18 @@
           return list;
       }, [piano]);
 
+      const giorniConCorsiPerUtenteRapido = useMemo(() => {
+        return addUtenteRapido.attivitaId
+          ? [...new Set(tuttiCorsiSelect.filter(c => c.data.id === addUtenteRapido.attivitaId).map(c => c.giorno))].sort((a, b) => a - b)
+          : [];
+      }, [tuttiCorsiSelect, addUtenteRapido.attivitaId]);
+
+      const corsiPerUtenteRapido = useMemo(() => {
+        return (addUtenteRapido.attivitaId && addUtenteRapido.giorno !== '')
+          ? tuttiCorsiSelect.map((c, index) => ({...c, originalIndex: index})).filter(c => c.data.id === addUtenteRapido.attivitaId && c.giorno === Number(addUtenteRapido.giorno))
+          : [];
+      }, [tuttiCorsiSelect, addUtenteRapido.attivitaId, addUtenteRapido.giorno]);
+
       const salvaUtenteRapido = (e) => {
         e.preventDefault();
         if (addUtenteRapido.corsoIndex === '') return alert("Seleziona un corso!");
@@ -541,7 +553,7 @@
         });
 
         setIsAddUserModalOpen(false);
-        setAddUtenteRapido({ corsoIndex: '', nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+        setAddUtenteRapido({ attivitaId: '', giorno: '', corsoIndex: '', nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
       };
 
       // --- LOGICA AGGIUNTA NUOVO CORSO ---
