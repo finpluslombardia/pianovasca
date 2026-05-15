@@ -72,6 +72,7 @@
     const ChevronRightIcon = (p) => <Icon {...p}><polyline points="9 18 15 12 9 6"/></Icon>;
     const ArrowUpIcon = (p) => <Icon {...p}><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></Icon>;
     const ArrowDownIcon = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></Icon>;
+    const StarIcon = (p) => <Icon {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Icon>;
 
     // --- UTILITY DATE PER PARTECIPANTI E CALENDARIO ---
     const isScaduto = (dateStr) => {
@@ -174,6 +175,7 @@
       // --- STATO DELL'APPLICAZIONE ---
       const [stagioni, setStagioni] = useState(['2025/2026']);
       const [stagioneSelezionata, setStagioneSelezionata] = useState('2025/2026');
+      const [stagionePredefinita, setStagionePredefinita] = useState('2025/2026');
       const [tuttiPiani, setTuttiPiani] = useState({ '2025/2026': {} });
       
       // Il piano corrente deriva dalla stagione selezionata
@@ -308,20 +310,28 @@
             // Nuovo formato con gestione Stagioni multiple
             if (data.tuttiPiani) {
               setTuttiPiani(data.tuttiPiani);
+              
+              let defaultSeason = data.stagionePredefinita;
+              
               if (data.stagioni && data.stagioni.length > 0) {
                  setStagioni(data.stagioni);
                  
-                 // Seleziona SEMPRE la prima stagione in lista all'apertura del sito
+                 if (!defaultSeason || !data.stagioni.includes(defaultSeason)) {
+                     defaultSeason = data.stagioni[0];
+                 }
+                 setStagionePredefinita(defaultSeason);
+                 
+                 // Seleziona SEMPRE la stagione predefinita all'apertura del sito
                  setStagioneSelezionata((prev) => {
                      if (!initialLoadDone.current) {
-                         return data.stagioni[0]; // Forza la prima in lista
+                         return defaultSeason; // Forza la predefinita
                      }
-                     return data.stagioni.includes(prev) ? prev : data.stagioni[0];
+                     return data.stagioni.includes(prev) ? prev : defaultSeason;
                  });
                  initialLoadDone.current = true;
               }
               // Salviamo anche l'ordine delle stagioni nel riferimento per riconoscerne le modifiche
-              lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni });
+              lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni, def: defaultSeason });
             } 
             // Migrazione automatica dal vecchio formato singolo a Stagioni
             else if (data.piano) {
@@ -337,6 +347,7 @@
               const initialTuttiPiani = { [defaultSeason]: pianoMigrato };
               setTuttiPiani(initialTuttiPiani);
               setStagioni([defaultSeason]);
+              setStagionePredefinita(defaultSeason);
               
               setStagioneSelezionata((prev) => {
                   if (!initialLoadDone.current) return defaultSeason;
@@ -344,7 +355,7 @@
               });
               initialLoadDone.current = true;
               
-              lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason] });
+              lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason], def: defaultSeason });
             }
           }
         }, (error) => console.error("Errore sync Cloud:", error));
@@ -352,7 +363,7 @@
       }, [user, firebaseInstances]);
 
       // --- FUNZIONE DI SALVATAGGIO CLOUD ---
-      const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare) => {
+      const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare, stagionePredef) => {
         if (!user || !firebaseInstances) {
             setStatoSalvataggio('error');
             setTimeout(() => setStatoSalvataggio('idle'), 4000);
@@ -362,8 +373,8 @@
         try {
             const { db, appId, doc, setDoc } = firebaseInstances;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
-            await setDoc(docRef, { tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, updatedAt: new Date().toISOString() });
-            lastSavedPiano.current = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare }); 
+            await setDoc(docRef, { tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, updatedAt: new Date().toISOString() });
+            lastSavedPiano.current = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef }); 
             setStatoSalvataggio('saved');
             setTimeout(() => setStatoSalvataggio('idle'), 3000);
         } catch (error) {
@@ -374,11 +385,11 @@
 
       useEffect(() => {
         if (!user || !firebaseInstances) return;
-        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni });
+        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita });
         if (currentStateStr === lastSavedPiano.current) return; 
-        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni), 1500);
+        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita), 1500);
         return () => clearTimeout(timer);
-      }, [tuttiPiani, stagioni, user, firebaseInstances]);
+      }, [tuttiPiani, stagioni, stagionePredefinita, user, firebaseInstances]);
 
       // --- CALCOLATORI DI TEMPO E VISTE ---
       const TIME_OPTIONS = useMemo(() => {
@@ -1039,6 +1050,9 @@
           return nuovoTutti;
         });
         setStagioneSelezionata(nuoveStagioni[0]);
+        if (stagionePredefinita === stagioneSelezionata) {
+            setStagionePredefinita(nuoveStagioni[0]);
+        }
         setConfermaEliminaStagione(false);
       };
 
@@ -1370,14 +1384,23 @@
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
                 <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
-                  <h3 className="font-bold text-lg flex items-center gap-2">Ordina Stagioni</h3>
+                  <h3 className="font-bold text-lg flex items-center gap-2">Gestione Stagioni</h3>
                   <button onClick={() => setIsGestioneStagioniOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                 </div>
                 <div className="p-4 flex flex-col gap-2 bg-slate-50 overflow-y-auto">
-                  <p className="text-sm text-slate-500 mb-2">Usa le frecce per modificare l'ordine in cui le stagioni appaiono nel menu a tendina.</p>
+                  <p className="text-sm text-slate-500 mb-3">Usa le frecce per l'ordine nel menu, o clicca la stella per impostare la stagione di avvio.</p>
                   {stagioni.map((s, idx) => (
-                    <div key={s} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
-                      <span className="font-bold text-slate-700">{s}</span>
+                    <div key={s} className={`flex items-center justify-between bg-white border p-3 rounded-lg shadow-sm transition-colors ${stagionePredefinita === s ? 'border-yellow-400 ring-1 ring-yellow-400' : 'border-slate-200'}`}>
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => setStagionePredefinita(s)}
+                          className={`p-1.5 rounded-full transition-colors ${stagionePredefinita === s ? 'text-yellow-500 bg-yellow-50' : 'text-slate-300 hover:text-yellow-500 hover:bg-slate-100'}`}
+                          title={stagionePredefinita === s ? "Stagione di Avvio" : "Imposta come avvio"}
+                        >
+                          <StarIcon size={20} className={stagionePredefinita === s ? "fill-yellow-500" : ""} />
+                        </button>
+                        <span className={`font-bold ${stagionePredefinita === s ? 'text-slate-900' : 'text-slate-700'}`}>{s}</span>
+                      </div>
                       <div className="flex items-center gap-1">
                         <button 
                           onClick={() => {
@@ -1835,7 +1858,7 @@
                            >
                              {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
                              <option value="NUOVA" className="font-bold text-blue-600">+ Crea nuova...</option>
-                             {stagioni.length > 1 && <option value="ORDINA" className="font-bold text-slate-600">⚙️ Ordina stagioni...</option>}
+                             {stagioni.length > 1 && <option value="ORDINA" className="font-bold text-slate-600">⚙️ Gestione stagioni...</option>}
                            </select>
                            {stagioni.length > 1 && (
                              <button 
