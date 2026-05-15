@@ -1138,21 +1138,55 @@
                 </div>
                 <div className="overflow-y-auto p-6">
                   <form id="addUserForm" onSubmit={salvaUtenteRapido}>
-                    <div className="mb-5">
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Seleziona Corso</label>
-                      <select value={addUtenteRapido.corsoIndex} onChange={e => setAddUtenteRapido({...addUtenteRapido, corsoIndex: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
-                        <option value="">-- Scegli un corso --</option>
-                        {tuttiCorsiSelect.map((c, idx) => {
-                           const infoAtt = attivita.find(a => a.id === c.data.id);
-                           const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
-                           const nomeCompleto = nomeLiv ? `${infoAtt?.name} - ${nomeLiv}` : infoAtt?.name;
-                           return (
-                             <option key={idx} value={idx}>
-                               {GIORNI[c.giorno]} {c.oraInizio} | {c.vasca === 'interna' ? 'V. Int.' : 'V. Est.'} | {nomeCompleto}
-                             </option>
-                           )
-                        })}
-                      </select>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">1. Attività</label>
+                        <select
+                          value={addUtenteRapido.attivitaId}
+                          onChange={e => setAddUtenteRapido({...addUtenteRapido, attivitaId: e.target.value, giorno: '', corsoIndex: ''})}
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none"
+                        >
+                          <option value="">-- Seleziona --</option>
+                          {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">2. Giorno</label>
+                        <select
+                          value={addUtenteRapido.giorno}
+                          onChange={e => setAddUtenteRapido({...addUtenteRapido, giorno: e.target.value, corsoIndex: ''})}
+                          disabled={!addUtenteRapido.attivitaId}
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none disabled:opacity-50"
+                        >
+                          <option value="">{addUtenteRapido.attivitaId ? '-- Seleziona --' : 'Attività'}</option>
+                          {giorniConCorsiPerUtenteRapido.map(gIdx => (
+                            <option key={gIdx} value={gIdx}>{GIORNI[gIdx]}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">3. Corso (Ora)</label>
+                        <select
+                          value={addUtenteRapido.corsoIndex}
+                          onChange={e => setAddUtenteRapido({...addUtenteRapido, corsoIndex: e.target.value})}
+                          disabled={addUtenteRapido.giorno === ''}
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none disabled:opacity-50"
+                        >
+                          <option value="">{addUtenteRapido.giorno !== '' ? '-- Seleziona --' : 'Giorno'}</option>
+                          {corsiPerUtenteRapido.map(c => {
+                             const infoAtt = attivita.find(a => a.id === c.data.id);
+                             const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
+                             const livelloStr = nomeLiv ? ` - ${nomeLiv}` : '';
+                             return (
+                               <option key={c.originalIndex} value={c.originalIndex}>
+                                 {c.oraInizio} | {c.vasca === 'interna' ? 'V. Int.' : 'V. Est.'}{livelloStr}
+                               </option>
+                             )
+                          })}
+                        </select>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 mb-5">
