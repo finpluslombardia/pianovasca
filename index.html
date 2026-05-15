@@ -231,6 +231,7 @@
       const [confermaEliminaStagione, setConfermaEliminaStagione] = useState(false);
       const [firebaseInstances, setFirebaseInstances] = useState(null);
       const lastSavedPiano = useRef(""); 
+      const initialLoadDone = useRef(false);
 
       // --- INIZIALIZZAZIONE FIREBASE DINAMICA ---
       useEffect(() => {
