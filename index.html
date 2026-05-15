@@ -70,6 +70,8 @@
     const CalendarIcon = (p) => <Icon {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Icon>;
     const ChevronLeftIcon = (p) => <Icon {...p}><polyline points="15 18 9 12 15 6"/></Icon>;
     const ChevronRightIcon = (p) => <Icon {...p}><polyline points="9 18 15 12 9 6"/></Icon>;
+    const ArrowUpIcon = (p) => <Icon {...p}><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></Icon>;
+    const ArrowDownIcon = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></Icon>;
 
     // --- UTILITY DATE PER PARTECIPANTI E CALENDARIO ---
     const isScaduto = (dateStr) => {
@@ -214,6 +216,9 @@
       // --- STATI RICERCA SOCIO ---
       const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
       const [searchQuery, setSearchQuery] = useState('');
+
+      // --- STATI GESTIONE STAGIONI ---
+      const [isGestioneStagioniOpen, setIsGestioneStagioniOpen] = useState(false);
 
       // --- STATI FIREBASE E SALVATAGGIO ---
       const [user, setUser] = useState(null);
@@ -492,6 +497,7 @@
       }, [piano, vascaSelezionata, filtriAttivita, inizioSettimana]);
 
       const corsiOggi = useMemo(() => {
+          if (giornoSelezionato === 7) return [];
           return getCorsiForDay(giornoSelezionato);
       }, [getCorsiForDay, giornoSelezionato]);
 
@@ -653,6 +659,7 @@
         e.stopPropagation();
         const info = attivita.find(a => a.id === corso.data.id);
         const vascaOriginale = corso.keys[0].split('-')[0];
+        const giornoOriginale = Number(corso.keys[0].split('-')[1]);
         
         // Ordina alfabeticamente all'apertura per sicurezza
         const partecipantiOrdinati = [...(corso.data.partecipanti || [])].sort((a, b) => a.nome.localeCompare(b.nome));
@@ -661,7 +668,7 @@
           corsoOriginale: corso,
           vasca: vascaOriginale,
           attivitaId: corso.data.id,
-          giorno: giornoSelezionato,
+          giorno: giornoOriginale,
           oraInizio: corso.oraInizio,
           durata: corso.durata,
           maxUtenti: corso.data.maxUtenti || '',
@@ -1063,7 +1070,7 @@
       const fascePomeriggio = fasceOrarie.filter(f => Number(f.id.split(':')[0]) >= 14);
 
       // Funzione riutilizzabile per renderizzare ogni singola tabella
-      const renderGriglia = (fasce, titolo) => {
+      const renderGriglia = (fasce, titolo, corsiDelGiorno, gIdx) => {
           const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
           const ROW_HEIGHT = 60; // Altezza fissa di base per ogni riga (in px)
           const pixelsPerMin = ROW_HEIGHT / intervallo; // Calcolo dinamico dello zoom in base all'intervallo
@@ -1096,7 +1103,7 @@
                                           </td>
                                           {activeCorsie.map(corsia => {
                                               // NUOVA LOGICA: Cerca i corsi che iniziano ALL'INTERNO di questa fascia oraria
-                                              const corsiInCella = corsiOggi.filter(c => 
+                                              const corsiInCella = corsiDelGiorno.filter(c => 
                                                   c.corsie[0] === corsia && 
                                                   c.startMin >= fasciaStartMin && 
                                                   c.startMin < (fasciaStartMin + intervallo)
@@ -1108,7 +1115,7 @@
                                                       className="border-b border-r border-slate-200 relative p-0 cursor-pointer hover:bg-blue-50/30 transition-colors" 
                                                       style={{ minWidth: '80px' }}
                                                       onDoubleClick={() => {
-                                                          setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [giornoSelezionato], oraInizio: fascia.id, corsie: [corsia]}));
+                                                          setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [gIdx], oraInizio: fascia.id, corsie: [corsia]}));
                                                           setIsAddModalOpen(true);
                                                       }}
                                                   >
@@ -1340,6 +1347,59 @@
                 <div className="px-6 py-4 border-t border-slate-200 flex gap-3 justify-end bg-slate-50 rounded-b-2xl">
                   <button type="button" onClick={() => setIsAddUserModalOpen(false)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">Annulla</button>
                   <button type="submit" form="addUserForm" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><UserPlusIcon size={18} /> Aggiungi Iscritto</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- MODALE ORDINA STAGIONI --- */}
+          {isGestioneStagioniOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
+                  <h3 className="font-bold text-lg flex items-center gap-2">Ordina Stagioni</h3>
+                  <button onClick={() => setIsGestioneStagioniOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                </div>
+                <div className="p-4 flex flex-col gap-2 bg-slate-50 overflow-y-auto">
+                  <p className="text-sm text-slate-500 mb-2">Usa le frecce per modificare l'ordine in cui le stagioni appaiono nel menu a tendina.</p>
+                  {stagioni.map((s, idx) => (
+                    <div key={s} className="flex items-center justify-between bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
+                      <span className="font-bold text-slate-700">{s}</span>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => {
+                            if (idx === 0) return;
+                            const newStagioni = [...stagioni];
+                            const temp = newStagioni[idx - 1];
+                            newStagioni[idx - 1] = newStagioni[idx];
+                            newStagioni[idx] = temp;
+                            setStagioni(newStagioni);
+                          }}
+                          disabled={idx === 0}
+                          className="p-1.5 rounded-md transition-colors text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default"
+                        >
+                          <ArrowUpIcon size={18} />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (idx === stagioni.length - 1) return;
+                            const newStagioni = [...stagioni];
+                            const temp = newStagioni[idx + 1];
+                            newStagioni[idx + 1] = newStagioni[idx];
+                            newStagioni[idx] = temp;
+                            setStagioni(newStagioni);
+                          }}
+                          disabled={idx === stagioni.length - 1}
+                          className="p-1.5 rounded-md transition-colors text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default"
+                        >
+                          <ArrowDownIcon size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
+                  <button onClick={() => setIsGestioneStagioniOpen(false)} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all">Chiudi</button>
                 </div>
               </div>
             </div>
@@ -1823,7 +1883,7 @@
                   {/* TASTO AGGIUNGI CORSO */}
                   <button 
                     onClick={() => {
-                      setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [giornoSelezionato], oraInizio: '06:00'}));
+                      setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [giornoSelezionato === 7 ? 0 : giornoSelezionato], oraInizio: '06:00'}));
                       setIsAddModalOpen(true);
                     }}
                     className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
