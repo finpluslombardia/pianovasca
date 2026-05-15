@@ -1769,6 +1769,9 @@
                         {giorno}
                       </button>
                     ))}
+                    <button onClick={() => setGiornoSelezionato(7)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === 7 ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
+                      Settimana
+                    </button>
                   </div>
               </div>
 
@@ -1838,12 +1841,21 @@
 
             <div className="bg-blue-50 text-blue-800 p-3 rounded-lg flex items-center gap-3 text-sm border border-blue-100">
               <InfoIcon size={18} className="text-blue-500 shrink-0" />
-              <p>Stai visualizzando la <strong>Stagione {stagioneSelezionata}</strong> (<strong>Vasca {vascaSelezionata === 'interna' ? 'Interna' : 'Esterna'}</strong> - <strong>{GIORNI[giornoSelezionato]}</strong>). Clicca <strong>Aggiungi Corso</strong> per inserire una nuova attività.</p>
+              <p>Stai visualizzando la <strong>Stagione {stagioneSelezionata}</strong> (<strong>Vasca {vascaSelezionata === 'interna' ? 'Interna' : 'Esterna'}</strong> - <strong>{giornoSelezionato === 7 ? 'Tutta la Settimana' : GIORNI[giornoSelezionato]}</strong>). Clicca <strong>Aggiungi Corso</strong> per inserire una nuova attività.</p>
             </div>
 
             {/* TABELLA UNICA - Esportata intera in un singolo foglio PDF */}
             <div id="griglia-piano-vasca" className="bg-transparent relative w-full">
-              {renderGriglia(fasceOrarie, null)}
+              {giornoSelezionato === 7 ? (
+                <div className="flex flex-col gap-8">
+                  {GIORNI.map((gNome, gIdx) => {
+                    const corsiDiQuestoGiorno = getCorsiForDay(gIdx);
+                    return <React.Fragment key={gIdx}>{renderGriglia(fasceOrarie, gNome, corsiDiQuestoGiorno, gIdx)}</React.Fragment>;
+                  })}
+                </div>
+              ) : (
+                renderGriglia(fasceOrarie, null, corsiOggi, giornoSelezionato)
+              )}
             </div>
 
           </main>
