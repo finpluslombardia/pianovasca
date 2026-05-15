@@ -309,13 +309,15 @@
               setTuttiPiani(data.tuttiPiani);
               if (data.stagioni && data.stagioni.length > 0) {
                  setStagioni(data.stagioni);
+                 
                  // Seleziona SEMPRE la prima stagione in lista all'apertura del sito
-                 if (!initialLoadDone.current) {
-                    setStagioneSelezionata(data.stagioni[0]);
-                    initialLoadDone.current = true;
-                 } else if (!data.stagioni.includes(stagioneSelezionata)) {
-                    setStagioneSelezionata(data.stagioni[0]);
-                 }
+                 setStagioneSelezionata((prev) => {
+                     if (!initialLoadDone.current) {
+                         return data.stagioni[0]; // Forza la prima in lista
+                     }
+                     return data.stagioni.includes(prev) ? prev : data.stagioni[0];
+                 });
+                 initialLoadDone.current = true;
               }
               // Salviamo anche l'ordine delle stagioni nel riferimento per riconoscerne le modifiche
               lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni });
@@ -334,8 +336,13 @@
               const initialTuttiPiani = { [defaultSeason]: pianoMigrato };
               setTuttiPiani(initialTuttiPiani);
               setStagioni([defaultSeason]);
-              setStagioneSelezionata(defaultSeason);
+              
+              setStagioneSelezionata((prev) => {
+                  if (!initialLoadDone.current) return defaultSeason;
+                  return prev;
+              });
               initialLoadDone.current = true;
+              
               lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason] });
             }
           }
