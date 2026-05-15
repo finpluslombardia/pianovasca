@@ -309,8 +309,11 @@
               setTuttiPiani(data.tuttiPiani);
               if (data.stagioni && data.stagioni.length > 0) {
                  setStagioni(data.stagioni);
-                 // Seleziona la prima stagione caricata solo se non ne abbiamo una attiva
-                 if (!data.stagioni.includes(stagioneSelezionata)) {
+                 // Seleziona SEMPRE la prima stagione in lista all'apertura del sito
+                 if (!initialLoadDone.current) {
+                    setStagioneSelezionata(data.stagioni[0]);
+                    initialLoadDone.current = true;
+                 } else if (!data.stagioni.includes(stagioneSelezionata)) {
                     setStagioneSelezionata(data.stagioni[0]);
                  }
               }
@@ -332,6 +335,7 @@
               setTuttiPiani(initialTuttiPiani);
               setStagioni([defaultSeason]);
               setStagioneSelezionata(defaultSeason);
+              initialLoadDone.current = true;
               lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason] });
             }
           }
