@@ -314,7 +314,8 @@
                     setStagioneSelezionata(data.stagioni[0]);
                  }
               }
-              lastSavedPiano.current = JSON.stringify(data.tuttiPiani);
+              // Salviamo anche l'ordine delle stagioni nel riferimento per riconoscerne le modifiche
+              lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni });
             } 
             // Migrazione automatica dal vecchio formato singolo a Stagioni
             else if (data.piano) {
@@ -331,7 +332,7 @@
               setTuttiPiani(initialTuttiPiani);
               setStagioni([defaultSeason]);
               setStagioneSelezionata(defaultSeason);
-              lastSavedPiano.current = JSON.stringify(initialTuttiPiani);
+              lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason] });
             }
           }
         }, (error) => console.error("Errore sync Cloud:", error));
@@ -350,7 +351,7 @@
             const { db, appId, doc, setDoc } = firebaseInstances;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
             await setDoc(docRef, { tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, updatedAt: new Date().toISOString() });
-            lastSavedPiano.current = JSON.stringify(pianiDaSalvare); 
+            lastSavedPiano.current = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare }); 
             setStatoSalvataggio('saved');
             setTimeout(() => setStatoSalvataggio('idle'), 3000);
         } catch (error) {
@@ -361,8 +362,8 @@
 
       useEffect(() => {
         if (!user || !firebaseInstances) return;
-        const currentPianoStr = JSON.stringify(tuttiPiani);
-        if (currentPianoStr === lastSavedPiano.current) return; 
+        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni });
+        if (currentStateStr === lastSavedPiano.current) return; 
         const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni), 1500);
         return () => clearTimeout(timer);
       }, [tuttiPiani, stagioni, user, firebaseInstances]);
