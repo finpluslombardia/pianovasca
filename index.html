@@ -690,6 +690,7 @@
           });
           setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
           setEditingPartecipanteIndex(null);
+          setShowAddForm(false);
       };
 
       // --- LOGICA AGGIUNTA NUOVO CORSO ---
@@ -2055,254 +2056,259 @@
             </div>
           )}
 
-          {/* HEADER E CONTROLLI */}
-          <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm p-4">
-            <div className="w-full mx-auto">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-                
-                {/* TITOLO E SELETTORE STAGIONE */}
-                <div className="flex flex-col xl:flex-row items-start xl:items-center gap-4 shrink-0 w-full md:w-auto">
-                  <div className="flex flex-col shrink-0">
-                    <h1 className="text-2xl font-bold text-slate-800 leading-tight">
-                      Gestione Piano Vasca
-                    </h1>
-                    <span className="text-sm font-medium text-slate-500">Centro Federale Lampugnano</span>
-                  </div>
+          {/* WRAPPER STICKY PER HEADER E SECONDO BANNER */}
+          <div className="sticky top-0 z-30 shadow-sm flex flex-col">
+            
+            {/* HEADER E CONTROLLI */}
+            <header className="bg-white border-b border-slate-200 p-4 relative z-20">
+              <div className="w-full mx-auto">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                  
+                  {/* TITOLO E SELETTORE STAGIONE */}
+                  <div className="flex flex-col xl:flex-row items-start xl:items-center gap-4 shrink-0 w-full md:w-auto">
+                    <div className="flex flex-col shrink-0">
+                      <h1 className="text-2xl font-bold text-slate-800 leading-tight">
+                        Gestione Piano Vasca
+                      </h1>
+                      <span className="text-sm font-medium text-slate-500">Centro Federale Lampugnano</span>
+                    </div>
 
-                  <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                    {/* BOX STAGIONE */}
-                    <div className="flex items-center bg-white border border-slate-200 rounded-lg px-3 py-1 shadow-sm shrink-0 h-[48px]">
-                      <div className="flex flex-col justify-center">
-                         <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Stagione</span>
-                         <div className="flex items-center">
-                           <select
-                             value={stagioneSelezionata}
-                             onChange={(e) => {
-                                 if (e.target.value === 'NUOVA') {
-                                     const nome = prompt("Inserisci il nome della nuova stagione (es. 2026/2027):");
-                                     if (nome && nome.trim() !== '') {
-                                         const cleanName = nome.trim();
-                                         if (!stagioni.includes(cleanName)) {
-                                             setStagioni([...stagioni, cleanName]);
-                                             setTuttiPiani(prev => ({ ...prev, [cleanName]: {} }));
-                                         }
-                                         setStagioneSelezionata(cleanName);
-                                     }
-                                 } else if (e.target.value === 'ORDINA') {
-                                     setIsGestioneStagioniOpen(true);
-                                 } else {
-                                     setStagioneSelezionata(e.target.value);
-                                 }
-                             }}
-                             className="bg-transparent font-bold text-sm text-slate-800 outline-none cursor-pointer -ml-1"
-                           >
-                             {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
-                             <option value="NUOVA" className="font-bold text-blue-600">+ Crea nuova...</option>
-                             {stagioni.length > 1 && <option value="ORDINA" className="font-bold text-slate-600">⚙️ Gestione stagioni...</option>}
-                           </select>
-                           {stagioni.length > 1 && (
-                             <button 
-                               onClick={eliminaStagione} 
-                               className={`p-1 rounded-md transition-colors ml-1 ${confermaEliminaStagione ? 'bg-red-500 text-white' : 'text-red-400 hover:bg-red-50'}`} 
-                               title={confermaEliminaStagione ? "Clicca di nuovo per eliminare" : "Elimina Stagione"}
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                      {/* BOX STAGIONE */}
+                      <div className="flex items-center bg-white border border-slate-200 rounded-lg px-3 py-1 shadow-sm shrink-0 h-[48px]">
+                        <div className="flex flex-col justify-center">
+                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Stagione</span>
+                           <div className="flex items-center">
+                             <select
+                               value={stagioneSelezionata}
+                               onChange={(e) => {
+                                   if (e.target.value === 'NUOVA') {
+                                       const nome = prompt("Inserisci il nome della nuova stagione (es. 2026/2027):");
+                                       if (nome && nome.trim() !== '') {
+                                           const cleanName = nome.trim();
+                                           if (!stagioni.includes(cleanName)) {
+                                               setStagioni([...stagioni, cleanName]);
+                                               setTuttiPiani(prev => ({ ...prev, [cleanName]: {} }));
+                                           }
+                                           setStagioneSelezionata(cleanName);
+                                       }
+                                   } else if (e.target.value === 'ORDINA') {
+                                       setIsGestioneStagioniOpen(true);
+                                   } else {
+                                       setStagioneSelezionata(e.target.value);
+                                   }
+                               }}
+                               className="bg-transparent font-bold text-sm text-slate-800 outline-none cursor-pointer -ml-1"
                              >
-                               <Trash2Icon size={14} />
-                             </button>
-                           )}
-                         </div>
-                      </div>
-                    </div>
-
-                    {/* BOX SETTIMANA */}
-                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm shrink-0 h-[48px] w-full sm:w-auto">
-                      <button onClick={() => setInizioSettimana(prev => new Date(prev.getTime() - 7 * 24 * 60 * 60 * 1000))} className="p-1 hover:bg-slate-100 rounded-md text-slate-600 transition-colors"><ChevronLeftIcon size={18} /></button>
-                      
-                      <div className="flex flex-col items-center justify-center px-2 min-w-[200px] relative hover:bg-slate-50 cursor-pointer rounded transition-colors group" title="Clicca per scegliere una data dal calendario">
-                         <input 
-                           type="date" 
-                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                           value={toYMD(inizioSettimana)}
-                           onChange={(e) => {
-                             if(e.target.value) {
-                               setInizioSettimana(getStartOfWeek(new Date(e.target.value)));
-                             }
-                           }}
-                           onClick={(e) => {
-                             try {
-                               if (e.target.showPicker) e.target.showPicker();
-                             } catch(err) {}
-                           }}
-                         />
-                         <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-blue-600 transition-colors"><CalendarIcon size={10}/> Settimana Attiva</span>
-                         <span className="text-sm font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
-                           {formatItalianDate(inizioSettimana)} - {formatItalianDate(new Date(inizioSettimana.getTime() + 6 * 24 * 60 * 60 * 1000))}
-                         </span>
+                               {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
+                               <option value="NUOVA" className="font-bold text-blue-600">+ Crea nuova...</option>
+                               {stagioni.length > 1 && <option value="ORDINA" className="font-bold text-slate-600">⚙️ Gestione stagioni...</option>}
+                             </select>
+                             {stagioni.length > 1 && (
+                               <button 
+                                 onClick={eliminaStagione} 
+                                 className={`p-1 rounded-md transition-colors ml-1 ${confermaEliminaStagione ? 'bg-red-500 text-white' : 'text-red-400 hover:bg-red-50'}`} 
+                                 title={confermaEliminaStagione ? "Clicca di nuovo per eliminare" : "Elimina Stagione"}
+                               >
+                                 <Trash2Icon size={14} />
+                               </button>
+                             )}
+                           </div>
+                        </div>
                       </div>
 
-                      <button onClick={() => setInizioSettimana(prev => new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000))} className="p-1 hover:bg-slate-100 rounded-md text-slate-600 transition-colors"><ChevronRightIcon size={18} /></button>
-                      <div className="w-px h-6 bg-slate-200 mx-1"></div>
-                      <button onClick={() => setInizioSettimana(getStartOfWeek(new Date()))} className="px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-md transition-colors">Oggi</button>
+                      {/* BOX SETTIMANA */}
+                      <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm shrink-0 h-[48px] w-full sm:w-auto">
+                        <button onClick={() => setInizioSettimana(prev => new Date(prev.getTime() - 7 * 24 * 60 * 60 * 1000))} className="p-1 hover:bg-slate-100 rounded-md text-slate-600 transition-colors"><ChevronLeftIcon size={18} /></button>
+                        
+                        <div className="flex flex-col items-center justify-center px-2 min-w-[200px] relative hover:bg-slate-50 cursor-pointer rounded transition-colors group" title="Clicca per scegliere una data dal calendario">
+                           <input 
+                             type="date" 
+                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                             value={toYMD(inizioSettimana)}
+                             onChange={(e) => {
+                               if(e.target.value) {
+                                 setInizioSettimana(getStartOfWeek(new Date(e.target.value)));
+                               }
+                             }}
+                             onClick={(e) => {
+                               try {
+                                 if (e.target.showPicker) e.target.showPicker();
+                               } catch(err) {}
+                             }}
+                           />
+                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-blue-600 transition-colors"><CalendarIcon size={10}/> Settimana Attiva</span>
+                           <span className="text-sm font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
+                             {formatItalianDate(inizioSettimana)} - {formatItalianDate(new Date(inizioSettimana.getTime() + 6 * 24 * 60 * 60 * 1000))}
+                           </span>
+                        </div>
+
+                        <button onClick={() => setInizioSettimana(prev => new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000))} className="p-1 hover:bg-slate-100 rounded-md text-slate-600 transition-colors"><ChevronRightIcon size={18} /></button>
+                        <div className="w-px h-6 bg-slate-200 mx-1"></div>
+                        <button onClick={() => setInizioSettimana(getStartOfWeek(new Date()))} className="px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-md transition-colors">Oggi</button>
+                      </div>
                     </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap justify-center items-center gap-2">
+                    
+                    {/* TASTO AGGIUNGI UTENTE RAPIDO */}
+                    <button 
+                      onClick={() => setIsAddUserModalOpen(true)}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+                    >
+                      <UserPlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Utente</span>
+                    </button>
+
+                    {/* TASTO AGGIUNGI CORSO */}
+                    <button 
+                      onClick={() => {
+                        setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [giornoSelezionato === 7 ? 0 : giornoSelezionato], oraInizio: '06:00'}));
+                        setIsAddModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+                    >
+                      <PlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Corso</span>
+                    </button>
+
+                    <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
+
+                    <div title="Il salvataggio avviene automaticamente ad ogni modifica" className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${statoSalvataggio === 'error' ? 'bg-red-100 text-red-700' : statoSalvataggio === 'saved' ? 'bg-green-100 text-green-700' : statoSalvataggio === 'saving' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {statoSalvataggio === 'saving' ? <LoaderIcon size={16} /> : statoSalvataggio === 'saved' ? <CheckIcon size={16} /> : statoSalvataggio === 'error' ? <InfoIcon size={16} /> : <CloudIcon size={16} />}
+                      <span className="hidden sm:inline">{statoSalvataggio === 'saving' ? 'Salvataggio...' : statoSalvataggio === 'saved' ? 'Salvato!' : statoSalvataggio === 'error' ? 'Errore Sync' : 'In Sync'}</span>
+                    </div>
+                    <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
+                    
+                    {/* MENU ESPORTAZIONE */}
+                    <div className="relative">
+                      <button onClick={() => setIsExportMenuOpen(!isExportMenuOpen)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors">
+                        <DownloadIcon size={16} /> <span className="hidden sm:inline">Esporta</span>
+                      </button>
+                      {isExportMenuOpen && (
+                        <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 min-w-[220px] flex flex-col">
+                          <button onClick={esportaExcel} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📊 Esporta in Excel / Fogli</button>
+                          <div className="h-px bg-slate-200 my-1"></div>
+                          <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
+                        </div>
+                      )}
+                    </div>
+
+                    <button onClick={svuotaPiano} className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-medium transition-colors min-w-[100px] justify-center"><Trash2Icon size={16} /> {confermaSvuota ? "Sicuro?" : "Svuota"}</button>
+                    <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
+                    <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci"><LogOutIcon size={16} /></button>
                   </div>
                 </div>
-                
-                <div className="flex flex-wrap justify-center items-center gap-2">
-                  
-                  {/* TASTO AGGIUNGI UTENTE RAPIDO */}
-                  <button 
-                    onClick={() => setIsAddUserModalOpen(true)}
-                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
-                  >
-                    <UserPlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Utente</span>
-                  </button>
+              </div>
+            </header>
 
-                  {/* TASTO AGGIUNGI CORSO */}
+            {/* SECONDO BANNER SPOSTATO QUI PER ESSERE STICKY INSIEME ALL'HEADER */}
+            <div className="bg-slate-50/95 backdrop-blur-sm px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 relative z-10 w-full mx-auto">
+              <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center w-full md:w-auto overflow-hidden">
+                    <div className="flex bg-slate-200/60 p-1.5 rounded-xl shrink-0">
+                      <button
+                        onClick={() => setVascaSelezionata('interna')}
+                        className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${vascaSelezionata === 'interna' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        Vasca Interna
+                      </button>
+                      <button
+                        onClick={() => setVascaSelezionata('esterna')}
+                        className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${vascaSelezionata === 'esterna' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        Vasca Esterna
+                      </button>
+                    </div>
+                    
+                    <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide w-full md:w-auto">
+                      {GIORNI.map((giorno, idx) => (
+                        <button key={giorno} onClick={() => setGiornoSelezionato(idx)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === idx ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
+                          {giorno}
+                        </button>
+                      ))}
+                      <button onClick={() => setGiornoSelezionato(7)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === 7 ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
+                        Settimana
+                      </button>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  {/* TASTO CERCA SOCIO (Spostato qui) */}
                   <button 
                     onClick={() => {
-                      setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [giornoSelezionato === 7 ? 0 : giornoSelezionato], oraInizio: '06:00'}));
-                      setIsAddModalOpen(true);
+                      setSearchQuery('');
+                      setIsSearchModalOpen(true);
                     }}
-                    className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+                    className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
                   >
-                    <PlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Corso</span>
+                    <SearchIcon size={16} className="text-slate-500" />
+                    <span className="hidden sm:inline font-bold text-slate-700">Cerca Socio</span>
                   </button>
 
-                  <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
-
-                  <div title="Il salvataggio avviene automaticamente ad ogni modifica" className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${statoSalvataggio === 'error' ? 'bg-red-100 text-red-700' : statoSalvataggio === 'saved' ? 'bg-green-100 text-green-700' : statoSalvataggio === 'saving' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                    {statoSalvataggio === 'saving' ? <LoaderIcon size={16} /> : statoSalvataggio === 'saved' ? <CheckIcon size={16} /> : statoSalvataggio === 'error' ? <InfoIcon size={16} /> : <CloudIcon size={16} />}
-                    <span className="hidden sm:inline">{statoSalvataggio === 'saving' ? 'Salvataggio...' : statoSalvataggio === 'saved' ? 'Salvato!' : statoSalvataggio === 'error' ? 'Errore Sync' : 'In Sync'}</span>
-                  </div>
-                  <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
-                  
-                  {/* MENU ESPORTAZIONE */}
+                  {/* MENU FILTRI */}
                   <div className="relative">
-                    <button onClick={() => setIsExportMenuOpen(!isExportMenuOpen)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors">
-                      <DownloadIcon size={16} /> <span className="hidden sm:inline">Esporta</span>
+                    <button 
+                      onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+                      className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
+                    >
+                      <FilterIcon size={16} className={filtriAttivita.length < attivita.length ? "text-blue-500 fill-blue-100" : "text-slate-500"} />
+                      <span className="hidden sm:inline">Filtri:</span>
+                      <span className="font-bold text-slate-800">
+                        {filtriAttivita.length === attivita.length ? 'Tutte' : `${filtriAttivita.length}`}
+                      </span>
                     </button>
-                    {isExportMenuOpen && (
-                      <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 min-w-[220px] flex flex-col">
-                        <button onClick={esportaExcel} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📊 Esporta in Excel / Fogli</button>
-                        <div className="h-px bg-slate-200 my-1"></div>
-                        <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
+                    
+                    {isFilterMenuOpen && (
+                      <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 z-50 min-w-[220px] flex flex-col gap-2">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtra Attività</span>
+                          <button 
+                            onClick={() => setFiltriAttivita(attivita.map(a => a.id))}
+                            className="text-xs font-bold text-blue-600 hover:underline"
+                          >
+                            Tutte
+                          </button>
+                        </div>
+                        <div className="h-px bg-slate-200 mb-1"></div>
+                        <div className="max-h-60 overflow-y-auto flex flex-col gap-1.5 pr-1">
+                          {attivita.map(a => (
+                            <label key={a.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-slate-700 hover:bg-slate-50 p-1.5 rounded transition-colors">
+                              <input 
+                                type="checkbox" 
+                                checked={filtriAttivita.includes(a.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setFiltriAttivita([...filtriAttivita, a.id]);
+                                  } else {
+                                    setFiltriAttivita(filtriAttivita.filter(id => id !== a.id));
+                                  }
+                                }}
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                              <div className={`w-3 h-3 rounded-full ${a.color.split(' ')[0]}`}></div>
+                              {a.name}
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  <button onClick={svuotaPiano} className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-medium transition-colors min-w-[100px] justify-center"><Trash2Icon size={16} /> {confermaSvuota ? "Sicuro?" : "Svuota"}</button>
-                  <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
-                  <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci"><LogOutIcon size={16} /></button>
+                  {/* VISTA GRIGLIA */}
+                  <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
+                    <ClockIcon size={16} className="text-slate-500" />
+                    <span className="text-sm font-medium text-slate-600 hidden sm:inline">Vista:</span>
+                    <select value={intervallo} onChange={(e) => setIntervallo(Number(e.target.value))} className="text-sm font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
+                      <option value={60}>60 min</option>
+                      <option value={45}>45 min</option>
+                      <option value={30}>30 min</option>
+                      <option value={15}>15 min</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
-          </header>
 
-          {/* SECONDO BANNER SPOSTATO QUI PER ESSERE STICKY INSIEME ALL'HEADER */}
-          <div className="bg-slate-50/95 backdrop-blur-sm px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 relative z-10 w-full mx-auto">
-            <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-              <div className="flex flex-col md:flex-row gap-4 items-start md:items-center w-full md:w-auto overflow-hidden">
-                  <div className="flex bg-slate-200/60 p-1.5 rounded-xl shrink-0">
-                    <button
-                      onClick={() => setVascaSelezionata('interna')}
-                      className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${vascaSelezionata === 'interna' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                      Vasca Interna
-                    </button>
-                    <button
-                      onClick={() => setVascaSelezionata('esterna')}
-                      className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${vascaSelezionata === 'esterna' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                    >
-                      Vasca Esterna
-                    </button>
-                  </div>
-                  
-                  <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide w-full md:w-auto">
-                    {GIORNI.map((giorno, idx) => (
-                      <button key={giorno} onClick={() => setGiornoSelezionato(idx)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === idx ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
-                        {giorno}
-                      </button>
-                    ))}
-                    <button onClick={() => setGiornoSelezionato(7)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === 7 ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
-                      Settimana
-                    </button>
-                  </div>
-              </div>
-
-              <div className="flex items-center gap-3 shrink-0">
-                {/* TASTO CERCA SOCIO (Spostato qui) */}
-                <button 
-                  onClick={() => {
-                    setSearchQuery('');
-                    setIsSearchModalOpen(true);
-                  }}
-                  className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
-                >
-                  <SearchIcon size={16} className="text-slate-500" />
-                  <span className="hidden sm:inline font-bold text-slate-700">Cerca Socio</span>
-                </button>
-
-                {/* MENU FILTRI */}
-                <div className="relative">
-                  <button 
-                    onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-                    className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
-                  >
-                    <FilterIcon size={16} className={filtriAttivita.length < attivita.length ? "text-blue-500 fill-blue-100" : "text-slate-500"} />
-                    <span className="hidden sm:inline">Filtri:</span>
-                    <span className="font-bold text-slate-800">
-                      {filtriAttivita.length === attivita.length ? 'Tutte' : `${filtriAttivita.length}`}
-                    </span>
-                  </button>
-                  
-                  {isFilterMenuOpen && (
-                    <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 z-50 min-w-[220px] flex flex-col gap-2">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtra Attività</span>
-                        <button 
-                          onClick={() => setFiltriAttivita(attivita.map(a => a.id))}
-                          className="text-xs font-bold text-blue-600 hover:underline"
-                        >
-                          Tutte
-                        </button>
-                      </div>
-                      <div className="h-px bg-slate-200 mb-1"></div>
-                      <div className="max-h-60 overflow-y-auto flex flex-col gap-1.5 pr-1">
-                        {attivita.map(a => (
-                          <label key={a.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-slate-700 hover:bg-slate-50 p-1.5 rounded transition-colors">
-                            <input 
-                              type="checkbox" 
-                              checked={filtriAttivita.includes(a.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setFiltriAttivita([...filtriAttivita, a.id]);
-                                } else {
-                                  setFiltriAttivita(filtriAttivita.filter(id => id !== a.id));
-                                }
-                              }}
-                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                            />
-                            <div className={`w-3 h-3 rounded-full ${a.color.split(' ')[0]}`}></div>
-                            {a.name}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* VISTA GRIGLIA */}
-                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
-                  <ClockIcon size={16} className="text-slate-500" />
-                  <span className="text-sm font-medium text-slate-600 hidden sm:inline">Vista:</span>
-                  <select value={intervallo} onChange={(e) => setIntervallo(Number(e.target.value))} className="text-sm font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
-                    <option value={60}>60 min</option>
-                    <option value={45}>45 min</option>
-                    <option value={30}>30 min</option>
-                    <option value={15}>15 min</option>
-                  </select>
-                </div>
-              </div>
-            </div>
           </div>
           {/* FINE WRAPPER STICKY */}
 
