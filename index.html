@@ -101,6 +101,51 @@
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
 
+    // --- NUOVE UTILITY PER DATE E SETTIMANE ---
+    // Forza la data al Lunedì della settimana selezionata
+    const snapToMonday = (dateStr) => {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      return toYMD(new Date(d.setDate(diff)));
+    };
+
+    // Forza la data alla Domenica della settimana selezionata
+    const snapToSunday = (dateStr) => {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? 0 : 7 - day);
+      return toYMD(new Date(d.setDate(diff)));
+    };
+
+    // Verifica se un partecipante è attivo nella settimana corrente
+    const isAttivoInSettimana = (p, inizioSet) => {
+      let validList = [];
+      if (p.iscrizioni && p.iscrizioni.length > 0) {
+          validList = p.iscrizioni.filter(i => i.inizio || i.fine);
+      } else if (p.scadIscrizione) {
+          validList = [{ inizio: '', fine: p.scadIscrizione }];
+      }
+      
+      if (validList.length === 0) return true;
+
+      const inizioRef = new Date(inizioSet);
+      inizioRef.setHours(0,0,0,0);
+      const fineRef = new Date(inizioRef.getTime() + 6 * 24 * 60 * 60 * 1000);
+      fineRef.setHours(23,59,59,999);
+
+      return validList.some(isc => {
+          const iStart = isc.inizio ? new Date(isc.inizio) : new Date(0);
+          const iEnd = isc.fine ? new Date(isc.fine) : new Date(8640000000000000);
+          iStart.setHours(0,0,0,0);
+          iEnd.setHours(23,59,59,999);
+
+          return iStart <= fineRef && iEnd >= inizioRef;
+      });
+    };
+
     // --- CONFIGURAZIONE INIZIALE ---
     const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
     const ORE_INIZIO = 6;  
@@ -234,6 +279,10 @@
       const [firebaseInstances, setFirebaseInstances] = useState(null);
       const lastSavedPiano = useRef(""); 
       const initialLoadDone = useRef(false);
+
+      const partecipantiAttiviModal = useMemo(() => {
+          return editModal ? (editModal.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)) : [];
+      }, [editModal, inizioSettimana]);
 
       // --- INIZIALIZZAZIONE FIREBASE DINAMICA ---
       useEffect(() => {
@@ -1419,7 +1468,7 @@
 
                         <div className="mt-1 border-t border-slate-200 pt-4">
                            <div className="flex justify-between items-center mb-3">
-                             <label className="block text-sm font-semibold text-slate-700">Periodi Iscrizione</label>
+                             <label className="block text-sm font-semibold text-slate-700">Periodi Iscrizione <span className="normal-case text-[10px] font-normal text-slate-400">(Si allineano a Lun/Dom)</span></label>
                              <button type="button" onClick={() => setAddUtenteRapido({...addUtenteRapido, iscrizioni: [...(addUtenteRapido.iscrizioni || []), {inizio:'', fine:''}]})} className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"><PlusIcon size={14}/> Aggiungi Periodo</button>
                            </div>
                            <div className="flex flex-col gap-3">
@@ -1428,11 +1477,11 @@
                                    <div className="flex-1 flex flex-col sm:flex-row gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                                       <div className="flex-1 flex items-center gap-2">
                                         <span className="text-sm font-bold text-slate-500 w-8">Dal</span>
-                                        <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].inizio = e.target.value; setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
+                                        <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].inizio = snapToMonday(e.target.value); setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
                                       </div>
                                       <div className="flex-1 flex items-center gap-2">
                                         <span className="text-sm font-bold text-slate-500 w-8">Al</span>
-                                        <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].fine = e.target.value; setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
+                                        <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].fine = snapToSunday(e.target.value); setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
                                       </div>
                                    </div>
                                    <button type="button" onClick={() => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc.splice(idx, 1); setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} disabled={(addUtenteRapido.iscrizioni || []).length <= 1} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
@@ -1819,7 +1868,7 @@
 
                         <div className="mt-3 border-t border-slate-200 pt-3">
                            <div className="flex justify-between items-center mb-2">
-                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Periodi Iscrizione</label>
+                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">Periodi Iscrizione <span className="normal-case text-[9px] font-normal text-slate-400">(Si allineano a Lun/Dom)</span></label>
                              <button type="button" onClick={() => setNuovoPartecipante({...nuovoPartecipante, iscrizioni: [...(nuovoPartecipante.iscrizioni || []), {inizio:'', fine:''}]})} className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded font-bold transition-colors flex items-center gap-1"><PlusIcon size={12}/> Aggiungi Periodo</button>
                            </div>
                            <div className="flex flex-col gap-2">
@@ -1828,11 +1877,11 @@
                                    <div className="flex-1 flex flex-col sm:flex-row gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
                                       <div className="flex-1 flex items-center gap-2">
                                         <span className="text-xs font-bold text-slate-400 w-6 text-right">Dal</span>
-                                        <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].inizio = e.target.value; setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
+                                        <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].inizio = snapToMonday(e.target.value); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
                                       </div>
                                       <div className="flex-1 flex items-center gap-2">
                                         <span className="text-xs font-bold text-slate-400 w-6 text-right">Al</span>
-                                        <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].fine = e.target.value; setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
+                                        <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].fine = snapToSunday(e.target.value); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
                                       </div>
                                    </div>
                                    <button type="button" onClick={() => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc.splice(idx, 1); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} disabled={(nuovoPartecipante.iscrizioni || []).length <= 1} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
