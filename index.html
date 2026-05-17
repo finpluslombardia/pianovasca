@@ -208,12 +208,12 @@
       });
 
       // --- STATO NUOVO PARTECIPANTE ---
-      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
       const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
 
       // --- STATI AGGIUNTA UTENTE RAPIDO ---
       const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', giorno: '', corsoIndex: '', nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', giorno: '', corsoIndex: '', nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
 
       // --- STATI RICERCA SOCIO ---
       const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -566,6 +566,7 @@
         if (!addUtenteRapido.nome.trim()) return alert("Inserisci il Cognome e Nome!");
         
         const selectedCourse = tuttiCorsiSelect[addUtenteRapido.corsoIndex];
+        const iscrizioniPulite = (addUtenteRapido.iscrizioni || []).filter(i => i.inizio || i.fine);
         
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
@@ -578,7 +579,7 @@
                     nome: addUtenteRapido.nome,
                     anno: addUtenteRapido.anno,
                     scadCertificato: addUtenteRapido.scadCertificato,
-                    scadIscrizione: addUtenteRapido.scadIscrizione
+                    iscrizioni: iscrizioniPulite
                 });
                 partecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
                 cell.partecipanti = partecipanti;
@@ -588,7 +589,7 @@
         });
 
         setIsAddUserModalOpen(false);
-        setAddUtenteRapido({ attivitaId: '', giorno: '', corsoIndex: '', nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+        setAddUtenteRapido({ attivitaId: '', giorno: '', corsoIndex: '', nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
       };
 
       // --- LOGICA RICERCA SOCIO ---
@@ -637,7 +638,7 @@
               partecipanti: partecipantiOrdinati,
               tab: 'iscritti'
           });
-          setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+          setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
           setEditingPartecipanteIndex(null);
       };
 
@@ -705,19 +706,24 @@
           partecipanti: partecipantiOrdinati,
           tab: 'iscritti' // Apre di default la scheda degli iscritti
         });
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
       };
 
       const aggiungiPartecipante = () => {
         if (!nuovoPartecipante.nome.trim()) return;
         
+        const partecipantePulito = {
+            ...nuovoPartecipante,
+            iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
+        };
+
         setEditModal(prev => {
           let nuoviPartecipanti = [...prev.partecipanti];
           if (editingPartecipanteIndex !== null) {
-            nuoviPartecipanti[editingPartecipanteIndex] = { ...nuovoPartecipante };
+            nuoviPartecipanti[editingPartecipanteIndex] = partecipantePulito;
           } else {
-            nuoviPartecipanti.push({ ...nuovoPartecipante });
+            nuoviPartecipanti.push(partecipantePulito);
           }
           
           // Mantiene l'ordine alfabetico
@@ -726,17 +732,19 @@
           return { ...prev, partecipanti: nuoviPartecipanti };
         });
         
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
       };
 
       const avviaModificaPartecipante = (idx) => {
-        setNuovoPartecipante({ ...editModal.partecipanti[idx] });
+        const p = editModal.partecipanti[idx];
+        let iscrizioni = p.iscrizioni && p.iscrizioni.length > 0 ? [...p.iscrizioni] : (p.scadIscrizione ? [{ inizio: '', fine: p.scadIscrizione }] : [{ inizio: '', fine: '' }]);
+        setNuovoPartecipante({ ...p, iscrizioni });
         setEditingPartecipanteIndex(idx);
       };
 
       const annullaModificaPartecipante = () => {
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', scadIscrizione: '' });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
       };
 
@@ -798,22 +806,43 @@
         const titoloCorso = nomeLivello ? `${infoAttivita.name} - ${nomeLivello}` : infoAttivita.name;
         const giornoNome = GIORNI[editModal.giorno];
 
+        const getIscrizionePdfStr = (p) => {
+             let validList = [];
+             if (p.iscrizioni && p.iscrizioni.length > 0) {
+                 validList = p.iscrizioni.filter(i => i.inizio || i.fine);
+             } else if (p.scadIscrizione) {
+                 validList = [{ inizio: '', fine: p.scadIscrizione }];
+             }
+             if (validList.length === 0) return { str: '-', scaduta: false };
+
+             const oggi = new Date();
+             oggi.setHours(0,0,0,0);
+             const haValido = validList.some(isc => isc.fine ? new Date(isc.fine) >= oggi : true);
+             
+             const str = validList.map(isc => `${isc.inizio ? formatDate(isc.inizio) : '...'} - ${isc.fine ? formatDate(isc.fine) : '...'}`).join('<br>');
+             
+             return { str, scaduta: !haValido };
+        };
+
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
            alert("Attenzione: Abilita i popup nel browser per visualizzare e stampare il registro.");
            return;
         }
         
-        let tableRows = editModal.partecipanti.map(p => `
+        let tableRows = editModal.partecipanti.map(p => {
+          const iscrPdf = getIscrizionePdfStr(p);
+          return `
           <tr>
             <td>${p.nome}</td>
             <td style="text-align:center;">${p.anno || '-'}</td>
             <td style="text-align:center; ${isScaduto(p.scadCertificato) ? 'color:#dc2626; font-weight:bold;' : ''}">${formatDate(p.scadCertificato)}</td>
-            <td style="text-align:center; ${isScaduto(p.scadIscrizione) ? 'color:#dc2626; font-weight:bold;' : ''}">${formatDate(p.scadIscrizione)}</td>
+            <td style="text-align:center; ${iscrPdf.scaduta ? 'color:#dc2626; font-weight:bold;' : ''}">${iscrPdf.str}</td>
             <td></td>
             <td></td>
           </tr>
-        `).join('');
+          `;
+        }).join('');
 
         printWindow.document.write(`
           <html>
@@ -1349,23 +1378,45 @@
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 mb-5">
-                        <div>
-                           <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cognome e Nome</label>
-                           <input type="text" value={addUtenteRapido.nome} onChange={e => setAddUtenteRapido({...addUtenteRapido, nome: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" placeholder="Es. Rossi Mario" required />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cognome e Nome</label>
+                              <input type="text" value={addUtenteRapido.nome} onChange={e => setAddUtenteRapido({...addUtenteRapido, nome: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" placeholder="Es. Rossi Mario" required />
+                           </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Anno di Nascita</label>
+                              <input type="number" placeholder="Es. 2015" value={addUtenteRapido.anno} onChange={e => setAddUtenteRapido({...addUtenteRapido, anno: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
+                           </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Certificato</label>
+                              <input type="date" value={addUtenteRapido.scadCertificato} onChange={e => setAddUtenteRapido({...addUtenteRapido, scadCertificato: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
+                           </div>
                         </div>
-                        <div>
-                           <label className="block text-sm font-semibold text-slate-700 mb-1.5">Anno di Nascita</label>
-                           <input type="number" placeholder="Es. 2015" value={addUtenteRapido.anno} onChange={e => setAddUtenteRapido({...addUtenteRapido, anno: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Certificato</label>
-                               <input type="date" value={addUtenteRapido.scadCertificato} onChange={e => setAddUtenteRapido({...addUtenteRapido, scadCertificato: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
-                            </div>
-                            <div>
-                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Iscrizione</label>
-                               <input type="date" value={addUtenteRapido.scadIscrizione} onChange={e => setAddUtenteRapido({...addUtenteRapido, scadIscrizione: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
-                            </div>
+
+                        <div className="mt-1 border-t border-slate-200 pt-4">
+                           <div className="flex justify-between items-center mb-3">
+                             <label className="block text-sm font-semibold text-slate-700">Periodi Iscrizione</label>
+                             <button type="button" onClick={() => setAddUtenteRapido({...addUtenteRapido, iscrizioni: [...(addUtenteRapido.iscrizioni || []), {inizio:'', fine:''}]})} className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"><PlusIcon size={14}/> Aggiungi Periodo</button>
+                           </div>
+                           <div className="flex flex-col gap-3">
+                             {(addUtenteRapido.iscrizioni || [{inizio:'', fine:''}]).map((isc, idx) => (
+                                <div key={idx} className="flex gap-2 items-center">
+                                   <div className="flex-1 flex flex-col sm:flex-row gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                      <div className="flex-1 flex items-center gap-2">
+                                        <span className="text-sm font-bold text-slate-500 w-8">Dal</span>
+                                        <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].inizio = e.target.value; setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
+                                      </div>
+                                      <div className="flex-1 flex items-center gap-2">
+                                        <span className="text-sm font-bold text-slate-500 w-8">Al</span>
+                                        <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].fine = e.target.value; setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
+                                      </div>
+                                   </div>
+                                   <button type="button" onClick={() => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc.splice(idx, 1); setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} disabled={(addUtenteRapido.iscrizioni || []).length <= 1} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                                      <Trash2Icon size={20}/>
+                                   </button>
+                                </div>
+                             ))}
+                           </div>
                         </div>
                     </div>
                   </form>
@@ -1727,7 +1778,7 @@
                           {editingPartecipanteIndex !== null ? <EditIcon size={18}/> : <PlusIcon size={18}/>} 
                           {editingPartecipanteIndex !== null ? 'Modifica Partecipante' : 'Inserisci Nuovo Partecipante'}
                         </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <div>
                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Cognome e Nome</label>
                              <input type="text" value={nuovoPartecipante.nome} onChange={e => setNuovoPartecipante({...nuovoPartecipante, nome: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1" placeholder="Es. Rossi Mario" />
@@ -1740,10 +1791,32 @@
                              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Scadenza Certificato</label>
                              <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1 cursor-pointer" />
                           </div>
-                          <div>
-                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Scadenza Iscrizione</label>
-                             <input type="date" value={nuovoPartecipante.scadIscrizione} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadIscrizione: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1 cursor-pointer" />
-                          </div>
+                        </div>
+
+                        <div className="mt-3 border-t border-slate-200 pt-3">
+                           <div className="flex justify-between items-center mb-2">
+                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Periodi Iscrizione</label>
+                             <button type="button" onClick={() => setNuovoPartecipante({...nuovoPartecipante, iscrizioni: [...(nuovoPartecipante.iscrizioni || []), {inizio:'', fine:''}]})} className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded font-bold transition-colors flex items-center gap-1"><PlusIcon size={12}/> Aggiungi Periodo</button>
+                           </div>
+                           <div className="flex flex-col gap-2">
+                             {(nuovoPartecipante.iscrizioni || [{inizio:'', fine:''}]).map((isc, idx) => (
+                                <div key={idx} className="flex gap-2 items-center">
+                                   <div className="flex-1 flex flex-col sm:flex-row gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                                      <div className="flex-1 flex items-center gap-2">
+                                        <span className="text-xs font-bold text-slate-400 w-6 text-right">Dal</span>
+                                        <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].inizio = e.target.value; setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
+                                      </div>
+                                      <div className="flex-1 flex items-center gap-2">
+                                        <span className="text-xs font-bold text-slate-400 w-6 text-right">Al</span>
+                                        <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].fine = e.target.value; setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
+                                      </div>
+                                   </div>
+                                   <button type="button" onClick={() => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc.splice(idx, 1); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} disabled={(nuovoPartecipante.iscrizioni || []).length <= 1} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                                      <Trash2Icon size={18}/>
+                                   </button>
+                                </div>
+                             ))}
+                           </div>
                         </div>
                         <div className="mt-4 flex gap-2 justify-end float-right">
                           {editingPartecipanteIndex !== null && (
@@ -1777,9 +1850,32 @@
                                   {formatDate(p.scadCertificato)}
                                   {isScaduto(p.scadCertificato) && <span className="ml-1 text-[10px] uppercase block leading-none">Scaduto</span>}
                                 </td>
-                                <td className={`p-3 text-center font-bold ${isScaduto(p.scadIscrizione) ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
-                                  {formatDate(p.scadIscrizione)}
-                                  {isScaduto(p.scadIscrizione) && <span className="ml-1 text-[10px] uppercase block leading-none">Scaduta</span>}
+                                <td className="p-3 text-center font-bold">
+                                  {(() => {
+                                     let validList = [];
+                                     if (p.iscrizioni && p.iscrizioni.length > 0) {
+                                         validList = p.iscrizioni.filter(isc => isc.inizio || isc.fine);
+                                     } else if (p.scadIscrizione) {
+                                         validList = [{ inizio: '', fine: p.scadIscrizione }];
+                                     }
+
+                                     if (validList.length === 0) return <span className="text-slate-400 font-normal">-</span>;
+
+                                     const oggi = new Date();
+                                     oggi.setHours(0,0,0,0);
+                                     const haValido = validList.some(isc => isc.fine ? new Date(isc.fine) >= oggi : true);
+
+                                     return (
+                                         <div className={`flex flex-col gap-1 items-center ${!haValido ? 'text-red-600 bg-red-50 p-1.5 rounded-lg' : 'text-slate-600'}`}>
+                                            {validList.map((isc, iIdx) => (
+                                                <div key={iIdx} className="text-[11px] leading-tight whitespace-nowrap">
+                                                   {isc.inizio ? formatDate(isc.inizio) : '...'} - {isc.fine ? formatDate(isc.fine) : '...'}
+                                                </div>
+                                            ))}
+                                            {!haValido && <span className="text-[9px] uppercase block leading-none mt-0.5">Scaduta</span>}
+                                         </div>
+                                     );
+                                  })()}
                                 </td>
                                 <td className="p-3 flex items-center justify-center gap-2">
                                   <button type="button" onClick={() => avviaModificaPartecipante(i)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
