@@ -1250,11 +1250,14 @@
                                                                       <span className="truncate pr-1 hide-on-pdf">{nomeLivello ? infoAttivita?.name : ''}</span>
                                                                       <span className="truncate pr-1 show-on-pdf">{nomeLivello ? nomeBrev : ''}</span>
                                                                       <div className="flex items-center gap-1 shrink-0">
-                                                                        {(corso.data.maxUtenti || (corso.data.partecipanti && corso.data.partecipanti.length > 0)) && (
-                                                                          <span className="flex items-center gap-0.5" title={`Iscritti: ${corso.data.partecipanti?.length || 0}${corso.data.maxUtenti ? ` / Max ${corso.data.maxUtenti}` : ''}`}>
-                                                                            <UsersIcon size={10} /> {corso.data.partecipanti?.length || 0}{corso.data.maxUtenti ? `/${corso.data.maxUtenti}` : ''}
-                                                                          </span>
-                                                                        )}
+                                                                        {(corso.data.maxUtenti || (corso.data.partecipanti && corso.data.partecipanti.length > 0)) && (() => {
+                                                                           const pAttivi = corso.data.partecipanti?.filter(p => isAttivoInSettimana(p, inizioSettimana)) || [];
+                                                                           return (
+                                                                               <span className="flex items-center gap-0.5" title={`Iscritti in questa sett.: ${pAttivi.length}${corso.data.maxUtenti ? ` / Max ${corso.data.maxUtenti}` : ''}`}>
+                                                                                 <UsersIcon size={10} /> {pAttivi.length}{corso.data.maxUtenti ? `/${corso.data.maxUtenti}` : ''}
+                                                                               </span>
+                                                                           );
+                                                                        })()}
                                                                         <span className="shrink-0">{corso.durata}'</span>
                                                                       </div>
                                                                     </div>
