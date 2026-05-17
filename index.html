@@ -1902,68 +1902,110 @@
                         <div className="clear-both"></div>
                       </div>
 
-                      {/* LIST */}
-                      <div className="flex-1 overflow-x-auto border border-slate-200 rounded-xl bg-white shadow-sm h-[300px]">
-                        <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
-                          <thead className="bg-slate-100 border-b border-slate-200 sticky top-0 z-10">
-                            <tr>
-                              <th className="p-3 font-semibold text-slate-700">Cognome e Nome</th>
-                              <th className="p-3 font-semibold text-center text-slate-700">Anno</th>
-                              <th className="p-3 font-semibold text-center text-slate-700">Scad. Certificato</th>
-                              <th className="p-3 font-semibold text-center text-slate-700">Scad. Iscrizione</th>
-                              <th className="p-3 text-center w-20"></th>
+                      {/* LISTE SEPARATE */}
+                      <div className="flex-1 overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-sm h-[300px] flex flex-col relative">
+                        {(() => {
+                          const attivi = editModal.partecipanti.filter(p => isAttivoInSettimana(p, inizioSettimana));
+                          const inattivi = editModal.partecipanti.filter(p => !isAttivoInSettimana(p, inizioSettimana));
+
+                          const renderRigaPartecipante = (p, i) => (
+                            <tr key={i} className={`border-b border-slate-100 transition-colors ${editingPartecipanteIndex === i ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                              <td className="p-3 font-medium text-slate-800">{p.nome}</td>
+                              <td className="p-3 text-center text-slate-600">{p.anno || '-'}</td>
+                              <td className={`p-3 text-center font-bold ${isScaduto(p.scadCertificato) ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
+                                {formatDate(p.scadCertificato)}
+                                {isScaduto(p.scadCertificato) && <span className="ml-1 text-[10px] uppercase block leading-none">Scaduto</span>}
+                              </td>
+                              <td className="p-3 text-center font-bold">
+                                {(() => {
+                                   let validList = [];
+                                   if (p.iscrizioni && p.iscrizioni.length > 0) {
+                                       validList = p.iscrizioni.filter(isc => isc.inizio || isc.fine);
+                                   } else if (p.scadIscrizione) {
+                                       validList = [{ inizio: '', fine: p.scadIscrizione }];
+                                   }
+
+                                   if (validList.length === 0) return <span className="text-slate-400 font-normal">-</span>;
+
+                                   const oggi = new Date();
+                                   oggi.setHours(0,0,0,0);
+                                   const haValido = validList.some(isc => isc.fine ? new Date(isc.fine) >= oggi : true);
+
+                                   return (
+                                       <div className={`flex flex-col gap-1 items-center ${!haValido ? 'text-red-600 bg-red-50 p-1.5 rounded-lg' : 'text-slate-600'}`}>
+                                          {validList.map((isc, iIdx) => (
+                                              <div key={iIdx} className="text-[11px] leading-tight whitespace-nowrap">
+                                                 {isc.inizio ? formatDate(isc.inizio) : '...'} - {isc.fine ? formatDate(isc.fine) : '...'}
+                                              </div>
+                                          ))}
+                                          {!haValido && <span className="text-[9px] uppercase block leading-none mt-0.5">Scaduta</span>}
+                                       </div>
+                                   );
+                                })()}
+                              </td>
+                              <td className="p-3 flex items-center justify-center gap-2">
+                                <button type="button" onClick={() => avviaModificaPartecipante(i)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
+                                <button type="button" onClick={() => rimuoviPartecipante(i)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {editModal.partecipanti.map((p, i) => (
-                              <tr key={i} className={`border-b border-slate-100 transition-colors ${editingPartecipanteIndex === i ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-                                <td className="p-3 font-medium text-slate-800 flex items-center gap-2">
-                                  {p.nome}
-                                  {!isAttivoInSettimana(p, inizioSettimana) && <span className="text-[9px] bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Non in sett.</span>}
-                                </td>
-                                <td className="p-3 text-center text-slate-600">{p.anno || '-'}</td>
-                                <td className={`p-3 text-center font-bold ${isScaduto(p.scadCertificato) ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
-                                  {formatDate(p.scadCertificato)}
-                                  {isScaduto(p.scadCertificato) && <span className="ml-1 text-[10px] uppercase block leading-none">Scaduto</span>}
-                                </td>
-                                <td className="p-3 text-center font-bold">
-                                  {(() => {
-                                     let validList = [];
-                                     if (p.iscrizioni && p.iscrizioni.length > 0) {
-                                         validList = p.iscrizioni.filter(isc => isc.inizio || isc.fine);
-                                     } else if (p.scadIscrizione) {
-                                         validList = [{ inizio: '', fine: p.scadIscrizione }];
-                                     }
+                          );
 
-                                     if (validList.length === 0) return <span className="text-slate-400 font-normal">-</span>;
+                          return (
+                            <div className="flex flex-col min-h-full">
+                              {/* SEZIONE ATTIVI */}
+                              <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 sticky top-0 z-10 flex justify-between items-center">
+                                <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Attivi in questa settimana</span>
+                                <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">{attivi.length}</span>
+                              </div>
+                              <div className="overflow-x-auto w-full">
+                                <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+                                  <thead className="bg-white border-b border-slate-200">
+                                    <tr>
+                                      <th className="p-3 font-semibold text-slate-700 w-1/4">Cognome e Nome</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/6">Anno</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/4">Scad. Certificato</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/4">Scad. Iscrizione</th>
+                                      <th className="p-3 text-center w-20"></th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {editModal.partecipanti.map((p, i) => isAttivoInSettimana(p, inizioSettimana) ? renderRigaPartecipante(p, i) : null)}
+                                    {attivi.length === 0 && (
+                                      <tr><td colSpan="5" className="p-6 text-center text-slate-400 italic">Nessun iscritto attivo in questa settimana.</td></tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
 
-                                     const oggi = new Date();
-                                     oggi.setHours(0,0,0,0);
-                                     const haValido = validList.some(isc => isc.fine ? new Date(isc.fine) >= oggi : true);
-
-                                     return (
-                                         <div className={`flex flex-col gap-1 items-center ${!haValido ? 'text-red-600 bg-red-50 p-1.5 rounded-lg' : 'text-slate-600'}`}>
-                                            {validList.map((isc, iIdx) => (
-                                                <div key={iIdx} className="text-[11px] leading-tight whitespace-nowrap">
-                                                   {isc.inizio ? formatDate(isc.inizio) : '...'} - {isc.fine ? formatDate(isc.fine) : '...'}
-                                                </div>
-                                            ))}
-                                            {!haValido && <span className="text-[9px] uppercase block leading-none mt-0.5">Scaduta</span>}
-                                         </div>
-                                     );
-                                  })()}
-                                </td>
-                                <td className="p-3 flex items-center justify-center gap-2">
-                                  <button type="button" onClick={() => avviaModificaPartecipante(i)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
-                                  <button type="button" onClick={() => rimuoviPartecipante(i)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
-                                </td>
-                              </tr>
-                            ))}
-                            {editModal.partecipanti.length === 0 && (
-                              <tr><td colSpan="5" className="p-8 text-center text-slate-400 italic">La lista è vuota. Aggiungi il primo partecipante utilizzando il modulo qui sopra.</td></tr>
-                            )}
-                          </tbody>
-                        </table>
+                              {/* SEZIONE INATTIVI */}
+                              {inattivi.length > 0 && (
+                                <>
+                                  <div className="bg-slate-50 px-4 py-2 border-y border-slate-200 flex justify-between items-center mt-auto sticky top-0 z-10">
+                                    <span className="font-bold text-slate-500 text-sm uppercase tracking-wider">Altri iscritti (Fuori periodo)</span>
+                                    <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{inattivi.length}</span>
+                                  </div>
+                                  <div className="overflow-x-auto w-full opacity-75 grayscale-[30%]">
+                                    <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+                                      {/* Intestazione nascosta per mantenere allineate le colonne con la prima tabella */}
+                                      <thead className="invisible h-0">
+                                        <tr>
+                                          <th className="w-1/4"></th>
+                                          <th className="w-1/6"></th>
+                                          <th className="w-1/4"></th>
+                                          <th className="w-1/4"></th>
+                                          <th className="w-20"></th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {editModal.partecipanti.map((p, i) => !isAttivoInSettimana(p, inizioSettimana) ? renderRigaPartecipante(p, i) : null)}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
