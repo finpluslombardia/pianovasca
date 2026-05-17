@@ -757,6 +757,7 @@
         });
         setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
+        setShowAddForm(false);
       };
 
       const aggiungiPartecipante = () => {
@@ -783,6 +784,7 @@
         
         setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
+        setShowAddForm(false);
       };
 
       const avviaModificaPartecipante = (idx) => {
@@ -790,11 +792,13 @@
         let iscrizioni = p.iscrizioni && p.iscrizioni.length > 0 ? [...p.iscrizioni] : (p.scadIscrizione ? [{ inizio: '', fine: p.scadIscrizione }] : [{ inizio: '', fine: '' }]);
         setNuovoPartecipante({ ...p, iscrizioni });
         setEditingPartecipanteIndex(idx);
+        setShowAddForm(true);
       };
 
       const annullaModificaPartecipante = () => {
         setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
+        setShowAddForm(false);
       };
 
       const rimuoviPartecipante = (idx) => {
@@ -856,6 +860,7 @@
         setEditModal(null);
         setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
+        setShowAddForm(false);
       };
 
       const eliminaCorsoModal = () => {
