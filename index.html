@@ -255,6 +255,7 @@
       // --- STATO NUOVO PARTECIPANTE ---
       const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
       const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
+      const [showAddForm, setShowAddForm] = useState(false);
 
       // --- STATI AGGIUNTA UTENTE RAPIDO ---
       const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
