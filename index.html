@@ -1845,61 +1845,80 @@
                   {/* TAB 2: GESTIONE ISCRITTI */}
                   {editModal.tab === 'iscritti' && (
                     <div className="flex flex-col h-full gap-5">
-                      {/* ADD FORM */}
-                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                        <h4 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                          {editingPartecipanteIndex !== null ? <EditIcon size={18}/> : <PlusIcon size={18}/>} 
-                          {editingPartecipanteIndex !== null ? 'Modifica Partecipante' : 'Inserisci Nuovo Partecipante'}
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div>
-                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Cognome e Nome</label>
-                             <input type="text" value={nuovoPartecipante.nome} onChange={e => setNuovoPartecipante({...nuovoPartecipante, nome: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1" placeholder="Es. Rossi Mario" />
-                          </div>
-                          <div>
-                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Anno di Nascita</label>
-                             <input type="number" placeholder="Es. 2015" value={nuovoPartecipante.anno} onChange={e => setNuovoPartecipante({...nuovoPartecipante, anno: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1" />
-                          </div>
-                          <div>
-                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Scadenza Certificato</label>
-                             <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 mt-1 cursor-pointer" />
-                          </div>
+                      {/* ADD FORM COMPLETO A SCOMPARSA */}
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all">
+                        <div 
+                          className={`p-4 flex justify-between items-center cursor-pointer select-none transition-colors ${showAddForm || editingPartecipanteIndex !== null ? 'bg-slate-50 border-b border-slate-200' : 'hover:bg-slate-50'}`}
+                          onClick={() => {
+                             if (editingPartecipanteIndex !== null) {
+                                 annullaModificaPartecipante();
+                             } else {
+                                 setShowAddForm(!showAddForm);
+                             }
+                          }}
+                        >
+                          <h4 className={`text-sm font-bold flex items-center gap-2 ${showAddForm || editingPartecipanteIndex !== null ? 'text-blue-700' : 'text-slate-800'}`}>
+                            {editingPartecipanteIndex !== null ? <EditIcon size={18}/> : <PlusIcon size={18} className={`transition-transform duration-200 ${showAddForm ? 'rotate-45' : ''}`}/>} 
+                            {editingPartecipanteIndex !== null ? 'Modifica Partecipante' : 'Inserisci Nuovo Partecipante'}
+                          </h4>
+                          <span className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${showAddForm || editingPartecipanteIndex !== null ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 hover:bg-blue-200 text-blue-700'}`}>
+                              {editingPartecipanteIndex !== null ? 'Annulla Modifica' : (showAddForm ? 'Chiudi' : 'Apri')}
+                          </span>
                         </div>
+                        
+                        {(showAddForm || editingPartecipanteIndex !== null) && (
+                          <div className="p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Cognome e Nome</label>
+                                 <input type="text" value={nuovoPartecipante.nome} onChange={e => setNuovoPartecipante({...nuovoPartecipante, nome: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1" placeholder="Es. Rossi Mario" />
+                              </div>
+                              <div>
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Anno di Nascita</label>
+                                 <input type="number" placeholder="Es. 2015" value={nuovoPartecipante.anno} onChange={e => setNuovoPartecipante({...nuovoPartecipante, anno: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1" />
+                              </div>
+                              <div>
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Scadenza Certificato</label>
+                                 <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer" />
+                              </div>
+                            </div>
 
-                        <div className="mt-3 border-t border-slate-200 pt-3">
-                           <div className="flex justify-between items-center mb-2">
-                             <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">Periodi Iscrizione <span className="normal-case text-[9px] font-normal text-slate-400">(Si allineano a Lun/Dom)</span></label>
-                             <button type="button" onClick={() => setNuovoPartecipante({...nuovoPartecipante, iscrizioni: [...(nuovoPartecipante.iscrizioni || []), {inizio:'', fine:''}]})} className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded font-bold transition-colors flex items-center gap-1"><PlusIcon size={12}/> Aggiungi Periodo</button>
-                           </div>
-                           <div className="flex flex-col gap-2">
-                             {(nuovoPartecipante.iscrizioni || [{inizio:'', fine:''}]).map((isc, idx) => (
-                                <div key={idx} className="flex gap-2 items-center">
-                                   <div className="flex-1 flex flex-col sm:flex-row gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
-                                      <div className="flex-1 flex items-center gap-2">
-                                        <span className="text-xs font-bold text-slate-400 w-6 text-right">Dal</span>
-                                        <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].inizio = snapToMonday(e.target.value); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
-                                      </div>
-                                      <div className="flex-1 flex items-center gap-2">
-                                        <span className="text-xs font-bold text-slate-400 w-6 text-right">Al</span>
-                                        <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].fine = snapToSunday(e.target.value); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
-                                      </div>
-                                   </div>
-                                   <button type="button" onClick={() => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc.splice(idx, 1); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} disabled={(nuovoPartecipante.iscrizioni || []).length <= 1} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
-                                      <Trash2Icon size={18}/>
-                                   </button>
-                                </div>
-                             ))}
-                           </div>
-                        </div>
-                        <div className="mt-4 flex gap-2 justify-end float-right">
-                          {editingPartecipanteIndex !== null && (
-                            <button type="button" onClick={annullaModificaPartecipante} className="px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded-lg text-sm shadow-sm transition-colors">Annulla</button>
-                          )}
-                          <button type="button" onClick={aggiungiPartecipante} className="px-6 bg-slate-800 hover:bg-slate-900 transition-colors text-white font-bold py-2 rounded-lg text-sm shadow-sm">
-                            {editingPartecipanteIndex !== null ? 'Salva Modifica' : 'Aggiungi alla lista'}
-                          </button>
-                        </div>
-                        <div className="clear-both"></div>
+                            <div className="mt-3 border-t border-slate-200 pt-3">
+                               <div className="flex justify-between items-center mb-2">
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">Periodi Iscrizione <span className="normal-case text-[9px] font-normal text-slate-400">(Si allineano a Lun/Dom)</span></label>
+                                 <button type="button" onClick={() => setNuovoPartecipante({...nuovoPartecipante, iscrizioni: [...(nuovoPartecipante.iscrizioni || []), {inizio:'', fine:''}]})} className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded font-bold transition-colors flex items-center gap-1"><PlusIcon size={12}/> Aggiungi Periodo</button>
+                               </div>
+                               <div className="flex flex-col gap-2">
+                                 {(nuovoPartecipante.iscrizioni || [{inizio:'', fine:''}]).map((isc, idx) => (
+                                    <div key={idx} className="flex gap-2 items-center">
+                                       <div className="flex-1 flex flex-col sm:flex-row gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                                          <div className="flex-1 flex items-center gap-2">
+                                            <span className="text-xs font-bold text-slate-400 w-6 text-right">Dal</span>
+                                            <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].inizio = snapToMonday(e.target.value); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
+                                          </div>
+                                          <div className="flex-1 flex items-center gap-2">
+                                            <span className="text-xs font-bold text-slate-400 w-6 text-right">Al</span>
+                                            <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].fine = snapToSunday(e.target.value); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
+                                          </div>
+                                       </div>
+                                       <button type="button" onClick={() => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc.splice(idx, 1); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} disabled={(nuovoPartecipante.iscrizioni || []).length <= 1} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                                          <Trash2Icon size={18}/>
+                                       </button>
+                                    </div>
+                                 ))}
+                               </div>
+                            </div>
+                            <div className="mt-4 flex gap-2 justify-end float-right">
+                              {editingPartecipanteIndex !== null && (
+                                <button type="button" onClick={annullaModificaPartecipante} className="px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded-lg text-sm shadow-sm transition-colors">Annulla</button>
+                              )}
+                              <button type="button" onClick={aggiungiPartecipante} className="px-6 bg-slate-800 hover:bg-slate-900 transition-colors text-white font-bold py-2 rounded-lg text-sm shadow-sm">
+                                {editingPartecipanteIndex !== null ? 'Salva Modifica' : 'Aggiungi alla lista'}
+                              </button>
+                            </div>
+                            <div className="clear-both"></div>
+                          </div>
+                        )}
                       </div>
 
                       {/* LISTE SEPARATE */}
