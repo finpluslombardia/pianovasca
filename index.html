@@ -764,6 +764,23 @@
         if (e && e.preventDefault) e.preventDefault();
         if (editModal.corsie.length === 0) return alert("Seleziona almeno una corsia!");
         
+        // Recupera i partecipanti già confermati nella lista
+        let finalPartecipanti = [...editModal.partecipanti];
+        
+        // Se l'utente ha compilato il nome ma ha dimenticato di cliccare "Aggiungi alla lista", lo salviamo in automatico!
+        if (nuovoPartecipante && nuovoPartecipante.nome && nuovoPartecipante.nome.trim() !== '') {
+            const partecipantePulito = {
+                ...nuovoPartecipante,
+                iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
+            };
+            if (editingPartecipanteIndex !== null) {
+              finalPartecipanti[editingPartecipanteIndex] = partecipantePulito;
+            } else {
+              finalPartecipanti.push(partecipantePulito);
+            }
+            finalPartecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
+        }
+        
         setTuttiPiani(prevTutti => {
           const prevSeason = prevTutti[stagioneSelezionata] || {};
           const nuovoPiano = { ...prevSeason };
@@ -781,12 +798,15 @@
                   maxUtenti: editModal.maxUtenti ? Number(editModal.maxUtenti) : '',
                   dataInizio: editModal.dataInizio,
                   dataFine: editModal.dataFine,
-                  partecipanti: editModal.partecipanti // Salva la lista aggiornata
+                  partecipanti: finalPartecipanti // Usa la lista aggiornata, compreso l'eventuale utente appena digitato
               };
           });
           return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
         });
+        
         setEditModal(null);
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setEditingPartecipanteIndex(null);
       };
 
       const eliminaCorsoModal = () => {
