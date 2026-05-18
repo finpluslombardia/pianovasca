@@ -575,7 +575,22 @@
           return getCorsiForDay(giornoSelezionato);
       }, [getCorsiForDay, giornoSelezionato]);
 
-      // --- LOGICA UTENTE RAPIDO ---
+      // --- LOGICA UTENTE RAPIDO E AUTOSUGGERIMENTO ---
+      const tuttiUtentiUnici = useMemo(() => {
+          const map = new Map();
+          Object.values(piano).forEach(cell => {
+             (cell.partecipanti || []).forEach(p => {
+                 if (p && p.nome) {
+                     const key = p.nome.toLowerCase().trim();
+                     if (!map.has(key)) {
+                         map.set(key, p);
+                     }
+                 }
+             });
+          });
+          return Array.from(map.values()).sort((a,b) => a.nome.localeCompare(b.nome));
+      }, [piano]);
+
       const tuttiCorsiSelect = useMemo(() => {
           const list = [];
           Object.keys(piano).forEach(k => {
