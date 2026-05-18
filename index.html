@@ -1072,7 +1072,7 @@
                         
                         if(cell.corso.data.istruttore) testoSfondo += `<i>${cell.corso.data.istruttore}</i><br>`;
                         testoSfondo += `⏱ ${cell.corso.durata} min`;
-                        if(cell.corso.data.maxUtenti) testoSfondo += ` 👥 ${cell.corso.data.maxUtenti}`;
+                        if(cell.corso.data.maxUtenti) testoSfondo += ` 👤 ${cell.corso.data.maxUtenti}`;
                         
                         htmlContent += `<td rowspan="${cell.rowSpan}" colspan="${cell.colSpan}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid #ccc;">${testoSfondo}</td>`;
                     }
