@@ -915,8 +915,6 @@
             <td style="text-align:center;">${p.anno || '-'}</td>
             <td style="text-align:center; ${isScaduto(p.scadCertificato) ? 'color:#dc2626; font-weight:bold;' : ''}">${formatDate(p.scadCertificato)}</td>
             <td style="text-align:center; ${iscrPdf.scaduta ? 'color:#dc2626; font-weight:bold;' : ''}">${iscrPdf.str}</td>
-            <td></td>
-            <td></td>
           </tr>
           `;
         }).join('');
@@ -929,7 +927,7 @@
                 @page { size: A4 portrait; margin: 15mm; }
                 body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; }
                 h1 { margin: 0 0 5px 0; font-size: 24px; color: #0f172a; }
-                h3 { margin: 0 0 20px 0; color: #64748b; font-weight: 500; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
+                h3 { margin: 0 0 20px 0; color: #64748b; font-weight: 500; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; line-height: 1.5; }
                 table { width: 100%; border-collapse: collapse; font-size: 13px; }
                 th, td { border: 1px solid #cbd5e1; padding: 12px 8px; text-align: left; }
                 th { background-color: #f8fafc; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 11px; }
@@ -941,22 +939,19 @@
               <div class="print-header">
                 <div>
                   <h1>${titoloCorso}</h1>
-                  <h3>${giornoNome} - Ore ${editModal.oraInizio} | Istruttore: ${editModal.istruttore || 'Non assegnato'}</h3>
-                </div>
-                <div style="text-align: right; color: #64748b; font-size: 12px;">
-                  Vasca ${editModal.vasca === 'interna' ? 'Interna' : 'Esterna'} - Corsie: ${editModal.corsie.join(', ')}<br>
-                  Data Stampa: ${new Date().toLocaleDateString('it-IT')}
+                  <h3>
+                    ${giornoNome} - Ore ${editModal.oraInizio} | Istruttore: ${editModal.istruttore || 'Non assegnato'}<br>
+                    Vasca ${editModal.vasca === 'interna' ? 'Interna' : 'Esterna'} - Corsie: ${editModal.corsie.join(', ')}
+                  </h3>
                 </div>
               </div>
               <table>
                 <thead>
                   <tr>
-                    <th style="width: 30%;">Cognome e Nome</th>
+                    <th style="width: 40%;">Cognome e Nome</th>
                     <th style="text-align:center; width: 10%;">Anno</th>
-                    <th style="text-align:center; width: 15%;">Certificato</th>
-                    <th style="text-align:center; width: 15%;">Iscrizione</th>
-                    <th style="width: 15%;">Presenza</th>
-                    <th style="width: 15%;">Note</th>
+                    <th style="text-align:center; width: 25%;">Certificato</th>
+                    <th style="text-align:center; width: 25%;">Iscrizione</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1987,7 +1982,7 @@
                               </div>
                               <div className="overflow-x-auto w-full">
                                 <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
-                                  <thead className="bg-white border-b border-slate-200">
+                                  <thead className="bg-slate-100 border-b border-slate-200">
                                     <tr>
                                       <th className="p-3 font-semibold text-slate-700 w-1/4">Cognome e Nome</th>
                                       <th className="p-3 font-semibold text-center text-slate-700 w-1/6">Anno</th>
