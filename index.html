@@ -879,8 +879,10 @@
       const stampaRegistro = () => {
         const infoAttivita = attivita.find(a => a.id === editModal.attivitaId);
         const nomeLivello = infoAttivita?.isFreeTextLevel ? editModal.livello : infoAttivita?.levels?.find(l => l.val === editModal.livello)?.name;
-        const titoloCorso = nomeLivello ? `${infoAttivita.name} - ${nomeLivello}` : infoAttivita.name;
         const giornoNome = GIORNI[editModal.giorno];
+        
+        // Nuovo formato del titolo principale
+        const titoloPrincipale = nomeLivello ? `${giornoNome}, ${editModal.oraInizio} - ${nomeLivello}` : `${giornoNome}, ${editModal.oraInizio}`;
 
         const getIscrizionePdfStr = (p) => {
              let validList = [];
@@ -922,7 +924,7 @@
         printWindow.document.write(`
           <html>
             <head>
-              <title>Registro - ${titoloCorso}</title>
+              <title>Registro - ${titoloPrincipale}</title>
               <style>
                 @page { size: A4 portrait; margin: 15mm; }
                 body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; }
@@ -938,9 +940,9 @@
             <body>
               <div class="print-header">
                 <div>
-                  <h1>${titoloCorso}</h1>
+                  <h1>${titoloPrincipale}</h1>
                   <h3>
-                    ${giornoNome} - Ore ${editModal.oraInizio} | Istruttore: ${editModal.istruttore || 'Non assegnato'}<br>
+                    ${infoAttivita.name} - Istruttore: ${editModal.istruttore || 'Non assegnato'}<br>
                     Vasca ${editModal.vasca === 'interna' ? 'Interna' : 'Esterna'} - Corsie: ${editModal.corsie.join(', ')}
                   </h3>
                 </div>
