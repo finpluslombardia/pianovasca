@@ -2326,6 +2326,12 @@
             </div>
 
           </main>
+
+          {/* DATALIST PER AUTOSUGGERIMENTO UTENTI */}
+          <datalist id="utenti-list">
+            {tuttiUtentiUnici.map((u, idx) => <option key={idx} value={u.nome} />)}
+          </datalist>
+
         </div>
       );
     }
