@@ -1,12 +1,1448 @@
-<!-- ... existing code ... -->
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestione Piano Vasca</title>
+  
+  <!-- Tailwind CSS per lo stile -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React e ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel per compilare JSX nel browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Libreria per generare il PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    /* Regole per le abbreviazioni riservate al PDF */
+    .show-on-pdf { display: none !important; }
+    .pdf-mode .show-on-pdf { display: inline-block !important; }
+    .pdf-mode .hide-on-pdf { display: none !important; }
+    
+    /* Regola aggiuntiva per i blocchi strutturali del PDF */
+    .show-block-on-pdf { display: none !important; }
+    .pdf-mode .show-block-on-pdf { display: block !important; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+  
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    // --- COMPONENTI ICONE ---
+    const Icon = ({ children, size = 24, className = "" }) => (
+      <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        {children}
+      </svg>
+    );
+    const DownloadIcon = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Icon>;
+    const UploadIcon = (p) => <Icon {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Icon>;
+    const Trash2Icon = (p) => <Icon {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2-2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></Icon>;
+    const InfoIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></Icon>;
+    const ClockIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Icon>;
+    const CloudIcon = (p) => <Icon {...p}><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></Icon>;
+    const CheckIcon = (p) => <Icon {...p}><polyline points="20 6 9 17 4 12"/></Icon>;
+    const LoaderIcon = (p) => <Icon {...p} className={`animate-spin ${p.className || ''}`}><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></Icon>;
+    const LockIcon = (p) => <Icon {...p}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></Icon>;
+    const LogOutIcon = (p) => <Icon {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></Icon>;
+    const XIcon = (p) => <Icon {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Icon>;
+    const PlusIcon = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Icon>;
+    const UsersIcon = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></Icon>;
+    const UserPlusIcon = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></Icon>;
+    const SearchIcon = (p) => <Icon {...p}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></Icon>;
+    const FilterIcon = (p) => <Icon {...p}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></Icon>;
+    const PrinterIcon = (p) => <Icon {...p}><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></Icon>;
+    const EditIcon = (p) => <Icon {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></Icon>;
+    const CalendarIcon = (p) => <Icon {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></Icon>;
+    const ChevronLeftIcon = (p) => <Icon {...p}><polyline points="15 18 9 12 15 6"/></Icon>;
+    const ChevronRightIcon = (p) => <Icon {...p}><polyline points="9 18 15 12 9 6"/></Icon>;
+    const ArrowUpIcon = (p) => <Icon {...p}><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></Icon>;
+    const ArrowDownIcon = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></Icon>;
+    const StarIcon = (p) => <Icon {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Icon>;
+
+    // --- UTILITY DATE PER PARTECIPANTI E CALENDARIO ---
+    const isScaduto = (dateStr) => {
+      if (!dateStr) return false;
+      return new Date(dateStr) < new Date();
+    };
+    const formatDate = (dateStr) => {
+      if (!dateStr) return '-';
+      const [y, m, d] = dateStr.split('-');
+      return `${d}/${m}/${y}`;
+    };
+
+    const getStartOfWeek = (date) => {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(d.setDate(diff));
+    };
+
+    const formatItalianDate = (date) => {
+      return date.toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+    };
+
+    const toYMD = (date) => {
+      const d = new Date(date);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    // --- NUOVE UTILITY PER DATE E SETTIMANE ---
+    // Forza la data al Lunedì della settimana selezionata
+    const snapToMonday = (dateStr) => {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      return toYMD(new Date(d.setDate(diff)));
+    };
+
+    // Forza la data alla Domenica della settimana selezionata
+    const snapToSunday = (dateStr) => {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? 0 : 7 - day);
+      return toYMD(new Date(d.setDate(diff)));
+    };
+
+    // Verifica se un partecipante è attivo nella settimana corrente
+    const isAttivoInSettimana = (p, inizioSet) => {
+      let validList = [];
+      if (p.iscrizioni && p.iscrizioni.length > 0) {
+          validList = p.iscrizioni.filter(i => i.inizio || i.fine);
+      } else if (p.scadIscrizione) {
+          validList = [{ inizio: '', fine: p.scadIscrizione }];
+      }
+      
+      if (validList.length === 0) return true;
+
+      const inizioRef = new Date(inizioSet);
+      inizioRef.setHours(0,0,0,0);
+      const fineRef = new Date(inizioRef.getTime() + 6 * 24 * 60 * 60 * 1000);
+      fineRef.setHours(23,59,59,999);
+
+      return validList.some(isc => {
+          const iStart = isc.inizio ? new Date(isc.inizio) : new Date(0);
+          const iEnd = isc.fine ? new Date(isc.fine) : new Date(8640000000000000);
+          iStart.setHours(0,0,0,0);
+          iEnd.setHours(23,59,59,999);
+
+          return iStart <= fineRef && iEnd >= inizioRef;
+      });
+    };
+
+    // --- CONFIGURAZIONE INIZIALE ---
+    const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+    const ORE_INIZIO = 6;  
+    const MINUTI_INIZIO = 0;
+    const ORE_FINE = 22;   
+    const MINUTI_FINE = 30;
+    const START_MIN_TOTAL = ORE_INIZIO * 60 + MINUTI_INIZIO;
+    const END_MIN_TOTAL = ORE_FINE * 60 + MINUTI_FINE;
+    
+    const CORSIE_INTERNA = ['1A', '1B', '2', '3', '4', '5', '6'];
+    const CORSIE_ESTERNA = ['1', '2', '3', '4', '5', '6', '7', '8'];
+
+    const ATTIVITA_DI_BASE = [
+      { id: 'libero', name: 'Nuoto Libero', color: 'bg-slate-300 text-slate-800', border: 'border-slate-400' },
+      { 
+        id: 'scuola_bambini', 
+        name: 'Scuola Nuoto Bambini', 
+        color: 'bg-sky-400 text-white', 
+        border: 'border-sky-500',
+        hasLevels: true,
+        levels: [
+          {val: '1', name: 'Stella Marina'}, {val: '2', name: 'Granchietto'}, {val: '3', name: 'Tartaruga'}, 
+          {val: '4', name: 'Polipetto'}, {val: '5', name: 'Pesce spada'}, {val: '6', name: 'Delfino'}, {val: '7', name: 'Squalo'}
+        ]
+      },
+      { 
+        id: 'scuola_adulti', 
+        name: 'Scuola Nuoto Adulti', 
+        color: 'bg-green-500 text-white', 
+        border: 'border-green-600',
+        hasLevels: true,
+        levels: [
+          {val: '1', name: 'Principianti'}, {val: '2', name: 'Intermedi'}, {val: '3', name: 'Avanzati'}, {val: '4', name: 'Avanzato Plus'}
+        ]
+      },
+      { 
+        id: 'acquagym', 
+        name: 'Aquafitness', 
+        color: 'bg-fuchsia-500 text-white', 
+        border: 'border-fuchsia-600',
+        hasLevels: true,
+        levels: [
+          {val: '1', name: 'Aquagym'}, {val: '2', name: 'Aquabike'}, {val: '3', name: 'AquaCross'}, 
+          {val: '4', name: 'AquaHiit'}, {val: '5', name: 'AquaCircuit'}, {val: '6', name: 'AquaGAG'}, 
+          {val: '7', name: 'AquaThai'}, {val: '8', name: 'AquaFit'}
+        ]
+      },
+      { id: 'propaganda', name: 'Propaganda', color: 'bg-purple-600 text-white', border: 'border-purple-700' },
+      { id: 'societa', name: 'Società', color: 'bg-orange-500 text-white', border: 'border-orange-600', isFreeTextLevel: true },
+      { id: 'privato', name: 'Lez. Privata', color: 'bg-yellow-300 text-yellow-900', border: 'border-yellow-400' },
+    ];
+
+    const isSameCourse = (c1, c2) => {
+        if (!c1 && !c2) return true;
+        if (!c1 || !c2) return false;
+        return c1.id === c2.id && c1.istruttore === c2.istruttore && c1.livello === c2.livello && c1.durata === c2.durata && c1.maxUtenti === c2.maxUtenti && c1.dataInizio === c2.dataInizio && c1.dataFine === c2.dataFine;
+    };
+
+    const abbrevia = (nome) => {
+        if(!nome) return '';
+        if(nome === 'Scuola Nuoto Bambini') return 'SN Bimbi';
+        if(nome === 'Scuola Nuoto Adulti') return 'SN Adulti';
+        if(nome === 'Nuoto Libero') return 'N. Libero';
+        if(nome === 'Lez. Privata') return 'Privata';
+        if(nome === 'Stella Marina') return 'Stella M.';
+        if(nome === 'Pesce spada') return 'P. Spada';
+        if(nome === 'Avanzato Plus') return 'Av. Plus';
+        return nome;
+    };
+
+    function App() {
+      // --- STATO DELL'APPLICAZIONE ---
+      const [stagioni, setStagioni] = useState(['2025/2026']);
+      const [stagioneSelezionata, setStagioneSelezionata] = useState('2025/2026');
+      const [stagionePredefinita, setStagionePredefinita] = useState('2025/2026');
+      const [tuttiPiani, setTuttiPiani] = useState({ '2025/2026': {} });
+      
+      // Il piano corrente deriva dalla stagione selezionata
+      const piano = tuttiPiani[stagioneSelezionata] || {};
+
+      const [vascaSelezionata, setVascaSelezionata] = useState('interna'); // 'interna' o 'esterna'
+      const [giornoSelezionato, setGiornoSelezionato] = useState((new Date().getDay() + 6) % 7);
+      const [attivita, setAttivita] = useState(ATTIVITA_DI_BASE);
+      const [intervallo, setIntervallo] = useState(30); 
+      const [editModal, setEditModal] = useState(null); 
+      const [isExportMenuOpen, setIsExportMenuOpen] = useState(false); // Menu esportazione
+      const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+      const [filtriAttivita, setFiltriAttivita] = useState(ATTIVITA_DI_BASE.map(a => a.id));
+      const [inizioSettimana, setInizioSettimana] = useState(getStartOfWeek(new Date()));
+
+      // --- STATI AGGIUNTA CORSO ---
+      const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+      const [nuovoCorso, setNuovoCorso] = useState({
+          vasca: 'interna',
+          giorni: [],
+          oraInizio: '06:00',
+          durata: 40,
+          maxUtenti: '',
+          corsie: [],
+          attivitaId: 'libero',
+          istruttore: '',
+          livello: '',
+          dataInizio: '',
+          dataFine: ''
+      });
+
+      // --- STATO NUOVO PARTECIPANTE ---
+      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
+      const [showAddForm, setShowAddForm] = useState(false);
+
+      // --- STATI AGGIUNTA UTENTE RAPIDO ---
+      const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', giorno: '', corsoIndex: '', nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+
+      // --- STATI RICERCA SOCIO ---
+      const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+      const [searchQuery, setSearchQuery] = useState('');
+
+      // --- STATI GESTIONE STAGIONI ---
+      const [isGestioneStagioniOpen, setIsGestioneStagioniOpen] = useState(false);
+
+      // --- STATI FIREBASE E SALVATAGGIO ---
+      const [user, setUser] = useState(null);
+      const [isAuthLoading, setIsAuthLoading] = useState(true);
+      const [email, setEmail] = useState('');
+      const [password, setPassword] = useState('');
+      const [loginError, setLoginError] = useState('');
+      const [statoSalvataggio, setStatoSalvataggio] = useState('idle');
+      const [confermaSvuota, setConfermaSvuota] = useState(false);
+      const [confermaEliminaStagione, setConfermaEliminaStagione] = useState(false);
+      const [firebaseInstances, setFirebaseInstances] = useState(null);
+      const lastSavedPiano = useRef(""); 
+      const initialLoadDone = useRef(false);
+
+      const partecipantiAttiviModal = useMemo(() => {
+          return editModal ? (editModal.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)) : [];
+      }, [editModal, inizioSettimana]);
+
+      // --- INIZIALIZZAZIONE FIREBASE DINAMICA ---
+      useEffect(() => {
+        const setupFirebase = async () => {
+            try {
+                const dynamicImport = new Function('url', 'return import(url)');
+                const { initializeApp } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+                const { getAuth, signInWithCustomToken, onAuthStateChanged, signInWithEmailAndPassword, signOut } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                const { getFirestore, doc, setDoc, onSnapshot } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+                const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+                let app, auth, db, appId;
+
+                if (firebaseConfigStr) {
+                    app = initializeApp(JSON.parse(firebaseConfigStr));
+                    appId = typeof __app_id !== 'undefined' ? __app_id : 'gestionale-vasca';
+                } else {
+                    const mioFirebaseConfig = {
+                        apiKey: "AIzaSyB6fUMyWtZ3IBFnyIoiFSmNVu_0FeMhW1Y",
+                        authDomain: "pianovasca-2d757.firebaseapp.com",
+                        projectId: "pianovasca-2d757",
+                        storageBucket: "pianovasca-2d757.firebasestorage.app",
+                        messagingSenderId: "564777055604",
+                        appId: "1:564777055604:web:a8ad7e71b50fb4ce82e821"
+                    };
+                    
+                    if (mioFirebaseConfig.apiKey) {
+                        app = initializeApp(mioFirebaseConfig);
+                        appId = 'gestionale-vasca-personale';
+                    } else {
+                        setIsAuthLoading(false);
+                        return;
+                    }
+                }
+                
+                auth = getAuth(app);
+                db = getFirestore(app);
+                setFirebaseInstances({ auth, db, appId, doc, setDoc, onSnapshot, signInWithEmailAndPassword, signOut });
+
+                onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    setIsAuthLoading(false);
+                });
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } 
+            } catch (err) {
+                console.error("Errore Firebase:", err);
+                setIsAuthLoading(false);
+            }
+        };
+        setupFirebase();
+      }, []);
+
+      const formatCellData = (data) => {
+          if (!data) return null;
+          let cell = typeof data === 'string' ? { id: data, istruttore: '', livello: '', durata: null, maxUtenti: '' } : { ...data };
+          if (cell.id.startsWith('scuola_adulti_')) return { ...cell, id: 'scuola_adulti', livello: cell.id.split('_')[2] };
+          if (cell.id.startsWith('scuola_bambini_')) return { ...cell, id: 'scuola_bambini', livello: cell.id.split('_')[2] };
+          return cell;
+      };
+
+      // --- LETTURA E SYNC DATI CLOUD ---
+      useEffect(() => {
+        if (!user || !firebaseInstances) return;
+        const { db, appId, doc, onSnapshot } = firebaseInstances;
+        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
+        
+        const unsubscribe = onSnapshot(docRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            
+            // Nuovo formato con gestione Stagioni multiple
+            if (data.tuttiPiani) {
+              setTuttiPiani(data.tuttiPiani);
+              
+              let defaultSeason = data.stagionePredefinita;
+              
+              if (data.stagioni && data.stagioni.length > 0) {
+                 setStagioni(data.stagioni);
+                 
+                 if (!defaultSeason || !data.stagioni.includes(defaultSeason)) {
+                     defaultSeason = data.stagioni[0];
+                 }
+                 setStagionePredefinita(defaultSeason);
+                 
+                 // Seleziona SEMPRE la stagione predefinita all'apertura del sito
+                 setStagioneSelezionata((prev) => {
+                     if (!initialLoadDone.current) {
+                         return defaultSeason; // Forza la predefinita
+                     }
+                     return data.stagioni.includes(prev) ? prev : defaultSeason;
+                 });
+                 initialLoadDone.current = true;
+              }
+              // Salviamo anche l'ordine delle stagioni nel riferimento per riconoscerne le modifiche
+              lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni, def: defaultSeason });
+            } 
+            // Migrazione automatica dal vecchio formato singolo a Stagioni
+            else if (data.piano) {
+              const pianoMigrato = {};
+              for (const key in data.piano) {
+                let newKey = key;
+                if (!key.startsWith('interna-') && !key.startsWith('esterna-')) {
+                  newKey = `interna-${key}`;
+                }
+                pianoMigrato[newKey] = formatCellData(data.piano[key]);
+              }
+              const defaultSeason = '2025/2026';
+              const initialTuttiPiani = { [defaultSeason]: pianoMigrato };
+              setTuttiPiani(initialTuttiPiani);
+              setStagioni([defaultSeason]);
+              setStagionePredefinita(defaultSeason);
+              
+              setStagioneSelezionata((prev) => {
+                  if (!initialLoadDone.current) return defaultSeason;
+                  return prev;
+              });
+              initialLoadDone.current = true;
+              
+              lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason], def: defaultSeason });
+            }
+          }
+        }, (error) => console.error("Errore sync Cloud:", error));
+        return () => unsubscribe();
+      }, [user, firebaseInstances]);
+
+      // --- FUNZIONE DI SALVATAGGIO CLOUD ---
+      const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare, stagionePredef) => {
+        if (!user || !firebaseInstances) {
+            setStatoSalvataggio('error');
+            setTimeout(() => setStatoSalvataggio('idle'), 4000);
+            return;
+        }
+        setStatoSalvataggio('saving');
+        try {
+            const { db, appId, doc, setDoc } = firebaseInstances;
+            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
+            await setDoc(docRef, { tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, updatedAt: new Date().toISOString() });
+            lastSavedPiano.current = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef }); 
+            setStatoSalvataggio('saved');
+            setTimeout(() => setStatoSalvataggio('idle'), 3000);
+        } catch (error) {
+            setStatoSalvataggio('error');
+            setTimeout(() => setStatoSalvataggio('idle'), 3000);
+        }
+      };
+
+      useEffect(() => {
+        if (!user || !firebaseInstances) return;
+        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita });
+        if (currentStateStr === lastSavedPiano.current) return; 
+        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita), 1500);
+        return () => clearTimeout(timer);
+      }, [tuttiPiani, stagioni, stagionePredefinita, user, firebaseInstances]);
+
+      // --- CALCOLATORI DI TEMPO E VISTE ---
+      const TIME_OPTIONS = useMemo(() => {
+        const opts = [];
+        let currentMin = START_MIN_TOTAL;
+        while (currentMin < END_MIN_TOTAL) {
+          const h = Math.floor(currentMin / 60);
+          const m = currentMin % 60;
+          opts.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+          currentMin += 15;
+        }
+        return opts;
+      }, []);
+
+      const fasceOrarie = useMemo(() => {
+        const fasce = [];
+        let currentMin = START_MIN_TOTAL;
+        while (currentMin < END_MIN_TOTAL) {
+          const h = Math.floor(currentMin / 60);
+          const m = currentMin % 60;
+          const start = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          
+          let nextMin = currentMin + intervallo;
+          let endH = Math.floor(nextMin / 60);
+          let endM = nextMin % 60;
+          if (nextMin > END_MIN_TOTAL) {
+              endH = Math.floor(END_MIN_TOTAL / 60);
+              endM = END_MIN_TOTAL % 60;
+          }
+
+          const end = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+          fasce.push({ id: start, label: `${start} - ${end}` });
+          currentMin = nextMin;
+        }
+        return fasce;
+      }, [intervallo]);
+
+      // --- LOGICA RICOSTRUZIONE ASSOLUTA CORSI ---
+      const getCorsiForDay = useCallback((giornoIdx) => {
+          const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
+          const corsi = [];
+          
+          // Data esatta del giorno visualizzato in questa colonna della griglia
+          const dataGiornoEsatto = new Date(inizioSettimana.getTime() + giornoIdx * 24 * 60 * 60 * 1000);
+          const dataGiornoYMD = toYMD(dataGiornoEsatto);
+
+          activeCorsie.forEach(corsia => {
+              const keys = Object.keys(piano).filter(k => k.startsWith(`${vascaSelezionata}-${giornoIdx}-`) && k.endsWith(`-${corsia}`));
+              keys.sort((a, b) => a.split('-')[2].localeCompare(b.split('-')[2])); 
+
+              let currentCourseEndMin = -1;
+              let currentCourse = null;
+
+              keys.forEach(k => {
+                  const timeStr = k.split('-')[2];
+                  const [h, m] = timeStr.split(':').map(Number);
+                  const startMin = h * 60 + m;
+                  const cell = piano[k];
+                  
+                  if (!filtriAttivita.includes(cell.id)) return;
+
+                  // --- FILTRO CALENDARIO ---
+                  const isInizioValido = !cell.dataInizio || cell.dataInizio <= dataGiornoYMD;
+                  const isFineValida = !cell.dataFine || cell.dataFine >= dataGiornoYMD;
+                  if (!isInizioValido || !isFineValida) return; // Salta se il corso non è attivo oggi
+
+                  const durata = cell.durata || 45; 
+                  
+                  if (startMin < currentCourseEndMin && isSameCourse(cell, currentCourse?.data)) {
+                      currentCourse.keys.push(k);
+                      currentCourseEndMin = Math.max(currentCourseEndMin, startMin + durata);
+                      return;
+                  }
+
+                  currentCourse = {
+                      oraInizio: timeStr,
+                      startMin: startMin,
+                      durata: durata,
+                      corsia: corsia,
+                      data: cell,
+                      keys: [k]
+                  };
+                  corsi.push(currentCourse);
+                  currentCourseEndMin = startMin + durata;
+              });
+          });
+
+          const corsiUnici = [];
+          const byStartMin = {};
+          corsi.forEach(c => {
+              if (!byStartMin[c.startMin]) byStartMin[c.startMin] = [];
+              byStartMin[c.startMin].push(c);
+          });
+
+          Object.keys(byStartMin).forEach(startMin => {
+              const corsiAtTime = byStartMin[startMin];
+              corsiAtTime.sort((a, b) => activeCorsie.indexOf(a.corsia) - activeCorsie.indexOf(b.corsia));
+              
+              const grouped = [];
+              corsiAtTime.forEach(c => {
+                  let placed = false;
+                  for (let g of grouped) {
+                      if (isSameCourse(g.data, c.data) && g.durata === c.durata) {
+                          const lastCorsiaIdx = activeCorsie.indexOf(g.corsie[g.corsie.length - 1]);
+                          const myCorsiaIdx = activeCorsie.indexOf(c.corsia);
+                          if (myCorsiaIdx === lastCorsiaIdx + 1) { 
+                              g.corsie.push(c.corsia);
+                              g.keys.push(...c.keys);
+                              placed = true;
+                              break;
+                          }
+                      }
+                  }
+                  if (!placed) {
+                      grouped.push({
+                          oraInizio: c.oraInizio,
+                          startMin: c.startMin,
+                          durata: c.durata,
+                          data: c.data,
+                          corsie: [c.corsia],
+                          keys: [...c.keys]
+                      });
+                  }
+              });
+              corsiUnici.push(...grouped);
+          });
+
+          return corsiUnici;
+      }, [piano, vascaSelezionata, filtriAttivita, inizioSettimana]);
+
+      const corsiOggi = useMemo(() => {
+          if (giornoSelezionato === 7) return [];
+          return getCorsiForDay(giornoSelezionato);
+      }, [getCorsiForDay, giornoSelezionato]);
+
+      // --- LOGICA UTENTE RAPIDO E AUTOSUGGERIMENTO ---
+      const tuttiUtentiUnici = useMemo(() => {
+          const map = new Map();
+          Object.values(piano).forEach(cell => {
+             (cell.partecipanti || []).forEach(p => {
+                 if (p && p.nome) {
+                     const key = p.nome.toLowerCase().trim();
+                     if (!map.has(key)) {
+                         map.set(key, p);
+                     }
+                 }
+             });
+          });
+          return Array.from(map.values()).sort((a,b) => a.nome.localeCompare(b.nome));
+      }, [piano]);
+
+      const tuttiCorsiSelect = useMemo(() => {
+          const list = [];
+          Object.keys(piano).forEach(k => {
+              const cell = piano[k];
+              const parts = k.split('-');
+              const vasca = parts[0];
+              const giorno = Number(parts[1]);
+              const oraInizio = parts[2];
+              const corsia = parts[3];
+              
+              const existing = list.find(c => c.vasca === vasca && c.giorno === giorno && c.oraInizio === oraInizio && isSameCourse(c.data, cell));
+              if (existing) {
+                  if (!existing.corsie.includes(corsia)) existing.corsie.push(corsia);
+                  if (!existing.keys.includes(k)) existing.keys.push(k);
+              } else {
+                  list.push({ vasca, giorno, oraInizio, corsie: [corsia], keys: [k], data: cell });
+              }
+          });
+          list.sort((a, b) => a.giorno - b.giorno || a.oraInizio.localeCompare(b.oraInizio));
+          return list;
+      }, [piano]);
+
+      const giorniConCorsiPerUtenteRapido = useMemo(() => {
+        return addUtenteRapido.attivitaId
+          ? [...new Set(tuttiCorsiSelect.filter(c => c.data.id === addUtenteRapido.attivitaId).map(c => c.giorno))].sort((a, b) => a - b)
+          : [];
+      }, [tuttiCorsiSelect, addUtenteRapido.attivitaId]);
+
+      const corsiPerUtenteRapido = useMemo(() => {
+        return addUtenteRapido.attivitaId
+          ? tuttiCorsiSelect.map((c, index) => ({...c, originalIndex: index})).filter(c => c.data.id === addUtenteRapido.attivitaId)
+          : [];
+      }, [tuttiCorsiSelect, addUtenteRapido.attivitaId]);
+
+      const salvaUtenteRapido = (e) => {
+        e.preventDefault();
+        if (addUtenteRapido.corsoIndex === '') return alert("Seleziona un corso!");
+        if (!addUtenteRapido.nome.trim()) return alert("Inserisci il Cognome e Nome!");
+        
+        const selectedCourse = tuttiCorsiSelect[addUtenteRapido.corsoIndex];
+        const iscrizioniPulite = (addUtenteRapido.iscrizioni || []).filter(i => i.inizio || i.fine);
+        
+        setTuttiPiani(prevTutti => {
+            const prevSeason = prevTutti[stagioneSelezionata] || {};
+            const nuovoPiano = { ...prevSeason };
+            
+            selectedCourse.keys.forEach(k => {
+                const cell = nuovoPiano[k] ? { ...nuovoPiano[k] } : { ...selectedCourse.data };
+                const partecipanti = [...(cell.partecipanti || [])];
+                partecipanti.push({
+                    nome: addUtenteRapido.nome,
+                    anno: addUtenteRapido.anno,
+                    scadCertificato: addUtenteRapido.scadCertificato,
+                    iscrizioni: iscrizioniPulite
+                });
+                partecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
+                cell.partecipanti = partecipanti;
+                nuovoPiano[k] = cell;
+            });
+            return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
+        });
+
+        setIsAddUserModalOpen(false);
+        setAddUtenteRapido({ attivitaId: '', giorno: '', corsoIndex: '', nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+      };
+
+      // --- LOGICA RICERCA SOCIO ---
+      const searchResults = useMemo(() => {
+          if (!searchQuery.trim() || searchQuery.length < 2) return [];
+          const results = [];
+          const query = searchQuery.toLowerCase();
+          
+          tuttiCorsiSelect.forEach(c => {
+              if (c.data.partecipanti) {
+                  c.data.partecipanti.forEach(p => {
+                      if (p.nome.toLowerCase().includes(query)) {
+                          results.push({
+                              partecipante: p,
+                              corso: c
+                          });
+                      }
+                  });
+              }
+          });
+          // Ordina alfabeticamente
+          results.sort((a, b) => a.partecipante.nome.localeCompare(b.partecipante.nome));
+          return results;
+      }, [searchQuery, tuttiCorsiSelect]);
+
+      const apriCorsoDaRicerca = (c) => {
+          setIsSearchModalOpen(false);
+          const info = attivita.find(a => a.id === c.data.id);
+          const vascaOriginale = c.vasca;
+          const partecipantiOrdinati = [...(c.data.partecipanti || [])].sort((a, b) => a.nome.localeCompare(b.nome));
+
+          setEditModal({
+              corsoOriginale: c,
+              vasca: vascaOriginale,
+              attivitaId: c.data.id,
+              giorno: c.giorno,
+              oraInizio: c.oraInizio,
+              durata: c.data.durata || 45,
+              maxUtenti: c.data.maxUtenti || '',
+              corsie: [...c.corsie],
+              istruttore: c.data.istruttore || '',
+              livello: c.data.livello || '',
+              dataInizio: c.data.dataInizio || '',
+              dataFine: c.data.dataFine || '',
+              infoAttivita: info,
+              partecipanti: partecipantiOrdinati,
+              tab: 'iscritti'
+          });
+          setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+          setEditingPartecipanteIndex(null);
+          setShowAddForm(false);
+      };
+
+      // --- LOGICA AGGIUNTA NUOVO CORSO ---
+      const salvaNuovoCorso = (e) => {
+        e.preventDefault();
+        if (nuovoCorso.giorni.length === 0) {
+            alert("Seleziona almeno un giorno!");
+            return;
+        }
+        if (nuovoCorso.corsie.length === 0) {
+            alert("Seleziona almeno una corsia!");
+            return;
+        }
+        
+        setTuttiPiani(prevTutti => {
+            const prevSeason = prevTutti[stagioneSelezionata] || {};
+            const nuovoPiano = { ...prevSeason };
+            
+            nuovoCorso.giorni.forEach(g => {
+                nuovoCorso.corsie.forEach(c => {
+                    nuovoPiano[`${nuovoCorso.vasca}-${g}-${nuovoCorso.oraInizio}-${c}`] = { 
+                        id: nuovoCorso.attivitaId, 
+                        istruttore: nuovoCorso.istruttore.trim(), 
+                        livello: nuovoCorso.livello,
+                        durata: Number(nuovoCorso.durata),
+                        maxUtenti: nuovoCorso.maxUtenti ? Number(nuovoCorso.maxUtenti) : '',
+                        dataInizio: nuovoCorso.dataInizio,
+                        dataFine: nuovoCorso.dataFine,
+                        partecipanti: [] // Inizializza array vuoto
+                    };
+                });
+            });
+            return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
+        });
+
+        setIsAddModalOpen(false);
+        setNuovoCorso(prev => ({...prev, corsie: [], giorni: [], istruttore: '', livello: '', maxUtenti: '', dataInizio: '', dataFine: '', vasca: vascaSelezionata}));
+      };
+
+      // --- LOGICA MODIFICA/ELIMINA CORSO E PARTECIPANTI ---
+      const handleClickCorso = (e, corso) => {
+        e.stopPropagation();
+        const info = attivita.find(a => a.id === corso.data.id);
+        const vascaOriginale = corso.keys[0].split('-')[0];
+        const giornoOriginale = Number(corso.keys[0].split('-')[1]);
+        
+        // Ordina alfabeticamente all'apertura per sicurezza
+        const partecipantiOrdinati = [...(corso.data.partecipanti || [])].sort((a, b) => a.nome.localeCompare(b.nome));
+
+        setEditModal({
+          corsoOriginale: corso,
+          vasca: vascaOriginale,
+          attivitaId: corso.data.id,
+          giorno: giornoOriginale,
+          oraInizio: corso.oraInizio,
+          durata: corso.durata,
+          maxUtenti: corso.data.maxUtenti || '',
+          corsie: [...corso.corsie],
+          istruttore: corso.data.istruttore || '',
+          livello: corso.data.livello || '',
+          dataInizio: corso.data.dataInizio || '',
+          dataFine: corso.data.dataFine || '',
+          infoAttivita: info,
+          partecipanti: partecipantiOrdinati,
+          tab: 'iscritti' // Apre di default la scheda degli iscritti
+        });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setEditingPartecipanteIndex(null);
+        setShowAddForm(false);
+      };
+
+      const aggiungiPartecipante = () => {
+        if (!nuovoPartecipante.nome.trim()) return;
+        
+        const partecipantePulito = {
+            ...nuovoPartecipante,
+            iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
+        };
+
+        setEditModal(prev => {
+          let nuoviPartecipanti = [...prev.partecipanti];
+          if (editingPartecipanteIndex !== null) {
+            nuoviPartecipanti[editingPartecipanteIndex] = partecipantePulito;
+          } else {
+            nuoviPartecipanti.push(partecipantePulito);
+          }
+          
+          // Mantiene l'ordine alfabetico
+          nuoviPartecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
+          
+          return { ...prev, partecipanti: nuoviPartecipanti };
+        });
+        
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setEditingPartecipanteIndex(null);
+        setShowAddForm(false);
+      };
+
+      const avviaModificaPartecipante = (idx) => {
+        const p = editModal.partecipanti[idx];
+        let iscrizioni = p.iscrizioni && p.iscrizioni.length > 0 ? [...p.iscrizioni] : (p.scadIscrizione ? [{ inizio: '', fine: p.scadIscrizione }] : [{ inizio: '', fine: '' }]);
+        setNuovoPartecipante({ ...p, iscrizioni });
+        setEditingPartecipanteIndex(idx);
+        setShowAddForm(true);
+      };
+
+      const annullaModificaPartecipante = () => {
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setEditingPartecipanteIndex(null);
+        setShowAddForm(false);
+      };
+
+      const rimuoviPartecipante = (idx) => {
+        setEditModal(prev => ({
+          ...prev,
+          partecipanti: prev.partecipanti.filter((_, i) => i !== idx)
+        }));
+        if (editingPartecipanteIndex === idx) {
+          annullaModificaPartecipante();
+        } else if (editingPartecipanteIndex > idx) {
+          setEditingPartecipanteIndex(prev => prev - 1);
+        }
+      };
+
+      const salvaModificheModal = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (editModal.corsie.length === 0) return alert("Seleziona almeno una corsia!");
+        
+        // Recupera i partecipanti già confermati nella lista
+        let finalPartecipanti = [...editModal.partecipanti];
+        
+        // Se l'utente ha compilato il nome ma ha dimenticato di cliccare "Aggiungi alla lista", lo salviamo in automatico!
+        if (nuovoPartecipante && nuovoPartecipante.nome && nuovoPartecipante.nome.trim() !== '') {
+            const partecipantePulito = {
+                ...nuovoPartecipante,
+                iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
+            };
+            if (editingPartecipanteIndex !== null) {
+              finalPartecipanti[editingPartecipanteIndex] = partecipantePulito;
+            } else {
+              finalPartecipanti.push(partecipantePulito);
+            }
+            finalPartecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
+        }
+        
+        setTuttiPiani(prevTutti => {
+          const prevSeason = prevTutti[stagioneSelezionata] || {};
+          const nuovoPiano = { ...prevSeason };
+          
+          // Elimina chiavi vecchie
+          editModal.corsoOriginale.keys.forEach(k => delete nuovoPiano[k]);
+          
+          // Crea con nuovi dati
+          editModal.corsie.forEach(c => {
+              nuovoPiano[`${editModal.vasca}-${editModal.giorno}-${editModal.oraInizio}-${c}`] = { 
+                  id: editModal.attivitaId, 
+                  istruttore: editModal.istruttore.trim(), 
+                  livello: editModal.livello,
+                  durata: Number(editModal.durata),
+                  maxUtenti: editModal.maxUtenti ? Number(editModal.maxUtenti) : '',
+                  dataInizio: editModal.dataInizio,
+                  dataFine: editModal.dataFine,
+                  partecipanti: finalPartecipanti // Usa la lista aggiornata, compreso l'eventuale utente appena digitato
+              };
+          });
+          return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
+        });
+        
+        setEditModal(null);
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setEditingPartecipanteIndex(null);
+        setShowAddForm(false);
+      };
+
+      const eliminaCorsoModal = () => {
+        setTuttiPiani(prevTutti => {
+          const prevSeason = prevTutti[stagioneSelezionata] || {};
+          const nuovoPiano = { ...prevSeason };
+          editModal.corsoOriginale.keys.forEach(k => delete nuovoPiano[k]);
+          return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
+        });
+        setEditModal(null);
+      };
+
+      // --- STAMPA REGISTRO PRESENZE ---
+      const stampaRegistro = () => {
+        const infoAttivita = attivita.find(a => a.id === editModal.attivitaId);
+        const nomeLivello = infoAttivita?.isFreeTextLevel ? editModal.livello : infoAttivita?.levels?.find(l => l.val === editModal.livello)?.name;
+        const giornoNome = GIORNI[editModal.giorno];
+        
+        // Nuovo formato del titolo principale
+        const titoloPrincipale = nomeLivello ? `${giornoNome}, ${editModal.oraInizio} - ${nomeLivello}` : `${giornoNome}, ${editModal.oraInizio}`;
+
+        const getIscrizionePdfStr = (p) => {
+             let validList = [];
+             if (p.iscrizioni && p.iscrizioni.length > 0) {
+                 validList = p.iscrizioni.filter(i => i.inizio || i.fine);
+             } else if (p.scadIscrizione) {
+                 validList = [{ inizio: '', fine: p.scadIscrizione }];
+             }
+             if (validList.length === 0) return { str: '-', scaduta: false };
+
+             const oggi = new Date();
+             oggi.setHours(0,0,0,0);
+             const haValido = validList.some(isc => isc.fine ? new Date(isc.fine) >= oggi : true);
+             
+             const str = validList.map(isc => `${isc.inizio ? formatDate(isc.inizio) : '...'} - ${isc.fine ? formatDate(isc.fine) : '...'}`).join('<br>');
+             
+             return { str, scaduta: !haValido };
+        };
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+           alert("Attenzione: Abilita i popup nel browser per visualizzare e stampare il registro.");
+           return;
+        }
+        
+        // Stampiamo solo i partecipanti attivi nella settimana in cui ci troviamo!
+        let tableRows = partecipantiAttiviModal.map(p => {
+          const iscrPdf = getIscrizionePdfStr(p);
+          return `
+          <tr>
+            <td>${p.nome}</td>
+            <td style="text-align:center;">${p.anno || '-'}</td>
+            <td style="text-align:center; ${isScaduto(p.scadCertificato) ? 'color:#dc2626; font-weight:bold;' : ''}">${formatDate(p.scadCertificato)}</td>
+            <td style="text-align:center; ${iscrPdf.scaduta ? 'color:#dc2626; font-weight:bold;' : ''}">${iscrPdf.str}</td>
+          </tr>
+          `;
+        }).join('');
+
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Registro - ${titoloPrincipale}</title>
+              <style>
+                @page { size: A4 portrait; margin: 15mm; }
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                h1 { margin: 0 0 5px 0; font-size: 24px; color: #0f172a; }
+                h3 { margin: 0 0 5px 0; color: #64748b; font-weight: 500; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; line-height: 1.5; }
+                table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                th, td { border: 1px solid #cbd5e1; padding: 12px 8px; text-align: left; }
+                th { background-color: #e2e8f0 !important; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 11px; }
+                td { color: #334155; }
+                .print-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 10px; }
+              </style>
+            </head>
+            <body>
+              <div class="print-header">
+                <div>
+                  <h1>${titoloPrincipale}</h1>
+                  <h3>
+                    ${infoAttivita.name} - Istruttore: ${editModal.istruttore || 'Non assegnato'}<br>
+                    Vasca ${editModal.vasca === 'interna' ? 'Interna' : 'Esterna'} - Corsie: ${editModal.corsie.join(', ')}
+                  </h3>
+                </div>
+              </div>
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 40%;">Cognome e Nome</th>
+                    <th style="text-align:center; width: 10%;">Anno</th>
+                    <th style="text-align:center; width: 25%;">Certificato</th>
+                    <th style="text-align:center; width: 25%;">Iscrizione</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${tableRows}
+                </tbody>
+              </table>
+              <script>
+                window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }
+              <\/script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      };
+
+      // --- FUNZIONI CARICAMENTO FILE ---
+      const esportaDati = () => {
+        const dataStr = JSON.stringify({ tuttiPiani, stagioni, attivita: ATTIVITA_DI_BASE }, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; link.download = `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}_backup.json`; link.click();
+        URL.revokeObjectURL(url);
+        setIsExportMenuOpen(false);
+      };
+
+      const esportaExcel = () => {
+        let htmlContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+          <head>
+            <meta charset="utf-8">
+            <style>
+              body { font-family: sans-serif; font-size: 11pt; }
+              table { border-collapse: collapse; width: 100%; font-size: 11pt; }
+              th, td { border: 1px solid #ccc; padding: 8px; text-align: center; vertical-align: middle; font-size: 11pt; }
+              th { background-color: #f8fafc; font-weight: bold; }
+            </style>
+          </head>
+          <body>
+        `;
+
+        const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
+
+        const getColor = (colorClass) => {
+            if(colorClass.includes('bg-sky-400')) return '#38bdf8';
+            if(colorClass.includes('bg-green-500')) return '#22c55e';
+            if(colorClass.includes('bg-fuchsia-500')) return '#d946ef';
+            if(colorClass.includes('bg-purple-600')) return '#9333ea';
+            if(colorClass.includes('bg-orange-500')) return '#f97316';
+            if(colorClass.includes('bg-yellow-300')) return '#fde047';
+            if(colorClass.includes('bg-slate-300')) return '#cbd5e1';
+            return '#e2e8f0';
+        };
+
+        const getTextColor = (colorClass) => {
+            if(colorClass.includes('text-white')) return '#ffffff';
+            if(colorClass.includes('text-slate-800')) return '#1e293b';
+            if(colorClass.includes('text-yellow-900')) return '#713f12';
+            return '#000000';
+        };
+
+        GIORNI.forEach((giorno, gIdx) => {
+            const corsiDelGiorno = getCorsiForDay(gIdx);
+            const matrix = Array(fasceOrarie.length).fill(null).map(() => Array(activeCorsie.length).fill(null));
+
+            corsiDelGiorno.forEach(corso => {
+               const startRow = Math.floor((corso.startMin - START_MIN_TOTAL) / intervallo);
+               const rowSpan = Math.max(1, Math.round(corso.durata / intervallo));
+               const colStart = activeCorsie.indexOf(corso.corsie[0]);
+               const colSpan = corso.corsie.length;
+               
+               for(let r=0; r<rowSpan; r++){
+                   for(let c=0; c<colSpan; c++){
+                       if(startRow+r < fasceOrarie.length && colStart+c < activeCorsie.length){
+                           matrix[startRow+r][colStart+c] = { 
+                               corso, 
+                               isTopLeft: (r===0 && c===0),
+                               rowSpan,
+                               colSpan
+                           };
+                       }
+                   }
+               }
+            });
+
+            htmlContent += `
+              <h2>Stagione ${stagioneSelezionata} - Vasca ${vascaSelezionata === 'interna' ? 'Interna' : 'Esterna'} - ${giorno}</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Orario</th>
+                    ${activeCorsie.map(c => `<th>Corsia ${c}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>
+            `;
+
+            fasceOrarie.forEach((fascia, r) => {
+                htmlContent += `<tr><td>${fascia.label}</td>`;
+                activeCorsie.forEach((corsia, c) => {
+                    const cell = matrix[r][c];
+                    if(!cell) {
+                        htmlContent += `<td></td>`;
+                    } else if(cell.isTopLeft) {
+                        const info = attivita.find(a => a.id === cell.corso.data.id);
+                        const bgColor = getColor(info ? info.color : '');
+                        const textColor = getTextColor(info ? info.color : '');
+                        const nomeLivello = info?.isFreeTextLevel ? cell.corso.data.livello : info?.levels?.find(l => l.val === cell.corso.data.livello)?.name;
+                        
+                        let testoSfondo = '';
+                        if (nomeLivello) testoSfondo += `<b>${(info.id === 'acquagym' || info.isFreeTextLevel) ? nomeLivello : `Liv. ${cell.corso.data.livello} - ${nomeLivello}`}</b><br>`;
+                        else testoSfondo += `<b>${info ? info.name : ''}</b><br>`;
+                        
+                        if(cell.corso.data.istruttore) testoSfondo += `<i>${cell.corso.data.istruttore}</i><br>`;
+                        testoSfondo += `⏱ ${cell.corso.durata} min`;
+                        if(cell.corso.data.maxUtenti) testoSfondo += ` 👤 ${cell.corso.data.maxUtenti}`;
+                        
+                        htmlContent += `<td rowspan="${cell.rowSpan}" colspan="${cell.colSpan}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid #ccc;">${testoSfondo}</td>`;
+                    }
+                });
+                htmlContent += `</tr>`;
+            });
+
+            htmlContent += `
+                </tbody>
+              </table>
+              <br><br>
+            `;
+        });
+
+        htmlContent += `
+          </body>
+        </html>
+        `;
+
+        const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url; 
+        link.download = `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}_${vascaSelezionata}.xls`; 
+        link.click();
+        URL.revokeObjectURL(url);
+        setIsExportMenuOpen(false);
+      };
+
+      const importaDati = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const dati = JSON.parse(e.target.result);
+            if (dati.tuttiPiani) {
+              setTuttiPiani(dati.tuttiPiani);
+              setStagioni(dati.stagioni || Object.keys(dati.tuttiPiani));
+              if (dati.stagioni && dati.stagioni.length > 0) setStagioneSelezionata(dati.stagioni[0]);
+            } else if (dati.piano) {
+              const pianoMigrato = {};
+              for (const key in dati.piano) {
+                let newKey = key;
+                if (!key.startsWith('interna-') && !key.startsWith('esterna-')) {
+                  newKey = `interna-${key}`;
+                }
+                pianoMigrato[newKey] = formatCellData(dati.piano[key]);
+              }
+              setTuttiPiani(prev => ({ ...prev, [stagioneSelezionata]: pianoMigrato }));
+            }
+          } catch (error) { console.error("Errore importazione:", error); }
+        };
+        reader.readAsText(file);
+        event.target.value = null;
+      };
+
+      const svuotaPiano = () => {
+        if (!confermaSvuota) {
+          setConfermaSvuota(true);
+          setTimeout(() => setConfermaSvuota(false), 3000);
+          return;
+        }
+        setTuttiPiani(prev => ({ ...prev, [stagioneSelezionata]: {} }));
+        setConfermaSvuota(false);
+      };
+
+      const eliminaStagione = () => {
+        if (stagioni.length === 1) return; // Non elimina se c'è una sola stagione
+        
+        if (!confermaEliminaStagione) {
+          setConfermaEliminaStagione(true);
+          setTimeout(() => setConfermaEliminaStagione(false), 3000);
+          return;
+        }
+        
+        const nuoveStagioni = stagioni.filter(s => s !== stagioneSelezionata);
+        setStagioni(nuoveStagioni);
+        setTuttiPiani(prev => {
+          const nuovoTutti = { ...prev };
+          delete nuovoTutti[stagioneSelezionata];
+          return nuovoTutti;
+        });
+        setStagioneSelezionata(nuoveStagioni[0]);
+        if (stagionePredefinita === stagioneSelezionata) {
+            setStagionePredefinita(nuoveStagioni[0]);
+        }
+        setConfermaEliminaStagione(false);
+      };
+
+      // --- GESTIONE ACCESSO ---
+      const handleLogin = async (e) => {
+        e.preventDefault();
+        setLoginError('');
+        try {
+            await firebaseInstances.signInWithEmailAndPassword(firebaseInstances.auth, email, password);
+        } catch (error) { setLoginError("Email o password errati."); }
+      };
+      const handleLogout = async () => {
+        if (firebaseInstances?.auth) { 
+          await firebaseInstances.signOut(firebaseInstances.auth); 
+          setTuttiPiani({ '2025/2026': {} }); 
+          setStagioni(['2025/2026']);
+        }
+      };
+
+      if (isAuthLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50"><LoaderIcon size={48} className="text-blue-500" /></div>;
+
+      if (!user && firebaseInstances?.appId === 'gestionale-vasca-personale') {
+         return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+               <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md border border-slate-100">
+                  <div className="flex justify-center mb-6"><div className="bg-blue-100 p-3 rounded-full text-blue-600"><LockIcon size={32} /></div></div>
+                  <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">Area Riservata</h2>
+                  <p className="text-slate-500 text-center mb-8 text-sm">Inserisci le credenziali amministratore per accedere al Piano Vasca.</p>
+                  <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                     <div><label className="block text-sm font-medium text-slate-700 mb-1">Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                     <div><label className="block text-sm font-medium text-slate-700 mb-1">Password</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" /></div>
+                     {loginError && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{loginError}</div>}
+                     <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg mt-2 shadow-sm transition-colors">Accedi</button>
+                  </form>
+               </div>
+            </div>
+         );
+      }
+
+      // Separiamo le fasce orarie
+      const fasceMattina = fasceOrarie.filter(f => Number(f.id.split(':')[0]) < 14);
+      const fascePomeriggio = fasceOrarie.filter(f => Number(f.id.split(':')[0]) >= 14);
+
+      // Funzione riutilizzabile per renderizzare ogni singola tabella
+      const renderGriglia = (fasce, titolo, corsiDelGiorno, gIdx) => {
+          const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
+          const ROW_HEIGHT = 60; // Altezza fissa di base per ogni riga (in px)
+          const pixelsPerMin = ROW_HEIGHT / intervallo; // Calcolo dinamico dello zoom in base all'intervallo
+          
+          return (
+              <div className={`bg-white rounded-xl shadow-sm border border-slate-200 relative ${titolo ? 'mb-6' : ''}`} style={{ pageBreakInside: 'avoid' }}>
+                  {titolo && (
+                      <div className="bg-slate-700 text-white font-bold p-2 text-center text-sm rounded-t-xl uppercase tracking-wider">
+                          {titolo}
+                      </div>
+                  )}
+                  <div className="overflow-x-auto pb-4">
+                      <table className="w-full border-collapse select-none">
+                          <thead>
+                              <tr>
+                                  <th className="sticky left-0 z-20 bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Orario</th>
+                                  {activeCorsie.map(corsia => <th key={corsia} className="bg-slate-50 border-b border-r border-slate-200 p-2 min-w-[80px] text-center text-xs font-bold text-slate-700">Corsia {corsia}</th>)}
+                              </tr>
+                          </thead>
+                          <tbody>
+                              {fasce.map((fascia) => {
+                                  const [h, m] = fascia.id.split(':').map(Number);
+                                  const fasciaStartMin = h * 60 + m;
+                                  
+                                  return (
+                                      <tr key={fascia.id} className="hover:bg-slate-50/50 group">
+                                          <td className="sticky left-0 z-20 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]"
+                                              style={{ height: `${ROW_HEIGHT}px` }}>
+                                              {fascia.label}
+                                          </td>
+                                          {activeCorsie.map(corsia => {
+                                              // NUOVA LOGICA: Cerca i corsi che iniziano ALL'INTERNO di questa fascia oraria
+                                              const corsiInCella = corsiDelGiorno.filter(c => 
+                                                  c.corsie[0] === corsia && 
+                                                  c.startMin >= fasciaStartMin && 
+                                                  c.startMin < (fasciaStartMin + intervallo)
+                                              );
+
+                                              return (
+                                                  <td 
+                                                      key={corsia} 
+                                                      className="border-b border-r border-slate-200 relative p-0 cursor-pointer hover:bg-blue-50/30 transition-colors" 
+                                                      style={{ minWidth: '80px' }}
+                                                      onDoubleClick={() => {
+                                                          setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [gIdx], oraInizio: fascia.id, corsie: [corsia]}));
+                                                          setIsAddModalOpen(true);
+                                                      }}
+                                                  >
+                                                      {corsiInCella.map((corso, i) => {
+                                                          const infoAttivita = attivita.find(a => a.id === corso.data.id);
+                                                          const nomeLivello = infoAttivita?.isFreeTextLevel ? corso.data.livello : infoAttivita?.levels?.find(l => l.val === corso.data.livello)?.name;
+                                                          
+                                                          const nomeBrev = abbrevia(infoAttivita ? infoAttivita.name : '');
+                                                          const livelloBrev = abbrevia(nomeLivello);
+
+                                                          // Applicazione dello zoom dinamico sui box
+                                                          const topOffset = (corso.startMin - fasciaStartMin) * pixelsPerMin;
+                                                          const altezzaPX = corso.durata * pixelsPerMin;
+                                                          const larghezzaCalc = `calc(${corso.corsie.length * 100}% + ${corso.corsie.length - 1}px)`;
+
+                                                          return (
+                                                              <div 
+                                                                  key={i}
+                                                                  onClick={(e) => handleClickCorso(e, corso)}
+                                                                  className={`absolute z-10 left-0 rounded-lg flex flex-col shadow-md cursor-pointer hover:brightness-95 hover:shadow-lg transition-all overflow-hidden border border-white/20 ${infoAttivita?.color || 'bg-slate-500 text-white'}`}
+                                                                  style={{ top: `${topOffset}px`, height: `${altezzaPX}px`, width: larghezzaCalc, minHeight: '24px' }}
+                                                              >
+                                                                  <span className="absolute top-1 left-1.5 text-[9px] font-bold opacity-80 leading-none tracking-tight">
+                                                                    {corso.oraInizio}
+                                                                  </span>
+                                                                  <div className="flex-1 flex flex-col items-center justify-center w-full overflow-hidden p-0.5 text-center">
+                                                                    {nomeLivello ? (
+                                                                      <>
+                                                                        <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                          {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
+                                                                        </span>
+                                                                        <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[11px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                          {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' ? livelloBrev : `L${corso.data.livello}-${livelloBrev}`}
+                                                                        </span>
+                                                                      </>
+                                                                    ) : (
+                                                                      <>
+                                                                        <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                          {infoAttivita ? infoAttivita.name : ''}
+                                                                        </span>
+                                                                        <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[11px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
+                                                                          {nomeBrev}
+                                                                        </span>
+                                                                      </>
+                                                                    )}
+
+                                                                    {corso.data.istruttore && (
+                                                                      <span className={`${corso.durata <= 30 ? 'text-[10px]' : 'text-xs'} font-semibold truncate w-full px-0.5 mt-0.5 text-white/95`}>
+                                                                        {corso.data.istruttore}
+                                                                      </span>
+                                                                    )}
+                                                                  </div>
+
+                                                                  {corso.durata > 30 && (
+                                                                    <div className="w-full bg-black/10 border-t border-white/30 py-0.5 px-1.5 flex justify-between items-center text-[11px] font-medium shrink-0">
+                                                                      <span className="truncate pr-1 hide-on-pdf">{nomeLivello ? infoAttivita?.name : ''}</span>
+                                                                      <span className="truncate pr-1 show-on-pdf">{nomeLivello ? nomeBrev : ''}</span>
+                                                                      <div className="flex items-center gap-1 shrink-0">
+                                                                        {(corso.data.maxUtenti || (corso.data.partecipanti && corso.data.partecipanti.length > 0)) && (() => {
+                                                                           const pAttivi = corso.data.partecipanti?.filter(p => isAttivoInSettimana(p, inizioSettimana)) || [];
+                                                                           const isPieno = corso.data.maxUtenti && pAttivi.length >= corso.data.maxUtenti;
+                                                                           return (
+                                                                               <span className={`flex items-center gap-0.5 ${isPieno ? 'text-red-600' : ''}`} title={`Iscritti in questa sett.: ${pAttivi.length}${corso.data.maxUtenti ? ` / Max ${corso.data.maxUtenti}` : ''}`}>
+                                                                                 <UsersIcon size={10} /> {pAttivi.length}{corso.data.maxUtenti ? `/${corso.data.maxUtenti}` : ''}
+                                                                               </span>
+                                                                           );
+                                                                        })()}
+                                                                        <span className="shrink-0">{corso.durata}'</span>
+                                                                      </div>
+                                                                    </div>
+                                                                  )}
+                                                              </div>
+                                                          )
+                                                      })}
+                                                  </td>
+                                              );
+                                          })}
+                                      </tr>
+                                  );
+                              })}
+                          </tbody>
+                      </table>
+                  </div>
+              </div>
+          );
+      };
+
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
+
+          {/* --- MODALE RICERCA SOCIO --- */}
+          {isSearchModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
+                  <h3 className="font-bold text-xl flex items-center gap-2"><SearchIcon size={24}/> Cerca Socio</h3>
+                  <button onClick={() => setIsSearchModalOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                </div>
+                <div className="p-5 border-b border-slate-200 bg-slate-50">
+                  <div className="relative">
+                    <SearchIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input 
+                      type="text" 
+                      autoFocus
+                      placeholder="Cerca per cognome o nome..." 
+                      value={searchQuery} 
+                      onChange={e => setSearchQuery(e.target.value)} 
+                      className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm text-lg" 
+                    />
+                  </div>
+                </div>
+                <div className="overflow-y-auto flex-1 bg-white" style={{ minHeight: '300px' }}>
+                  {searchQuery.length > 0 && searchQuery.length < 2 ? (
+                    <div className="p-8 text-center text-slate-500">Digita almeno 2 caratteri per cercare...</div>
+                  ) : searchResults.length > 0 ? (
+                    <ul className="divide-y divide-slate-100">
+                      {searchResults.map((res, i) => {
+                        const infoAtt = attivita.find(a => a.id === res.corso.data.id);
+                        const nomeLiv = infoAtt?.isFreeTextLevel ? res.corso.data.livello : infoAtt?.levels?.find(l => l.val === res.corso.data.livello)?.name;
+                        const nomeCompleto = nomeLiv ? `${infoAtt?.name} - ${nomeLiv}` : infoAtt?.name;
+                        
+                        return (
+                          <li key={i} className="hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between p-4 group" onClick={() => apriCorsoDaRicerca(res.corso)}>
+                            <div>
+                              <div className="font-bold text-slate-800 text-lg mb-1">{res.partecipante.nome}</div>
+                              <div className="text-sm font-medium text-slate-500 flex items-center gap-2">
+                                <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200">{GIORNI[res.corso.giorno]} {res.corso.oraInizio}</span>
+                                <span>{res.corso.vasca === 'interna' ? 'V. Interna' : 'V. Esterna'}</span>
+                                <span className="text-blue-600 font-semibold truncate max-w-[200px] sm:max-w-none">{nomeCompleto}</span>
+                              </div>
+                            </div>
+                            <div className="text-slate-300 group-hover:text-blue-500 transition-colors">
+                              <ChevronRightIcon size={24} />
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : searchQuery.length >= 2 ? (
+                    <div className="p-8 text-center text-slate-500">Nessun socio trovato con "{searchQuery}"</div>
+                  ) : (
+                    <div className="p-8 text-center text-slate-400">Inserisci il nome da cercare nel campo in alto.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* --- MODALE AGGIUNGI UTENTE RAPIDO --- */}
+          {isAddUserModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                <div className="px-5 py-4 bg-blue-600 text-white flex justify-between items-center">
+                  <h3 className="font-bold text-xl flex items-center gap-2"><UserPlusIcon size={24}/> Aggiungi Utente</h3>
+                  <button onClick={() => setIsAddUserModalOpen(false)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                </div>
+                <div className="overflow-y-auto p-6">
+                  <form id="addUserForm" onSubmit={salvaUtenteRapido}>
+                    <div className="mb-5">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">1. Seleziona Attività</label>
+                      <select
+                        value={addUtenteRapido.attivitaId}
+                        onChange={e => setAddUtenteRapido({...addUtenteRapido, attivitaId: e.target.value, corsiSelezionati: []})}
+                        className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none"
+                      >
+                        <option value="">-- Seleziona un'attività --</option>
+                        {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    </div>
+
                     {addUtenteRapido.attivitaId && (
                         <div className="mb-5">
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">2. Seleziona i Corsi</label>
-                            <div className="flex flex-wrap gap-2 border border-slate-300 rounded-lg p-3 bg-slate-50">
+                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">2. Seleziona i Corsi <span className="font-normal text-slate-500">(puoi sceglierne più di uno)</span></label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-3 bg-slate-50">
                                 {corsiPerUtenteRapido.map(c => {
                                     const isChecked = (addUtenteRapido.corsiSelezionati || []).includes(c.originalIndex);
+                                    const infoAtt = attivita.find(a => a.id === c.data.id);
+                                    const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
+                                    const livelloStr = nomeLiv ? ` - ${nomeLiv}` : '';
                                     return (
-                                        <label key={c.originalIndex} className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-bold cursor-pointer transition-colors ${isChecked ? 'border-blue-500 bg-blue-100 text-blue-700' : 'border-slate-300 bg-white hover:bg-slate-100 text-slate-600'}`}>
+                                        <label key={c.originalIndex} className={`flex items-start gap-2.5 p-2 rounded-lg border-2 cursor-pointer transition-colors ${isChecked ? 'border-blue-500 bg-blue-50' : 'border-transparent hover:bg-slate-100'}`}>
                                             <input 
                                                 type="checkbox" 
                                                 checked={isChecked} 
@@ -16,16 +1452,947 @@
                                                     else selected.splice(selected.indexOf(c.originalIndex), 1);
                                                     setAddUtenteRapido({...addUtenteRapido, corsiSelezionati: selected});
                                                 }}
-                                                className="w-3.5 h-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
                                             />
-                                            {GIORNI[c.giorno].substring(0,3)} {c.oraInizio}
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-800">{GIORNI[c.giorno]} {c.oraInizio}</span>
+                                                <span className="text-[11px] text-slate-500 font-medium leading-tight">{c.vasca === 'interna' ? 'Vasca Int.' : 'Vasca Est.'}{livelloStr}</span>
+                                            </div>
                                         </label>
                                     )
                                 })}
                                 {corsiPerUtenteRapido.length === 0 && (
-                                    <div className="text-center text-sm text-slate-500 italic py-2 w-full">Nessun corso trovato.</div>
+                                    <div className="col-span-full text-center text-sm text-slate-500 italic py-2">Nessun corso trovato per questa attività.</div>
                                 )}
                             </div>
                         </div>
                     )}
-<!-- ... existing code ... -->
+
+                    <div className="grid grid-cols-1 gap-4 mb-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cognome e Nome</label>
+                              <input 
+                                type="text" 
+                                list="utenti-list"
+                                value={addUtenteRapido.nome} 
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    const existing = tuttiUtentiUnici.find(u => u.nome.toLowerCase() === val.toLowerCase().trim());
+                                    if (existing) {
+                                        setAddUtenteRapido({
+                                            ...addUtenteRapido, 
+                                            nome: val,
+                                            anno: existing.anno || '',
+                                            scadCertificato: existing.scadCertificato || '',
+                                            iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
+                                        });
+                                    } else {
+                                        setAddUtenteRapido({...addUtenteRapido, nome: val});
+                                    }
+                                }} 
+                                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" 
+                                placeholder="Es. Rossi Mario" 
+                                required 
+                              />
+                           </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Anno di Nascita</label>
+                              <input type="number" placeholder="Es. 2015" value={addUtenteRapido.anno} onChange={e => setAddUtenteRapido({...addUtenteRapido, anno: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
+                           </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Certificato</label>
+                              <input type="date" value={addUtenteRapido.scadCertificato} onChange={e => setAddUtenteRapido({...addUtenteRapido, scadCertificato: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
+                           </div>
+                        </div>
+
+                        <div className="mt-1 border-t border-slate-200 pt-4">
+                           <div className="flex justify-between items-center mb-3">
+                             <label className="block text-sm font-semibold text-slate-700">Periodi Iscrizione <span className="normal-case text-[10px] font-normal text-slate-400">(Si allineano a Lun/Dom)</span></label>
+                             <button type="button" onClick={() => setAddUtenteRapido({...addUtenteRapido, iscrizioni: [...(addUtenteRapido.iscrizioni || []), {inizio:'', fine:''}]})} className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"><PlusIcon size={14}/> Aggiungi Periodo</button>
+                           </div>
+                           <div className="flex flex-col gap-3">
+                             {(addUtenteRapido.iscrizioni || [{inizio:'', fine:''}]).map((isc, idx) => (
+                                <div key={idx} className="flex gap-2 items-center">
+                                   <div className="flex-1 flex flex-col sm:flex-row gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                      <div className="flex-1 flex items-center gap-2">
+                                        <span className="text-sm font-bold text-slate-500 w-8">Dal</span>
+                                        <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].inizio = snapToMonday(e.target.value); setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
+                                      </div>
+                                      <div className="flex-1 flex items-center gap-2">
+                                        <span className="text-sm font-bold text-slate-500 w-8">Al</span>
+                                        <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].fine = snapToSunday(e.target.value); setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
+                                      </div>
+                                   </div>
+                                   <button type="button" onClick={() => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc.splice(idx, 1); setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} disabled={(addUtenteRapido.iscrizioni || []).length <= 1} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                                      <Trash2Icon size={20}/>
+                                   </button>
+                                </div>
+                             ))}
+                           </div>
+                        </div>
+                    </div>
+                  </form>
+                </div>
+                
+                <div className="px-6 py-4 border-t border-slate-200 flex gap-3 justify-end bg-slate-50 rounded-b-2xl">
+                  <button type="button" onClick={() => setIsAddUserModalOpen(false)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">Annulla</button>
+                  <button type="submit" form="addUserForm" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><UserPlusIcon size={18} /> Aggiungi Iscritto</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- MODALE ORDINA STAGIONI --- */}
+          {isGestioneStagioniOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
+                  <h3 className="font-bold text-lg flex items-center gap-2">Gestione Stagioni</h3>
+                  <button onClick={() => setIsGestioneStagioniOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                </div>
+                <div className="p-4 flex flex-col gap-2 bg-slate-50 overflow-y-auto">
+                  <p className="text-sm text-slate-500 mb-3">Usa le frecce per l'ordine nel menu, o clicca la stella per impostare la stagione di avvio.</p>
+                  {stagioni.map((s, idx) => (
+                    <div key={s} className={`flex items-center justify-between bg-white border p-3 rounded-lg shadow-sm transition-colors ${stagionePredefinita === s ? 'border-yellow-400 ring-1 ring-yellow-400' : 'border-slate-200'}`}>
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => setStagionePredefinita(s)}
+                          className={`p-1.5 rounded-full transition-colors ${stagionePredefinita === s ? 'text-yellow-500 bg-yellow-50' : 'text-slate-300 hover:text-yellow-500 hover:bg-slate-100'}`}
+                          title={stagionePredefinita === s ? "Stagione di Avvio" : "Imposta come avvio"}
+                        >
+                          <StarIcon size={20} className={stagionePredefinita === s ? "fill-yellow-500" : ""} />
+                        </button>
+                        <span className={`font-bold ${stagionePredefinita === s ? 'text-slate-900' : 'text-slate-700'}`}>{s}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => {
+                            if (idx === 0) return;
+                            const newStagioni = [...stagioni];
+                            const temp = newStagioni[idx - 1];
+                            newStagioni[idx - 1] = newStagioni[idx];
+                            newStagioni[idx] = temp;
+                            setStagioni(newStagioni);
+                          }}
+                          disabled={idx === 0}
+                          className="p-1.5 rounded-md transition-colors text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default"
+                        >
+                          <ArrowUpIcon size={18} />
+                        </button>
+                        <button 
+                          onClick={() => {
+                            if (idx === stagioni.length - 1) return;
+                            const newStagioni = [...stagioni];
+                            const temp = newStagioni[idx + 1];
+                            newStagioni[idx + 1] = newStagioni[idx];
+                            newStagioni[idx] = temp;
+                            setStagioni(newStagioni);
+                          }}
+                          disabled={idx === stagioni.length - 1}
+                          className="p-1.5 rounded-md transition-colors text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default"
+                        >
+                          <ArrowDownIcon size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
+                  <button onClick={() => setIsGestioneStagioniOpen(false)} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all">Chiudi</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- MODALE AGGIUNGI CORSO --- */}
+          {isAddModalOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                <div className="px-5 py-4 bg-blue-600 text-white flex justify-between items-center">
+                  <h3 className="font-bold text-xl flex items-center gap-2"><PlusIcon size={24}/> Aggiungi Corso</h3>
+                  <button onClick={() => setIsAddModalOpen(false)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                </div>
+                <div className="overflow-y-auto p-6">
+                  <form id="addCourseForm" onSubmit={salvaNuovoCorso}>
+                    <div className="mb-5">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Attività</label>
+                      <select value={nuovoCorso.attivitaId} onChange={e => setNuovoCorso({...nuovoCorso, attivitaId: e.target.value, livello: ''})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
+                        {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    </div>
+
+                    {attivita.find(a => a.id === nuovoCorso.attivitaId)?.hasLevels && (
+                      <div className="mb-5">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                          {nuovoCorso.attivitaId === 'acquagym' ? 'Sottocategoria' : 'Livello'}
+                        </label>
+                        <select value={nuovoCorso.livello} onChange={e => setNuovoCorso({...nuovoCorso, livello: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
+                          <option value="">Nessuna selezione</option>
+                          {attivita.find(a => a.id === nuovoCorso.attivitaId).levels.map(l => <option key={l.val} value={l.val}>{l.name}</option>)}
+                        </select>
+                      </div>
+                    )}
+                    
+                    {attivita.find(a => a.id === nuovoCorso.attivitaId)?.isFreeTextLevel && (
+                      <div className="mb-5">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                          Nome Società
+                        </label>
+                        <input type="text" value={nuovoCorso.livello} onChange={e => setNuovoCorso({...nuovoCorso, livello: e.target.value})} placeholder="Es. Nuoto Club" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
+                      </div>
+                    )}
+
+                    <div className="mb-5">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
+                      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                        <button type="button" onClick={() => setNuovoCorso({...nuovoCorso, vasca: 'interna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${nuovoCorso.vasca === 'interna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Interna</button>
+                        <button type="button" onClick={() => setNuovoCorso({...nuovoCorso, vasca: 'esterna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${nuovoCorso.vasca === 'esterna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Esterna</button>
+                      </div>
+                    </div>
+
+                    <div className="mb-5">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Giorni</label>
+                      <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                        {GIORNI.map((g, i) => (
+                           <label key={i} className={`flex items-center justify-center border-2 rounded-lg py-2 cursor-pointer transition-all text-xs font-semibold ${nuovoCorso.giorni.includes(i) ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                              <input type="checkbox" className="hidden" checked={nuovoCorso.giorni.includes(i)} onChange={(e) => { if(e.target.checked) setNuovoCorso({...nuovoCorso, giorni: [...nuovoCorso.giorni, i]}); else setNuovoCorso({...nuovoCorso, giorni: nuovoCorso.giorni.filter(x => x !== i)}); }} />
+                              {g.substring(0, 3)}
+                           </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mb-5">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ora Inizio</label>
+                        <select value={nuovoCorso.oraInizio} onChange={e => setNuovoCorso({...nuovoCorso, oraInizio: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
+                          {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Durata (minuti)</label>
+                        <input 
+                          type="number" 
+                          value={nuovoCorso.durata} 
+                          onChange={e => setNuovoCorso({...nuovoCorso, durata: Number(e.target.value)})}
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none"
+                          min="1"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Max Utenti (opz.)</label>
+                        <input 
+                          type="number" 
+                          value={nuovoCorso.maxUtenti} 
+                          onChange={e => setNuovoCorso({...nuovoCorso, maxUtenti: e.target.value})}
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none"
+                          min="1"
+                          placeholder="Es. 15"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-5">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Valido dal (opz.)</label>
+                        <input 
+                          type="date" 
+                          value={nuovoCorso.dataInizio} 
+                          onChange={e => setNuovoCorso({...nuovoCorso, dataInizio: e.target.value})}
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Valido al (opz.)</label>
+                        <input 
+                          type="date" 
+                          value={nuovoCorso.dataFine} 
+                          onChange={e => setNuovoCorso({...nuovoCorso, dataFine: e.target.value})}
+                          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mb-5">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Corsie</label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {(nuovoCorso.vasca === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA).map(c => (
+                           <label key={c} className={`flex items-center justify-center gap-1 border-2 rounded-xl py-2.5 cursor-pointer transition-all ${nuovoCorso.corsie.includes(c) ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                              <input type="checkbox" className="hidden" checked={nuovoCorso.corsie.includes(c)} onChange={(e) => { if(e.target.checked) setNuovoCorso({...nuovoCorso, corsie: [...nuovoCorso.corsie, c]}); else setNuovoCorso({...nuovoCorso, corsie: nuovoCorso.corsie.filter(x => x !== c)}); }} />
+                              {c}
+                           </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mb-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Istruttore</label>
+                      <input type="text" value={nuovoCorso.istruttore} onChange={e => setNuovoCorso({...nuovoCorso, istruttore: e.target.value})} placeholder="Nome istruttore (opzionale)" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
+                    </div>
+                  </form>
+                </div>
+                
+                <div className="px-6 py-4 border-t border-slate-200 flex gap-3 justify-end bg-slate-50 rounded-b-2xl">
+                  <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">Annulla</button>
+                  <button type="submit" form="addCourseForm" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><CheckIcon size={18} /> Aggiungi in griglia</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- MODALE EDIT CORSO (CON TAB PARTECIPANTI) --- */}
+          {editModal && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh] max-h-[800px]">
+                
+                {/* Header Tabulato */}
+                <div className={`px-2 pt-2 flex flex-col border-b border-white/20 text-white ${attivita.find(a => a.id === editModal.attivitaId)?.color.split(' ')[0] || 'bg-blue-600'}`}>
+                  <div className="flex justify-between items-center px-3 pb-2 pt-1">
+                    <h3 className="font-bold text-xl flex items-center gap-2">Gestione Corso</h3>
+                    <button onClick={() => setEditModal(null)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                  </div>
+                  <div className="flex">
+                    <button onClick={() => setEditModal({...editModal, tab: 'iscritti'})} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 ${editModal.tab === 'iscritti' ? 'border-white bg-white/10' : 'border-transparent hover:bg-white/5 opacity-80'}`}>Lista Iscritti ({partecipantiAttiviModal.length}{editModal.maxUtenti ? `/${editModal.maxUtenti}` : ''})</button>
+                    <button onClick={() => setEditModal({...editModal, tab: 'dettagli'})} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 ${editModal.tab === 'dettagli' ? 'border-white bg-white/10' : 'border-transparent hover:bg-white/5 opacity-80'}`}>Impostazioni Corso</button>
+                  </div>
+                </div>
+
+                {/* Corpo del Modale */}
+                <div className="flex-1 overflow-y-auto p-6 bg-slate-50 relative">
+                  
+                  {/* TAB 1: IMPOSTAZIONI DEL CORSO */}
+                  {editModal.tab === 'dettagli' && (
+                    <form id="editCourseForm" onSubmit={salvaModificheModal}>
+                      <div className="mb-5">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Attività</label>
+                        <select value={editModal.attivitaId} onChange={e => setEditModal({...editModal, attivitaId: e.target.value, livello: ''})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
+                          {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                        </select>
+                      </div>
+
+                      {attivita.find(a => a.id === editModal.attivitaId)?.hasLevels && (
+                        <div className="mb-5">
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                            {editModal.attivitaId === 'acquagym' ? 'Sottocategoria' : 'Livello'}
+                          </label>
+                          <select value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
+                            <option value="">Nessuna selezione</option>
+                            {attivita.find(a => a.id === editModal.attivitaId).levels.map(l => <option key={l.val} value={l.val}>{l.name}</option>)}
+                          </select>
+                        </div>
+                      )}
+                      
+                      {attivita.find(a => a.id === editModal.attivitaId)?.isFreeTextLevel && (
+                        <div className="mb-5">
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                            Nome Società
+                          </label>
+                          <input type="text" value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} placeholder="Es. Nuoto Club" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm" />
+                        </div>
+                      )}
+
+                      <div className="mb-5">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
+                        <div className="flex gap-2 p-1 bg-slate-200 rounded-lg border border-slate-300 shadow-inner">
+                          <button type="button" onClick={() => setEditModal({...editModal, vasca: 'interna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'interna' ? 'bg-white shadow text-blue-600' : 'text-slate-600 hover:text-slate-800'}`}>Vasca Interna</button>
+                          <button type="button" onClick={() => setEditModal({...editModal, vasca: 'esterna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'esterna' ? 'bg-white shadow text-blue-600' : 'text-slate-600 hover:text-slate-800'}`}>Vasca Esterna</button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-5">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Giorno</label>
+                          <select value={editModal.giorno} onChange={e => setEditModal({...editModal, giorno: Number(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
+                            {GIORNI.map((g, i) => <option key={i} value={i}>{g}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ora Inizio</label>
+                          <select value={editModal.oraInizio} onChange={e => setEditModal({...editModal, oraInizio: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
+                            {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-5">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Durata (minuti)</label>
+                          <input 
+                            type="number" 
+                            value={editModal.durata} 
+                            onChange={e => setEditModal({...editModal, durata: Number(e.target.value)})}
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm"
+                            min="1"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Max Utenti (opz.)</label>
+                          <input 
+                            type="number" 
+                            value={editModal.maxUtenti} 
+                            onChange={e => setEditModal({...editModal, maxUtenti: e.target.value})}
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm"
+                            min="1"
+                            placeholder="Es. 15"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-5">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Valido dal (opz.)</label>
+                          <input 
+                            type="date" 
+                            value={editModal.dataInizio} 
+                            onChange={e => setEditModal({...editModal, dataInizio: e.target.value})}
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm cursor-pointer"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Valido al (opz.)</label>
+                          <input 
+                            type="date" 
+                            value={editModal.dataFine} 
+                            onChange={e => setEditModal({...editModal, dataFine: e.target.value})}
+                            className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mb-5">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Corsie</label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {(editModal.vasca === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA).map(c => (
+                             <label key={c} className={`flex items-center justify-center gap-1 border-2 rounded-xl py-2.5 cursor-pointer transition-all ${editModal.corsie.includes(c) ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                                <input type="checkbox" className="hidden" checked={editModal.corsie.includes(c)} onChange={(e) => { if(e.target.checked) setEditModal({...editModal, corsie: [...editModal.corsie, c]}); else setEditModal({...editModal, corsie: editModal.corsie.filter(x => x !== c)}); }} />
+                                {c}
+                             </label>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="mb-2">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Istruttore</label>
+                        <input type="text" value={editModal.istruttore} onChange={e => setEditModal({...editModal, istruttore: e.target.value})} placeholder="Nome istruttore (opzionale)" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm" />
+                      </div>
+                    </form>
+                  )}
+
+                  {/* TAB 2: GESTIONE ISCRITTI */}
+                  {editModal.tab === 'iscritti' && (
+                    <div className="flex flex-col h-full gap-5">
+                      {/* ADD FORM COMPLETO A SCOMPARSA */}
+                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all">
+                        <div 
+                          className={`p-4 flex justify-between items-center cursor-pointer select-none transition-colors ${showAddForm || editingPartecipanteIndex !== null ? 'bg-slate-50 border-b border-slate-200' : 'hover:bg-slate-50'}`}
+                          onClick={() => {
+                             if (editingPartecipanteIndex !== null) {
+                                 annullaModificaPartecipante();
+                             } else {
+                                 setShowAddForm(!showAddForm);
+                             }
+                          }}
+                        >
+                          <h4 className={`text-sm font-bold flex items-center gap-2 ${showAddForm || editingPartecipanteIndex !== null ? 'text-blue-700' : 'text-slate-800'}`}>
+                            {editingPartecipanteIndex !== null ? <EditIcon size={18}/> : <PlusIcon size={18} className={`transition-transform duration-200 ${showAddForm ? 'rotate-45' : ''}`}/>} 
+                            {editingPartecipanteIndex !== null ? 'Modifica Partecipante' : 'Inserisci Nuovo Partecipante'}
+                          </h4>
+                          <span className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${showAddForm || editingPartecipanteIndex !== null ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 hover:bg-blue-200 text-blue-700'}`}>
+                              {editingPartecipanteIndex !== null ? 'Annulla Modifica' : (showAddForm ? 'Chiudi' : 'Apri')}
+                          </span>
+                        </div>
+                        
+                        {(showAddForm || editingPartecipanteIndex !== null) && (
+                          <div className="p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Cognome e Nome</label>
+                                 <input 
+                                    type="text" 
+                                    list={nuovoPartecipante.nome.length >= 2 ? "utenti-list" : undefined}
+                                    value={nuovoPartecipante.nome} 
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        const existing = tuttiUtentiUnici.find(u => u.nome.toLowerCase() === val.toLowerCase().trim());
+                                        if (existing && editingPartecipanteIndex === null) {
+                                            setNuovoPartecipante({
+                                                ...nuovoPartecipante, 
+                                                nome: val,
+                                                anno: existing.anno || '',
+                                                scadCertificato: existing.scadCertificato || '',
+                                                iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
+                                            });
+                                        } else {
+                                            setNuovoPartecipante({...nuovoPartecipante, nome: val});
+                                        }
+                                    }} 
+                                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1" 
+                                    placeholder="Es. Rossi Mario" 
+                                 />
+                              </div>
+                              <div>
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Anno di Nascita</label>
+                                 <input type="number" placeholder="Es. 2015" value={nuovoPartecipante.anno} onChange={e => setNuovoPartecipante({...nuovoPartecipante, anno: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1" />
+                              </div>
+                              <div>
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Scadenza Certificato</label>
+                                 <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer" />
+                              </div>
+                            </div>
+
+                            <div className="mt-3 border-t border-slate-200 pt-3">
+                               <div className="flex justify-between items-center mb-2">
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">Periodi Iscrizione</label>
+                                 <button type="button" onClick={() => setNuovoPartecipante({...nuovoPartecipante, iscrizioni: [...(nuovoPartecipante.iscrizioni || []), {inizio:'', fine:''}]})} className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded font-bold transition-colors flex items-center gap-1"><PlusIcon size={12}/> Aggiungi Periodo</button>
+                               </div>
+                               <div className="flex flex-col gap-2">
+                                 {(nuovoPartecipante.iscrizioni || [{inizio:'', fine:''}]).map((isc, idx) => (
+                                    <div key={idx} className="flex gap-2 items-center">
+                                       <div className="flex-1 flex flex-col sm:flex-row gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                                          <div className="flex-1 flex items-center gap-2">
+                                            <span className="text-xs font-bold text-slate-400 w-6 text-right">Dal</span>
+                                            <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].inizio = e.target.value; setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
+                                          </div>
+                                          <div className="flex-1 flex items-center gap-2">
+                                            <span className="text-xs font-bold text-slate-400 w-6 text-right">Al</span>
+                                            <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].fine = e.target.value; setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
+                                          </div>
+                                       </div>
+                                       <button type="button" onClick={() => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc.splice(idx, 1); setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} disabled={(nuovoPartecipante.iscrizioni || []).length <= 1} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                                          <Trash2Icon size={18}/>
+                                       </button>
+                                    </div>
+                                 ))}
+                               </div>
+                            </div>
+                            <div className="mt-4 flex gap-2 justify-end float-right">
+                              {editingPartecipanteIndex !== null && (
+                                <button type="button" onClick={annullaModificaPartecipante} className="px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded-lg text-sm shadow-sm transition-colors">Annulla</button>
+                              )}
+                              <button type="button" onClick={aggiungiPartecipante} className="px-6 bg-slate-800 hover:bg-slate-900 transition-colors text-white font-bold py-2 rounded-lg text-sm shadow-sm">
+                                {editingPartecipanteIndex !== null ? 'Salva Modifica' : 'Aggiungi alla lista'}
+                              </button>
+                            </div>
+                            <div className="clear-both"></div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* LISTE SEPARATE */}
+                      <div className="flex-1 overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-sm h-[300px] flex flex-col relative">
+                        {(() => {
+                          const attivi = editModal.partecipanti.filter(p => isAttivoInSettimana(p, inizioSettimana));
+                          const inattivi = editModal.partecipanti.filter(p => !isAttivoInSettimana(p, inizioSettimana));
+
+                          const renderRigaPartecipante = (p, i) => (
+                            <tr key={i} className={`border-b border-slate-100 transition-colors ${editingPartecipanteIndex === i ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                              <td className="p-3 font-medium text-slate-800">{p.nome}</td>
+                              <td className="p-3 text-center text-slate-600">{p.anno || '-'}</td>
+                              <td className={`p-3 text-center font-bold ${isScaduto(p.scadCertificato) ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
+                                {formatDate(p.scadCertificato)}
+                                {isScaduto(p.scadCertificato) && <span className="ml-1 text-[10px] uppercase block leading-none">Scaduto</span>}
+                              </td>
+                              <td className="p-3 text-center font-bold">
+                                {(() => {
+                                   let validList = [];
+                                   if (p.iscrizioni && p.iscrizioni.length > 0) {
+                                       validList = p.iscrizioni.filter(isc => isc.inizio || isc.fine);
+                                   } else if (p.scadIscrizione) {
+                                       validList = [{ inizio: '', fine: p.scadIscrizione }];
+                                   }
+
+                                   if (validList.length === 0) return <span className="text-slate-400 font-normal">-</span>;
+
+                                   const oggi = new Date();
+                                   oggi.setHours(0,0,0,0);
+                                   const haValido = validList.some(isc => isc.fine ? new Date(isc.fine) >= oggi : true);
+
+                                   return (
+                                       <div className={`flex flex-col gap-1 items-center ${!haValido ? 'text-red-600 bg-red-50 p-1.5 rounded-lg' : 'text-slate-600'}`}>
+                                          {validList.map((isc, iIdx) => (
+                                              <div key={iIdx} className="text-[11px] leading-tight whitespace-nowrap">
+                                                 {isc.inizio ? formatDate(isc.inizio) : '...'} - {isc.fine ? formatDate(isc.fine) : '...'}
+                                              </div>
+                                          ))}
+                                          {!haValido && <span className="text-[9px] uppercase block leading-none mt-0.5">Scaduta</span>}
+                                       </div>
+                                   );
+                                })()}
+                              </td>
+                              <td className="p-3 flex items-center justify-center gap-2">
+                                <button type="button" onClick={() => avviaModificaPartecipante(i)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
+                                <button type="button" onClick={() => rimuoviPartecipante(i)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
+                              </td>
+                            </tr>
+                          );
+
+                          return (
+                            <div className="flex flex-col min-h-full">
+                              {/* SEZIONE ATTIVI */}
+                              <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 sticky top-0 z-10 flex justify-between items-center">
+                                <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Attivi in questa settimana</span>
+                                <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">{attivi.length}</span>
+                              </div>
+                              <div className="overflow-x-auto w-full">
+                                <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+                                  <thead className="bg-slate-100 border-b border-slate-200">
+                                    <tr>
+                                      <th className="p-3 font-semibold text-slate-700 w-1/4">Cognome e Nome</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/6">Anno</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/4">Scad. Certificato</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/4">Scad. Iscrizione</th>
+                                      <th className="p-3 text-center w-20"></th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {editModal.partecipanti.map((p, i) => isAttivoInSettimana(p, inizioSettimana) ? renderRigaPartecipante(p, i) : null)}
+                                    {attivi.length === 0 && (
+                                      <tr><td colSpan="5" className="p-6 text-center text-slate-400 italic">Nessun iscritto attivo in questa settimana.</td></tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {/* SEZIONE INATTIVI */}
+                              {inattivi.length > 0 && (
+                                <>
+                                  <div className="bg-slate-50 px-4 py-2 border-y border-slate-200 flex justify-between items-center mt-auto sticky top-0 z-10">
+                                    <span className="font-bold text-slate-500 text-sm uppercase tracking-wider">Altri iscritti (Fuori periodo)</span>
+                                    <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{inattivi.length}</span>
+                                  </div>
+                                  <div className="overflow-x-auto w-full opacity-75 grayscale-[30%]">
+                                    <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+                                      {/* Intestazione nascosta per mantenere allineate le colonne con la prima tabella */}
+                                      <thead className="invisible h-0">
+                                        <tr>
+                                          <th className="w-1/4"></th>
+                                          <th className="w-1/6"></th>
+                                          <th className="w-1/4"></th>
+                                          <th className="w-1/4"></th>
+                                          <th className="w-20"></th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {editModal.partecipanti.map((p, i) => !isAttivoInSettimana(p, inizioSettimana) ? renderRigaPartecipante(p, i) : null)}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Footer Modal */}
+                <div className="px-6 py-4 border-t border-slate-200 flex justify-between bg-white rounded-b-2xl shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)] z-20">
+                  {editModal.tab === 'dettagli' ? (
+                    <button type="button" onClick={eliminaCorsoModal} className="px-4 py-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-bold transition-colors flex items-center gap-2"><Trash2Icon size={18} /> <span className="hidden sm:inline">Elimina Corso</span></button>
+                  ) : (
+                    <button type="button" onClick={stampaRegistro} disabled={partecipantiAttiviModal.length === 0} className={`px-5 py-2.5 rounded-lg font-bold transition-colors flex items-center gap-2 ${partecipantiAttiviModal.length > 0 ? 'text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm' : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed'}`}><PrinterIcon size={18} /> Stampa Registro</button>
+                  )}
+                  
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => setEditModal(null)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">Annulla</button>
+                    {/* Al click "Salva Tutto", salviamo direttamente i dati per qualsiasi scheda */}
+                    <button type="button" onClick={salvaModificheModal} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><CheckIcon size={18} /> Salva Tutto</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* WRAPPER STICKY PER HEADER E SECONDO BANNER */}
+          <div className="sticky top-0 z-30 shadow-sm flex flex-col">
+            
+            {/* HEADER E CONTROLLI */}
+            <header className="bg-white border-b border-slate-200 p-4 relative z-20">
+              <div className="w-full mx-auto">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                  
+                  {/* TITOLO E SELETTORE STAGIONE */}
+                  <div className="flex flex-col xl:flex-row items-start xl:items-center gap-4 shrink-0 w-full md:w-auto">
+                    <div className="flex flex-col shrink-0">
+                      <h1 className="text-2xl font-bold text-slate-800 leading-tight">
+                        Gestione Piano Vasca
+                      </h1>
+                      <span className="text-sm font-medium text-slate-500">Centro Federale Lampugnano</span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                      {/* BOX STAGIONE */}
+                      <div className="flex items-center bg-white border border-slate-200 rounded-lg px-3 py-1 shadow-sm shrink-0 h-[48px]">
+                        <div className="flex flex-col justify-center">
+                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Stagione</span>
+                           <div className="flex items-center">
+                             <select
+                               value={stagioneSelezionata}
+                               onChange={(e) => {
+                                   if (e.target.value === 'NUOVA') {
+                                       const nome = prompt("Inserisci il nome della nuova stagione (es. 2026/2027):");
+                                       if (nome && nome.trim() !== '') {
+                                           const cleanName = nome.trim();
+                                           if (!stagioni.includes(cleanName)) {
+                                               setStagioni([...stagioni, cleanName]);
+                                               setTuttiPiani(prev => ({ ...prev, [cleanName]: {} }));
+                                           }
+                                           setStagioneSelezionata(cleanName);
+                                       }
+                                   } else if (e.target.value === 'ORDINA') {
+                                       setIsGestioneStagioniOpen(true);
+                                   } else {
+                                       setStagioneSelezionata(e.target.value);
+                                   }
+                               }}
+                               className="bg-transparent font-bold text-sm text-slate-800 outline-none cursor-pointer -ml-1"
+                             >
+                               {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
+                               <option value="NUOVA" className="font-bold text-blue-600">+ Crea nuova...</option>
+                               {stagioni.length > 1 && <option value="ORDINA" className="font-bold text-slate-600">⚙️ Gestione stagioni...</option>}
+                             </select>
+                             {stagioni.length > 1 && (
+                               <button 
+                                 onClick={eliminaStagione} 
+                                 className={`p-1 rounded-md transition-colors ml-1 ${confermaEliminaStagione ? 'bg-red-500 text-white' : 'text-red-400 hover:bg-red-50'}`} 
+                                 title={confermaEliminaStagione ? "Clicca di nuovo per eliminare" : "Elimina Stagione"}
+                               >
+                                 <Trash2Icon size={14} />
+                               </button>
+                             )}
+                           </div>
+                        </div>
+                      </div>
+
+                      {/* BOX SETTIMANA */}
+                      <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm shrink-0 h-[48px] w-full sm:w-auto">
+                        <button onClick={() => setInizioSettimana(prev => new Date(prev.getTime() - 7 * 24 * 60 * 60 * 1000))} className="p-1 hover:bg-slate-100 rounded-md text-slate-600 transition-colors"><ChevronLeftIcon size={18} /></button>
+                        
+                        <div className="flex flex-col items-center justify-center px-2 min-w-[200px] relative hover:bg-slate-50 cursor-pointer rounded transition-colors group" title="Clicca per scegliere una data dal calendario">
+                           <input 
+                             type="date" 
+                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                             value={toYMD(inizioSettimana)}
+                             onChange={(e) => {
+                               if(e.target.value) {
+                                 setInizioSettimana(getStartOfWeek(new Date(e.target.value)));
+                               }
+                             }}
+                             onClick={(e) => {
+                               try {
+                                 if (e.target.showPicker) e.target.showPicker();
+                               } catch(err) {}
+                             }}
+                           />
+                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider flex items-center gap-1 group-hover:text-blue-600 transition-colors"><CalendarIcon size={10}/> Settimana Attiva</span>
+                           <span className="text-sm font-bold text-slate-800 group-hover:text-blue-700 transition-colors">
+                             {formatItalianDate(inizioSettimana)} - {formatItalianDate(new Date(inizioSettimana.getTime() + 6 * 24 * 60 * 60 * 1000))}
+                           </span>
+                        </div>
+
+                        <button onClick={() => setInizioSettimana(prev => new Date(prev.getTime() + 7 * 24 * 60 * 60 * 1000))} className="p-1 hover:bg-slate-100 rounded-md text-slate-600 transition-colors"><ChevronRightIcon size={18} /></button>
+                        <div className="w-px h-6 bg-slate-200 mx-1"></div>
+                        <button onClick={() => setInizioSettimana(getStartOfWeek(new Date()))} className="px-2 py-1 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-md transition-colors">Oggi</button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap justify-center items-center gap-2">
+                    
+                    {/* TASTO AGGIUNGI UTENTE RAPIDO */}
+                    <button 
+                      onClick={() => setIsAddUserModalOpen(true)}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+                    >
+                      <UserPlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Utente</span>
+                    </button>
+
+                    {/* TASTO AGGIUNGI CORSO */}
+                    <button 
+                      onClick={() => {
+                        setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [giornoSelezionato === 7 ? 0 : giornoSelezionato], oraInizio: '06:00'}));
+                        setIsAddModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+                    >
+                      <PlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Corso</span>
+                    </button>
+
+                    <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
+
+                    <div title="Il salvataggio avviene automaticamente ad ogni modifica" className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${statoSalvataggio === 'error' ? 'bg-red-100 text-red-700' : statoSalvataggio === 'saved' ? 'bg-green-100 text-green-700' : statoSalvataggio === 'saving' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {statoSalvataggio === 'saving' ? <LoaderIcon size={16} /> : statoSalvataggio === 'saved' ? <CheckIcon size={16} /> : statoSalvataggio === 'error' ? <InfoIcon size={16} /> : <CloudIcon size={16} />}
+                      <span className="hidden sm:inline">{statoSalvataggio === 'saving' ? 'Salvataggio...' : statoSalvataggio === 'saved' ? 'Salvato!' : statoSalvataggio === 'error' ? 'Errore Sync' : 'In Sync'}</span>
+                    </div>
+                    <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
+                    
+                    {/* MENU ESPORTAZIONE */}
+                    <div className="relative">
+                      <button onClick={() => setIsExportMenuOpen(!isExportMenuOpen)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors">
+                        <DownloadIcon size={16} /> <span className="hidden sm:inline">Esporta</span>
+                      </button>
+                      {isExportMenuOpen && (
+                        <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 min-w-[220px] flex flex-col">
+                          <button onClick={esportaExcel} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📊 Esporta in Excel / Fogli</button>
+                          <div className="h-px bg-slate-200 my-1"></div>
+                          <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
+                        </div>
+                      )}
+                    </div>
+
+                    <button onClick={svuotaPiano} className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-medium transition-colors min-w-[100px] justify-center"><Trash2Icon size={16} /> {confermaSvuota ? "Sicuro?" : "Svuota"}</button>
+                    <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
+                    <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci"><LogOutIcon size={16} /></button>
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            {/* SECONDO BANNER SPOSTATO QUI PER ESSERE STICKY INSIEME ALL'HEADER */}
+            <div className="bg-slate-50/95 backdrop-blur-sm px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 relative z-10 w-full mx-auto">
+              <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center w-full md:w-auto overflow-hidden">
+                    <div className="flex bg-slate-200/60 p-1.5 rounded-xl shrink-0">
+                      <button
+                        onClick={() => setVascaSelezionata('interna')}
+                        className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${vascaSelezionata === 'interna' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        Vasca Interna
+                      </button>
+                      <button
+                        onClick={() => setVascaSelezionata('esterna')}
+                        className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${vascaSelezionata === 'esterna' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                      >
+                        Vasca Esterna
+                      </button>
+                    </div>
+                    
+                    <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide w-full md:w-auto">
+                      {GIORNI.map((giorno, idx) => (
+                        <button key={giorno} onClick={() => setGiornoSelezionato(idx)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === idx ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
+                          {giorno}
+                        </button>
+                      ))}
+                      <button onClick={() => setGiornoSelezionato(7)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === 7 ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
+                        Settimana
+                      </button>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  {/* TASTO CERCA SOCIO (Spostato qui) */}
+                  <button 
+                    onClick={() => {
+                      setSearchQuery('');
+                      setIsSearchModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
+                  >
+                    <SearchIcon size={16} className="text-slate-500" />
+                    <span className="hidden sm:inline font-bold text-slate-700">Cerca Socio</span>
+                  </button>
+
+                  {/* MENU FILTRI */}
+                  <div className="relative">
+                    <button 
+                      onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+                      className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
+                    >
+                      <FilterIcon size={16} className={filtriAttivita.length < attivita.length ? "text-blue-500 fill-blue-100" : "text-slate-500"} />
+                      <span className="hidden sm:inline">Filtri:</span>
+                      <span className="font-bold text-slate-800">
+                        {filtriAttivita.length === attivita.length ? 'Tutte' : `${filtriAttivita.length}`}
+                      </span>
+                    </button>
+                    
+                    {isFilterMenuOpen && (
+                      <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 z-50 min-w-[220px] flex flex-col gap-2">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtra Attività</span>
+                          <button 
+                            onClick={() => setFiltriAttivita(attivita.map(a => a.id))}
+                            className="text-xs font-bold text-blue-600 hover:underline"
+                          >
+                            Tutte
+                          </button>
+                        </div>
+                        <div className="h-px bg-slate-200 mb-1"></div>
+                        <div className="max-h-60 overflow-y-auto flex flex-col gap-1.5 pr-1">
+                          {attivita.map(a => (
+                            <label key={a.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-slate-700 hover:bg-slate-50 p-1.5 rounded transition-colors">
+                              <input 
+                                type="checkbox" 
+                                checked={filtriAttivita.includes(a.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setFiltriAttivita([...filtriAttivita, a.id]);
+                                  } else {
+                                    setFiltriAttivita(filtriAttivita.filter(id => id !== a.id));
+                                  }
+                                }}
+                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                              />
+                              <div className={`w-3 h-3 rounded-full ${a.color.split(' ')[0]}`}></div>
+                              {a.name}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* VISTA GRIGLIA */}
+                  <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
+                    <ClockIcon size={16} className="text-slate-500" />
+                    <span className="text-sm font-medium text-slate-600 hidden sm:inline">Vista:</span>
+                    <select value={intervallo} onChange={(e) => setIntervallo(Number(e.target.value))} className="text-sm font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
+                      <option value={60}>60 min</option>
+                      <option value={45}>45 min</option>
+                      <option value={30}>30 min</option>
+                      <option value={15}>15 min</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          {/* FINE WRAPPER STICKY */}
+
+          <main className="flex-1 w-full mx-auto p-4 md:p-6 pt-4 md:pt-6 flex flex-col gap-6">
+            {/* TABELLA UNICA - Esportata intera in un singolo foglio PDF */}
+            <div id="griglia-piano-vasca" className="bg-transparent relative w-full">
+              {giornoSelezionato === 7 ? (
+                <div className="flex flex-col gap-8">
+                  {GIORNI.map((gNome, gIdx) => {
+                    const corsiDiQuestoGiorno = getCorsiForDay(gIdx);
+                    return <React.Fragment key={gIdx}>{renderGriglia(fasceOrarie, gNome, corsiDiQuestoGiorno, gIdx)}</React.Fragment>;
+                  })}
+                </div>
+              ) : (
+                renderGriglia(fasceOrarie, null, corsiOggi, giornoSelezionato)
+              )}
+            </div>
+
+          </main>
+
+          {/* DATALIST PER AUTOSUGGERIMENTO UTENTI */}
+          <datalist id="utenti-list">
+            {tuttiUtentiUnici.map((u, idx) => <option key={idx} value={u.nome} />)}
+          </datalist>
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
