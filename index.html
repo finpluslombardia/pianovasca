@@ -1913,7 +1913,7 @@
                                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Cognome e Nome</label>
                                  <input 
                                     type="text" 
-                                    list="utenti-list"
+                                    list={nuovoPartecipante.nome.length >= 2 ? "utenti-list" : undefined}
                                     value={nuovoPartecipante.nome} 
                                     onChange={e => {
                                         const val = e.target.value;
