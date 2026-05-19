@@ -2235,13 +2235,17 @@
                     {/* MENU ESPORTAZIONE */}
                     <div className="relative">
                       <button onClick={() => setIsExportMenuOpen(!isExportMenuOpen)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors">
-                        <DownloadIcon size={16} /> <span className="hidden sm:inline">Esporta</span>
+                        <DownloadIcon size={16} /> <span className="hidden sm:inline">Esporta / Importa</span>
                       </button>
                       {isExportMenuOpen && (
                         <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 min-w-[220px] flex flex-col">
                           <button onClick={esportaExcel} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📊 Esporta in Excel / Fogli</button>
                           <div className="h-px bg-slate-200 my-1"></div>
                           <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
+                          <label className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium cursor-pointer">
+                            <UploadIcon size={16} /> Ripristina Backup (JSON)
+                            <input type="file" accept=".json" onChange={(e) => { importaDati(e); setIsExportMenuOpen(false); }} className="hidden" />
+                          </label>
                         </div>
                       )}
                     </div>
