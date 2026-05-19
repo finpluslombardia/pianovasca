@@ -620,10 +620,10 @@
       }, [tuttiCorsiSelect, addUtenteRapido.attivitaId]);
 
       const corsiPerUtenteRapido = useMemo(() => {
-        return (addUtenteRapido.attivitaId && addUtenteRapido.giorno !== '')
-          ? tuttiCorsiSelect.map((c, index) => ({...c, originalIndex: index})).filter(c => c.data.id === addUtenteRapido.attivitaId && c.giorno === Number(addUtenteRapido.giorno))
+        return addUtenteRapido.attivitaId
+          ? tuttiCorsiSelect.map((c, index) => ({...c, originalIndex: index})).filter(c => c.data.id === addUtenteRapido.attivitaId)
           : [];
-      }, [tuttiCorsiSelect, addUtenteRapido.attivitaId, addUtenteRapido.giorno]);
+      }, [tuttiCorsiSelect, addUtenteRapido.attivitaId]);
 
       const salvaUtenteRapido = (e) => {
         e.preventDefault();
