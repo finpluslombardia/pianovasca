@@ -597,34 +597,6 @@
           return Array.from(map.values()).sort((a,b) => a.nome.localeCompare(b.nome));
       }, [piano]);
 
-      const utentiConScadenze = useMemo(() => {
-          const oggi = new Date();
-          oggi.setHours(0,0,0,0);
-          const tra30Giorni = new Date(oggi);
-          tra30Giorni.setDate(oggi.getDate() + 30);
-
-          const scaduti = [];
-          const inScadenza = [];
-
-          tuttiUtentiUnici.forEach(u => {
-              if (!u.scadCertificato) return;
-              const dataScad = new Date(u.scadCertificato);
-              dataScad.setHours(0,0,0,0);
-
-              if (dataScad < oggi) {
-                  scaduti.push(u);
-              } else if (dataScad <= tra30Giorni) {
-                  inScadenza.push(u);
-              }
-          });
-
-          // Ordina per data di scadenza (la più vicina prima)
-          scaduti.sort((a, b) => new Date(a.scadCertificato) - new Date(b.scadCertificato));
-          inScadenza.sort((a, b) => new Date(a.scadCertificato) - new Date(b.scadCertificato));
-
-          return { scaduti, inScadenza };
-      }, [tuttiUtentiUnici]);
-
       const tuttiCorsiSelect = useMemo(() => {
           const list = [];
           Object.keys(piano).forEach(k => {
@@ -646,6 +618,68 @@
           list.sort((a, b) => a.giorno - b.giorno || a.oraInizio.localeCompare(b.oraInizio));
           return list;
       }, [piano]);
+
+      const utentiConScadenze = useMemo(() => {
+          const oggi = new Date();
+          oggi.setHours(0,0,0,0);
+          const tra30Giorni = new Date(oggi);
+          tra30Giorni.setDate(oggi.getDate() + 30);
+
+          const mapUtenti = new Map();
+
+          // Pass 1: raccogliamo tutti gli utenti garantendo che abbiano l'array 'corsi' vuoto per sicurezza
+          tuttiUtentiUnici.forEach(u => {
+              if (!u || !u.nome || !u.scadCertificato) return;
+              const pKey = u.nome.toLowerCase().trim();
+              mapUtenti.set(pKey, { ...u, corsi: [] }); // Inizializza SEMPRE l'array corsi vuoto
+          });
+
+          // Pass 2: popoliamo l'array 'corsi' per ogni utente in base ai corsi a cui sono iscritti
+          tuttiCorsiSelect.forEach(c => {
+              const infoAtt = attivita.find(a => a.id === c.data.id);
+              const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
+              const nomeCorsoStr = nomeLiv ? `${infoAtt?.name} - ${nomeLiv}` : (infoAtt?.name || 'Corso');
+              const giornoStr = (typeof GIORNI !== 'undefined' && GIORNI[c.giorno]) ? GIORNI[c.giorno].substring(0,3) : '';
+              const corsoDettaglio = `${nomeCorsoStr} (${giornoStr} ${c.oraInizio || ''})`.trim();
+
+              (c.data.partecipanti || []).forEach(p => {
+                  if (!p || !p.nome || !p.scadCertificato) return;
+                  const pKey = p.nome.toLowerCase().trim();
+                  
+                  let utenteMap = mapUtenti.get(pKey);
+                  if (!utenteMap) {
+                      utenteMap = { ...p, corsi: [] };
+                      mapUtenti.set(pKey, utenteMap);
+                  }
+                  
+                  // Se l'elenco corsi non esiste ancora, forziamo la creazione (non dovrebbe mai accadere, ma blindiamo il codice)
+                  if (!utenteMap.corsi) utenteMap.corsi = [];
+                  
+                  if (!utenteMap.corsi.includes(corsoDettaglio)) {
+                      utenteMap.corsi.push(corsoDettaglio);
+                  }
+              });
+          });
+
+          const scaduti = [];
+          const inScadenza = [];
+
+          Array.from(mapUtenti.values()).forEach(u => {
+              const dataScad = new Date(u.scadCertificato);
+              dataScad.setHours(0,0,0,0);
+
+              if (dataScad < oggi) {
+                  scaduti.push(u);
+              } else if (dataScad <= tra30Giorni) {
+                  inScadenza.push(u);
+              }
+          });
+
+          scaduti.sort((a, b) => new Date(a.scadCertificato) - new Date(b.scadCertificato));
+          inScadenza.sort((a, b) => new Date(a.scadCertificato) - new Date(b.scadCertificato));
+
+          return { scaduti, inScadenza };
+      }, [tuttiCorsiSelect, attivita, tuttiUtentiUnici]);
 
       const giorniConCorsiPerUtenteRapido = useMemo(() => {
         return addUtenteRapido.attivitaId
@@ -1466,7 +1500,10 @@
                                   <tbody>
                                       {utentiConScadenze.scaduti.map((u, i) => (
                                           <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                                              <td className="p-3 font-semibold text-slate-800 w-2/3">{u.nome}</td>
+                                              <td className="p-3 w-2/3">
+                                                  <div className="font-semibold text-slate-800">{u.nome}</div>
+                                                  <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">{(u.corsi || []).join(', ')}</div>
+                                              </td>
                                               <td className="p-3 font-bold text-red-600 text-right w-1/3">Scaduto il {formatDate(u.scadCertificato)}</td>
                                           </tr>
                                       ))}
@@ -1492,7 +1529,7 @@
                                           <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
                                               <td className="p-3 w-2/3">
                                                   <div className="font-semibold text-slate-800">{u.nome}</div>
-                                                  <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">{u.corsi.join(', ')}</div>
+                                                  <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">{(u.corsi || []).join(', ')}</div>
                                               </td>
                                               <td className="p-3 font-bold text-orange-600 text-right w-1/3">Scade il {formatDate(u.scadCertificato)}</td>
                                           </tr>
@@ -1821,9 +1858,9 @@
 
                     <div className="mb-5">
                       <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Corsie</label>
-                      <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
+                      <div className="grid grid-cols-4 gap-2">
                         {(nuovoCorso.vasca === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA).map(c => (
-                           <label key={c} className={`flex items-center justify-center border-2 rounded-lg py-2 cursor-pointer transition-all text-xs font-semibold ${nuovoCorso.corsie.includes(c) ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                           <label key={c} className={`flex items-center justify-center gap-1 border-2 rounded-xl py-2.5 cursor-pointer transition-all ${nuovoCorso.corsie.includes(c) ? 'bg-blue-50 border-blue-500 text-blue-700 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                               <input type="checkbox" className="hidden" checked={nuovoCorso.corsie.includes(c)} onChange={(e) => { if(e.target.checked) setNuovoCorso({...nuovoCorso, corsie: [...nuovoCorso.corsie, c]}); else setNuovoCorso({...nuovoCorso, corsie: nuovoCorso.corsie.filter(x => x !== c)}); }} />
                               {c}
                            </label>
