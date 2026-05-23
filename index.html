@@ -1943,7 +1943,7 @@
                       {attivita.find(a => a.id === editModal.attivitaId)?.hasLevels && (
                         <div className="mb-5">
                           <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                            {editModal.attivitaId === 'acquagym' ? 'Sottocategoria' : 'Livello'}
+                            {['acquagym', 'propaganda'].includes(editModal.attivitaId) ? 'Sottocategoria' : 'Livello'}
                           </label>
                           <select value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
                             <option value="">Nessuna selezione</option>
