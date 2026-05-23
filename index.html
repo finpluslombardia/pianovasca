@@ -286,6 +286,19 @@
       const lastSavedPiano = useRef(""); 
       const initialLoadDone = useRef(false);
 
+      // --- BLOCCO SCORRIMENTO SFONDO ---
+      useEffect(() => {
+          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal;
+          if (isAnyModalOpen) {
+              document.body.style.overflow = 'hidden';
+          } else {
+              document.body.style.overflow = '';
+          }
+          return () => {
+              document.body.style.overflow = '';
+          };
+      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal]);
+
       const partecipantiAttiviModal = useMemo(() => {
           return editModal ? (editModal.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)) : [];
       }, [editModal, inizioSettimana]);
