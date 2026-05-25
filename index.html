@@ -2341,7 +2341,7 @@
                       <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm shrink-0 h-[48px] w-full sm:w-auto">
                         <button onClick={() => setInizioSettimana(prev => new Date(prev.getTime() - 7 * 24 * 60 * 60 * 1000))} className="p-1 hover:bg-slate-100 rounded-md text-slate-600 transition-colors"><ChevronLeftIcon size={18} /></button>
                         
-                        <div className="flex flex-col items-center justify-center px-2 min-w-[200px] relative hover:bg-slate-50 cursor-pointer rounded transition-colors group" title="Clicca per scegliere una data dal calendario">
+                        <div className="flex flex-col items-center justify-center px-2 w-[210px] relative hover:bg-slate-50 cursor-pointer rounded transition-colors group" title="Clicca per scegliere una data dal calendario">
                            <input 
                              type="date" 
                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
