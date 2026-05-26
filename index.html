@@ -1976,13 +1976,14 @@
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 mb-5">
-                        <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Giorno</label>
-                          <select value={editModal.giorno} onChange={e => setEditModal({...editModal, giorno: Number(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
-                            {GIORNI.map((g, i) => <option key={i} value={i}>{g}</option>)}
-                          </select>
-                        </div>
+                      <div className="mb-5">
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Giorno</label>
+                        <select value={editModal.giorno} onChange={e => setEditModal({...editModal, giorno: Number(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
+                          {GIORNI.map((g, i) => <option key={i} value={i}>{g}</option>)}
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4 mb-5">
                         <div>
                           <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ora Inizio</label>
                           <input 
@@ -1993,9 +1994,6 @@
                             required
                           />
                         </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 mb-5">
                         <div>
                           <label className="block text-sm font-semibold text-slate-700 mb-1.5">Durata (minuti)</label>
                           <input 
