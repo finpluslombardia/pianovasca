@@ -106,24 +106,6 @@
     };
 
     // --- NUOVE UTILITY PER DATE E SETTIMANE ---
-    // Forza la data al Lunedì della settimana selezionata
-    const snapToMonday = (dateStr) => {
-      if (!dateStr) return '';
-      const d = new Date(dateStr);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      return toYMD(new Date(d.setDate(diff)));
-    };
-
-    // Forza la data alla Domenica della settimana selezionata
-    const snapToSunday = (dateStr) => {
-      if (!dateStr) return '';
-      const d = new Date(dateStr);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? 0 : 7 - day);
-      return toYMD(new Date(d.setDate(diff)));
-    };
-
     // Verifica se un partecipante è attivo nella settimana corrente
     const isAttivoInSettimana = (p, inizioSet) => {
       let validList = [];
@@ -277,7 +259,7 @@
 
       // --- STATI AGGIUNTA UTENTE RAPIDO ---
       const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', giorno: '', corsoIndex: '', nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
 
       // --- STATI RICERCA SOCIO ---
       const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -725,34 +707,36 @@
 
       const salvaUtenteRapido = (e) => {
         e.preventDefault();
-        if (addUtenteRapido.corsoIndex === '') return alert("Seleziona un corso!");
+        if (!addUtenteRapido.corsiSelezionati || addUtenteRapido.corsiSelezionati.length === 0) return alert("Seleziona almeno un corso!");
         if (!addUtenteRapido.nome.trim()) return alert("Inserisci il Cognome e Nome!");
         
-        const selectedCourse = tuttiCorsiSelect[addUtenteRapido.corsoIndex];
         const iscrizioniPulite = (addUtenteRapido.iscrizioni || []).filter(i => i.inizio || i.fine);
         
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
             const nuovoPiano = { ...prevSeason };
             
-            selectedCourse.keys.forEach(k => {
-                const cell = nuovoPiano[k] ? { ...nuovoPiano[k] } : { ...selectedCourse.data };
-                const partecipanti = [...(cell.partecipanti || [])];
-                partecipanti.push({
-                    nome: addUtenteRapido.nome,
-                    anno: addUtenteRapido.anno,
-                    scadCertificato: addUtenteRapido.scadCertificato,
-                    iscrizioni: iscrizioniPulite
+            addUtenteRapido.corsiSelezionati.forEach(cIndex => {
+                const selectedCourse = tuttiCorsiSelect[cIndex];
+                selectedCourse.keys.forEach(k => {
+                    const cell = nuovoPiano[k] ? { ...nuovoPiano[k] } : { ...selectedCourse.data };
+                    const partecipanti = [...(cell.partecipanti || [])];
+                    partecipanti.push({
+                        nome: addUtenteRapido.nome,
+                        anno: addUtenteRapido.anno,
+                        scadCertificato: addUtenteRapido.scadCertificato,
+                        iscrizioni: iscrizioniPulite
+                    });
+                    partecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
+                    cell.partecipanti = partecipanti;
+                    nuovoPiano[k] = cell;
                 });
-                partecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
-                cell.partecipanti = partecipanti;
-                nuovoPiano[k] = cell;
             });
             return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
         });
 
         setIsAddUserModalOpen(false);
-        setAddUtenteRapido({ attivitaId: '', giorno: '', corsoIndex: '', nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
       };
 
       // --- LOGICA RICERCA SOCIO ---
@@ -1177,8 +1161,12 @@
                         const nomeLivello = info?.isFreeTextLevel ? cell.corso.data.livello : info?.levels?.find(l => l.val === cell.corso.data.livello)?.name;
                         
                         let testoSfondo = '';
-                        if (nomeLivello) testoSfondo += `<b>${(info.id === 'acquagym' || info.id === 'propaganda' || info.isFreeTextLevel) ? nomeLivello : `Liv. ${cell.corso.data.livello} - ${nomeLivello}`}</b><br>`;
-                        else testoSfondo += `<b>${info ? info.name : ''}</b><br>`;
+                        if (nomeLivello) {
+                          const mostraSoloNome = (info.id === 'acquagym' || info.id === 'propaganda' || info.isFreeTextLevel);
+                          testoSfondo += `<b>${mostraSoloNome ? nomeLivello : `Liv. ${cell.corso.data.livello} - ${nomeLivello}`}</b><br>`;
+                        } else {
+                          testoSfondo += `<b>${info ? info.name : ''}</b><br>`;
+                        }
                         
                         if(cell.corso.data.istruttore) testoSfondo += `<i>${cell.corso.data.istruttore}</i><br>`;
                         testoSfondo += `⏱ ${cell.corso.durata} min`;
@@ -1202,11 +1190,33 @@
         </html>
         `;
 
+        const getWeekNum = (date) => {
+            const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+            const dayNum = d.getUTCDay() || 7;
+            d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+            const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        };
+        const fineSettimana = new Date(inizioSettimana.getTime() + 6 * 24 * 60 * 60 * 1000);
+        const fDateShort = (date) => {
+            const d = String(date.getDate()).padStart(2, '0');
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const y = String(date.getFullYear()).slice(-2);
+            return `${d}-${m}-${y}`; 
+        };
+        
+        const weekNum = getWeekNum(inizioSettimana);
+        const strInizio = fDateShort(inizioSettimana);
+        const strFine = fDateShort(fineSettimana);
+        const nomeVasca = vascaSelezionata === 'interna' ? 'Vasca Interna' : 'Vasca Esterna';
+        
+        const fileName = `W${weekNum} ${strInizio} - ${strFine} ${nomeVasca}.xls`;
+
         const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url; 
-        link.download = `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}_${vascaSelezionata}.xls`; 
+        link.download = fileName; 
         link.click();
         URL.revokeObjectURL(url);
         setIsExportMenuOpen(false);
@@ -1389,10 +1399,10 @@
                                                                     {nomeLivello ? (
                                                                       <>
                                                                         <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-0.5`}>
-                                                                          {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' || corso.data.id === 'propaganda' ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
+                                                                          {infoAttivita?.isFreeTextLevel || ['acquagym', 'propaganda'].includes(corso.data.id) ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
                                                                         </span>
                                                                         <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[11px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
-                                                                          {infoAttivita?.isFreeTextLevel || corso.data.id === 'acquagym' || corso.data.id === 'propaganda' ? livelloBrev : `L${corso.data.livello}-${livelloBrev}`}
+                                                                          {infoAttivita?.isFreeTextLevel || ['acquagym', 'propaganda'].includes(corso.data.id) ? livelloBrev : `L${corso.data.livello}-${livelloBrev}`}
                                                                         </span>
                                                                       </>
                                                                     ) : (
@@ -1644,8 +1654,9 @@
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cognome e Nome</label>
                               <input 
                                 type="text" 
-                                list="utenti-list"
+                                list={addUtenteRapido.nome.length >= 2 ? "utenti-list" : undefined}
                                 value={addUtenteRapido.nome} 
+                                placeholder="Inizia a scrivere il nome..."
                                 onChange={e => {
                                     const val = e.target.value;
                                     const existing = tuttiUtentiUnici.find(u => u.nome.toLowerCase() === val.toLowerCase().trim());
@@ -1662,7 +1673,6 @@
                                     }
                                 }} 
                                 className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" 
-                                placeholder="Es. Rossi Mario" 
                                 required 
                               />
                            </div>
@@ -1687,11 +1697,11 @@
                                    <div className="flex-1 flex flex-col sm:flex-row gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                                       <div className="flex-1 flex items-center gap-2">
                                         <span className="text-sm font-bold text-slate-500 w-8">Dal</span>
-                                        <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].inizio = snapToMonday(e.target.value); setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
+                                        <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].inizio = e.target.value; setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
                                       </div>
                                       <div className="flex-1 flex items-center gap-2">
                                         <span className="text-sm font-bold text-slate-500 w-8">Al</span>
-                                        <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].fine = snapToSunday(e.target.value); setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
+                                        <input type="date" value={isc.fine || ''} onChange={(e) => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc[idx].fine = e.target.value; setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} className="w-full px-3 py-2 text-sm rounded-lg bg-white border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer" />
                                       </div>
                                    </div>
                                    <button type="button" onClick={() => { const newIsc = [...(addUtenteRapido.iscrizioni || [])]; newIsc.splice(idx, 1); setAddUtenteRapido({...addUtenteRapido, iscrizioni: newIsc}); }} disabled={(addUtenteRapido.iscrizioni || []).length <= 1} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
@@ -1856,7 +1866,7 @@
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Max Utenti</label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Max Utenti (opz.)</label>
                         <input 
                           type="number" 
                           value={nuovoCorso.maxUtenti} 
@@ -2005,7 +2015,7 @@
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Max Utenti</label>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Max Utenti (opz.)</label>
                           <input 
                             type="number" 
                             value={editModal.maxUtenti} 
@@ -2090,6 +2100,7 @@
                                     type="text" 
                                     list={nuovoPartecipante.nome.length >= 2 ? "utenti-list" : undefined}
                                     value={nuovoPartecipante.nome} 
+                                    placeholder="Inizia a scrivere..."
                                     onChange={e => {
                                         const val = e.target.value;
                                         const existing = tuttiUtentiUnici.find(u => u.nome.toLowerCase() === val.toLowerCase().trim());
@@ -2106,7 +2117,6 @@
                                         }
                                     }} 
                                     className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1" 
-                                    placeholder="Es. Rossi Mario" 
                                  />
                               </div>
                               <div>
