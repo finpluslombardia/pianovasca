@@ -940,6 +940,31 @@
           // Elimina chiavi vecchie
           editModal.corsoOriginale.keys.forEach(k => delete nuovoPiano[k]);
           
+          // --- Sincronizzazione globale dei certificati medici e anagrafica ---
+          const mapAggiornamenti = new Map();
+          finalPartecipanti.forEach(p => {
+              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato, anno: p.anno });
+          });
+
+          Object.keys(nuovoPiano).forEach(k => {
+              if (nuovoPiano[k].partecipanti && nuovoPiano[k].partecipanti.length > 0) {
+                  let changed = false;
+                  const newPartecipanti = nuovoPiano[k].partecipanti.map(esistente => {
+                      if (!esistente || !esistente.nome) return esistente;
+                      const updateInfo = mapAggiornamenti.get(esistente.nome.toLowerCase().trim());
+                      if (updateInfo) {
+                          if (updateInfo.scadCertificato !== esistente.scadCertificato || updateInfo.anno !== esistente.anno) {
+                              changed = true;
+                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno };
+                          }
+                      }
+                      return esistente;
+                  });
+                  if (changed) nuovoPiano[k] = { ...nuovoPiano[k], partecipanti: newPartecipanti };
+              }
+          });
+          // --- Fine Sincronizzazione ---
+          
           // Crea con nuovi dati
           editModal.corsie.forEach(c => {
               nuovoPiano[`${editModal.vasca}-${editModal.giorno}-${editModal.oraInizio}-${c}`] = { 
