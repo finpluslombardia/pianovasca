@@ -925,10 +925,17 @@
                 ...nuovoPartecipante,
                 iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
             };
+            const nomeNorm = partecipantePulito.nome.toLowerCase().trim();
+            
             if (editingPartecipanteIndex !== null) {
               finalPartecipanti[editingPartecipanteIndex] = partecipantePulito;
             } else {
-              finalPartecipanti.push(partecipantePulito);
+              const existingIndex = finalPartecipanti.findIndex(p => p.nome.toLowerCase().trim() === nomeNorm);
+              if(existingIndex !== -1) {
+                  finalPartecipanti[existingIndex] = partecipantePulito;
+              } else {
+                  finalPartecipanti.push(partecipantePulito);
+              }
             }
             finalPartecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
         }
