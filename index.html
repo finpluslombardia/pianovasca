@@ -284,6 +284,8 @@
       const isDataLoaded = useRef(false); // Blocco per evitare sovrascritture accidentali
       const lastSavedPiano = useRef(""); 
       const initialLoadDone = useRef(false);
+      const hasModificheLocaliInSospeso = useRef(false); // true = ci sono modifiche locali non ancora confermate su Firestore
+      const ultimoStatoLocaleVisto = useRef(""); // ultima "istantanea" locale osservata dal debounce di salvataggio
 
       // --- BLOCCO SCORRIMENTO SFONDO ---
       useEffect(() => {
@@ -372,6 +374,22 @@
         
         const unsubscribe = onSnapshot(docRef, (docSnap) => {
           isDataLoaded.current = true; // Sblocca il salvataggio automatico solo dopo la lettura
+
+          // BUGFIX: ignoriamo l'eco locale della nostra stessa scrittura (hasPendingWrites = true).
+          // Questo eco può contenere dati già superati da modifiche fatte nel frattempo dall'utente
+          // (es. un nuovo partecipante aggiunto dopo l'ultimo salvataggio ma prima che questo eco
+          // arrivasse): applicarlo cancellerebbe silenziosamente quella modifica.
+          if (docSnap.metadata.hasPendingWrites) {
+            return;
+          }
+
+          // BUGFIX: se ci sono modifiche locali non ancora salvate (il timer di debounce è
+          // ancora in attesa), non sovrascriviamo lo stato con i dati arrivati dal server:
+          // sarebbero dati più vecchi rispetto a quello che l'utente ha appena digitato.
+          if (hasModificheLocaliInSospeso.current) {
+            return;
+          }
+
           if (docSnap.exists()) {
             const data = docSnap.data();
             
@@ -442,7 +460,14 @@
             const { db, appId, doc, setDoc } = firebaseInstances;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
             await setDoc(docRef, { tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, updatedAt: new Date().toISOString() });
-            lastSavedPiano.current = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef }); 
+            const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef });
+            lastSavedPiano.current = statoAppenaSalvato;
+            // Abbassiamo il flag "modifiche in sospeso" solo se, durante il salvataggio (che è
+            // asincrono), l'utente non ha nel frattempo fatto altre modifiche: in tal caso il
+            // flag deve restare attivo finché anche quelle non saranno salvate a loro volta.
+            if (statoAppenaSalvato === ultimoStatoLocaleVisto.current) {
+              hasModificheLocaliInSospeso.current = false;
+            }
             setStatoSalvataggio('saved');
             setTimeout(() => setStatoSalvataggio('idle'), 3000);
         } catch (error) {
@@ -455,6 +480,10 @@
         if (!user || !firebaseInstances || !isDataLoaded.current) return; // Blocco di sicurezza! Impedisce il salvataggio prima della lettura
         const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita });
         if (currentStateStr === lastSavedPiano.current) return; 
+        // Registriamo lo stato locale più recente e segnaliamo che c'è una modifica da salvare:
+        // questo impedisce all'onSnapshot di sovrascriverla nel frattempo (vedi BUGFIX sopra).
+        ultimoStatoLocaleVisto.current = currentStateStr;
+        hasModificheLocaliInSospeso.current = true;
         const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita), 1500);
         return () => clearTimeout(timer);
       }, [tuttiPiani, stagioni, stagionePredefinita, user, firebaseInstances]);
