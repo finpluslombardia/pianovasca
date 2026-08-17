@@ -418,14 +418,21 @@
                  }
                  setStagionePredefinita(defaultSeason);
                  
+                 // BUGFIX: catturiamo "è il primo caricamento?" PRIMA di chiamare setStagioneSelezionata
+                 // e di aggiornare il ref. La funzione passata a setStagioneSelezionata viene eseguita
+                 // da React in un momento successivo: se si controllasse initialLoadDone.current al suo
+                 // interno, lo si troverebbe già a "true" (perché la riga sottostante lo aggiorna subito,
+                 // in modo sincrono), e la stagione di avvio con la stella non verrebbe più applicata.
+                 const eraPrimoCaricamento = !initialLoadDone.current;
+                 initialLoadDone.current = true;
+                 
                  // Seleziona SEMPRE la stagione predefinita all'apertura del sito
                  setStagioneSelezionata((prev) => {
-                     if (!initialLoadDone.current) {
+                     if (eraPrimoCaricamento) {
                          return defaultSeason; // Forza la predefinita
                      }
                      return data.stagioni.includes(prev) ? prev : defaultSeason;
                  });
-                 initialLoadDone.current = true;
               }
               // Salviamo anche l'ordine delle stagioni nel riferimento per riconoscerne le modifiche
               lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni, def: defaultSeason });
@@ -446,11 +453,15 @@
               setStagioni([defaultSeason]);
               setStagionePredefinita(defaultSeason);
               
+              // BUGFIX: vedi nota sopra, stessa correzione (catturare il valore prima di
+              // aggiornare il ref, invece di leggerlo dentro la funzione di aggiornamento).
+              const eraPrimoCaricamento = !initialLoadDone.current;
+              initialLoadDone.current = true;
+              
               setStagioneSelezionata((prev) => {
-                  if (!initialLoadDone.current) return defaultSeason;
+                  if (eraPrimoCaricamento) return defaultSeason;
                   return prev;
               });
-              initialLoadDone.current = true;
               
               lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason], def: defaultSeason });
             }
@@ -745,7 +756,11 @@
 
       const corsiPerUtenteRapido = useMemo(() => {
         return addUtenteRapido.attivitaId
-          ? tuttiCorsiSelect.map((c, index) => ({...c, originalIndex: index})).filter(c => c.data.id === addUtenteRapido.attivitaId)
+          // BUGFIX: usiamo un id stabile basato sulle chiavi reali del corso (c.keys) invece
+          // della posizione nell'array (originalIndex). La posizione può cambiare se la lista
+          // dei corsi viene ricalcolata (es. corso aggiunto/modificato altrove) mentre questa
+          // finestra è aperta, causando la selezione del corso sbagliato o un blocco dell'app.
+          ? tuttiCorsiSelect.filter(c => c.data.id === addUtenteRapido.attivitaId).map(c => ({...c, selId: c.keys.join('|')}))
           : [];
       }, [tuttiCorsiSelect, addUtenteRapido.attivitaId]);
 
@@ -755,15 +770,27 @@
         if (!addUtenteRapido.nome.trim()) return alert("Inserisci il Cognome e Nome!");
         
         const iscrizioniPulite = (addUtenteRapido.iscrizioni || []).filter(i => i.inizio || i.fine);
+        let corsiNonPiuDisponibili = 0;
         
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
             const nuovoPiano = { ...prevSeason };
             
-            addUtenteRapido.corsiSelezionati.forEach(cIndex => {
-                const selectedCourse = tuttiCorsiSelect[cIndex];
-                selectedCourse.keys.forEach(k => {
-                    const cell = nuovoPiano[k] ? { ...nuovoPiano[k] } : { ...selectedCourse.data };
+            // BUGFIX: usiamo direttamente le chiavi salvate al momento della selezione
+            // (sel.keys), invece di recuperare il corso tramite un indice nella lista
+            // tuttiCorsiSelect. Se quella lista era cambiata nel frattempo (es. un altro
+            // corso aggiunto o modificato), l'indice poteva puntare al corso sbagliato o
+            // non esistere più, bloccando l'inserimento con un errore.
+            addUtenteRapido.corsiSelezionati.forEach(sel => {
+                const keys = sel && sel.keys ? sel.keys : [];
+                keys.forEach(k => {
+                    if (!nuovoPiano[k]) {
+                        // Il corso non esiste più (rimosso o spostato nel frattempo): saltiamo
+                        // in sicurezza invece di far crashare il salvataggio.
+                        corsiNonPiuDisponibili++;
+                        return;
+                    }
+                    const cell = { ...nuovoPiano[k] };
                     const partecipanti = [...(cell.partecipanti || [])];
                     partecipanti.push({
                         nome: addUtenteRapido.nome,
@@ -781,6 +808,10 @@
 
         setIsAddUserModalOpen(false);
         setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+
+        if (corsiNonPiuDisponibili > 0) {
+            alert("Attenzione: uno o più corsi selezionati non erano più disponibili (probabilmente modificati nel frattempo) e sono stati saltati. Controlla la lista iscritti dei corsi interessati.");
+        }
       };
 
       // --- LOGICA RICERCA SOCIO ---
@@ -844,6 +875,27 @@
         if (nuovoCorso.corsie.length === 0) {
             alert("Seleziona almeno una corsia!");
             return;
+        }
+
+        // BUGFIX: controlliamo PRIMA di salvare se una delle celle scelte (giorno/ora/corsia)
+        // è già occupata da un altro corso. Senza questo controllo la cella esistente veniva
+        // sovrascritta e cancellata silenziosamente, iscritti compresi.
+        const conflitti = [];
+        nuovoCorso.giorni.forEach(g => {
+            nuovoCorso.corsie.forEach(c => {
+                const key = `${nuovoCorso.vasca}-${g}-${nuovoCorso.oraInizio}-${c}`;
+                const esistente = piano[key];
+                if (esistente) {
+                    const nIscritti = (esistente.partecipanti || []).length;
+                    conflitti.push(`${GIORNI[g]} ${nuovoCorso.oraInizio} - Corsia ${c}${nIscritti > 0 ? ` (${nIscritti} iscritti)` : ''}`);
+                }
+            });
+        });
+        if (conflitti.length > 0) {
+            const conferma = window.confirm(
+                `Attenzione: in queste corsie/orari è già presente un corso, che verrebbe SOSTITUITO (con eventuali iscritti persi):\n\n${conflitti.join('\n')}\n\nVuoi continuare comunque e sovrascriverli?`
+            );
+            if (!conferma) return;
         }
         
         setTuttiPiani(prevTutti => {
@@ -959,6 +1011,28 @@
       const salvaModificheModal = (e) => {
         if (e && e.preventDefault) e.preventDefault();
         if (editModal.corsie.length === 0) return alert("Seleziona almeno una corsia!");
+
+        // BUGFIX: controlliamo PRIMA di salvare se la nuova posizione (giorno/ora/corsia) del
+        // corso va a occupare una cella già usata da UN ALTRO corso (escludendo le celle
+        // originali di questo stesso corso, che verranno comunque sostituite). Senza questo
+        // controllo la cella esistente veniva sovrascritta e cancellata silenziosamente.
+        const keyOriginali = new Set(editModal.corsoOriginale.keys);
+        const conflitti = [];
+        editModal.corsie.forEach(c => {
+            const key = `${editModal.vasca}-${editModal.giorno}-${editModal.oraInizio}-${c}`;
+            if (keyOriginali.has(key)) return; // è una cella del corso stesso, nessun conflitto
+            const esistente = piano[key];
+            if (esistente) {
+                const nIscritti = (esistente.partecipanti || []).length;
+                conflitti.push(`${GIORNI[editModal.giorno]} ${editModal.oraInizio} - Corsia ${c}${nIscritti > 0 ? ` (${nIscritti} iscritti)` : ''}`);
+            }
+        });
+        if (conflitti.length > 0) {
+            const conferma = window.confirm(
+                `Attenzione: in queste corsie/orari è già presente un altro corso, che verrebbe SOSTITUITO (con eventuali iscritti persi):\n\n${conflitti.join('\n')}\n\nVuoi continuare comunque e sovrascriverli?`
+            );
+            if (!conferma) return;
+        }
         
         // Recupera i partecipanti già confermati nella lista
         let finalPartecipanti = [...editModal.partecipanti];
@@ -1693,19 +1767,19 @@
                             <label className="block text-sm font-semibold text-slate-700 mb-1.5">2. Seleziona i Corsi <span className="font-normal text-slate-500">(puoi sceglierne più di uno)</span></label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-3 bg-slate-50">
                                 {corsiPerUtenteRapido.map(c => {
-                                    const isChecked = (addUtenteRapido.corsiSelezionati || []).includes(c.originalIndex);
+                                    const isChecked = (addUtenteRapido.corsiSelezionati || []).some(sel => sel.selId === c.selId);
                                     const infoAtt = attivita.find(a => a.id === c.data.id);
                                     const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
                                     const livelloStr = nomeLiv ? ` - ${nomeLiv}` : '';
                                     return (
-                                        <label key={c.originalIndex} className={`flex items-start gap-2.5 p-2 rounded-lg border-2 cursor-pointer transition-colors ${isChecked ? 'border-blue-500 bg-blue-50' : 'border-transparent hover:bg-slate-100'}`}>
+                                        <label key={c.selId} className={`flex items-start gap-2.5 p-2 rounded-lg border-2 cursor-pointer transition-colors ${isChecked ? 'border-blue-500 bg-blue-50' : 'border-transparent hover:bg-slate-100'}`}>
                                             <input 
                                                 type="checkbox" 
                                                 checked={isChecked} 
                                                 onChange={(e) => {
                                                     const selected = [...(addUtenteRapido.corsiSelezionati || [])];
-                                                    if(e.target.checked) selected.push(c.originalIndex);
-                                                    else selected.splice(selected.indexOf(c.originalIndex), 1);
+                                                    if(e.target.checked) selected.push({ selId: c.selId, keys: c.keys });
+                                                    else selected.splice(selected.findIndex(sel => sel.selId === c.selId), 1);
                                                     setAddUtenteRapido({...addUtenteRapido, corsiSelezionati: selected});
                                                 }}
                                                 className="mt-1 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
