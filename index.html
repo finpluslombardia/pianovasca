@@ -34,6 +34,17 @@
     /* Regola aggiuntiva per i blocchi strutturali del PDF */
     .show-block-on-pdf { display: none !important; }
     .pdf-mode .show-block-on-pdf { display: block !important; }
+
+    /* Animazione popup di conferma (toast) */
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(-12px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes toast-out {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to { opacity: 0; transform: translateY(-12px) scale(0.95); }
+    }
+    .toast-enter { animation: toast-in 0.25s ease-out; }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
@@ -297,6 +308,16 @@
       const initialLoadDone = useRef(false);
       const hasModificheLocaliInSospeso = useRef(false); // true = ci sono modifiche locali non ancora confermate su Firestore
       const ultimoStatoLocaleVisto = useRef(""); // ultima "istantanea" locale osservata dal debounce di salvataggio
+
+      // --- STATI TOAST (popup di conferma a comparsa) ---
+      const [toasts, setToasts] = useState([]);
+      const mostraToast = useCallback((messaggio, tipo = 'success') => {
+        const id = Date.now() + Math.random();
+        setToasts(prev => [...prev, { id, messaggio, tipo }]);
+        setTimeout(() => {
+          setToasts(prev => prev.filter(t => t.id !== id));
+        }, 3000);
+      }, []);
 
       // --- BLOCCO SCORRIMENTO SFONDO ---
       useEffect(() => {
@@ -806,11 +827,14 @@
             return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
         });
 
+        const nomeAggiunto = addUtenteRapido.nome.trim();
         setIsAddUserModalOpen(false);
         setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
 
         if (corsiNonPiuDisponibili > 0) {
-            alert("Attenzione: uno o più corsi selezionati non erano più disponibili (probabilmente modificati nel frattempo) e sono stati saltati. Controlla la lista iscritti dei corsi interessati.");
+            mostraToast("Alcuni corsi selezionati non erano più disponibili e sono stati saltati.", 'error');
+        } else {
+            mostraToast(`${nomeAggiunto} aggiunto con successo!`);
         }
       };
 
@@ -921,6 +945,7 @@
 
         setIsAddModalOpen(false);
         setNuovoCorso(prev => ({...prev, corsie: [], giorni: [], istruttore: '', livello: '', maxUtenti: '', dataInizio: '', dataFine: '', vasca: vascaSelezionata}));
+        mostraToast("Corso creato con successo!");
       };
 
       // --- LOGICA MODIFICA/ELIMINA CORSO E PARTECIPANTI ---
@@ -1110,6 +1135,7 @@
         setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
+        mostraToast("Modifiche salvate con successo!");
       };
 
       const eliminaCorsoModal = () => {
@@ -2560,12 +2586,6 @@
                     </button>
 
                     <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
-
-                    <div title="Il salvataggio avviene automaticamente ad ogni modifica" className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${statoSalvataggio === 'error' ? 'bg-red-100 text-red-700' : statoSalvataggio === 'saved' ? 'bg-green-100 text-green-700' : statoSalvataggio === 'saving' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                      {statoSalvataggio === 'saving' ? <LoaderIcon size={16} /> : statoSalvataggio === 'saved' ? <CheckIcon size={16} /> : statoSalvataggio === 'error' ? <InfoIcon size={16} /> : <CloudIcon size={16} />}
-                      <span className="hidden sm:inline">{statoSalvataggio === 'saving' ? 'Salvataggio...' : statoSalvataggio === 'saved' ? 'Salvato!' : statoSalvataggio === 'error' ? 'Errore Sync' : 'In Sync'}</span>
-                    </div>
-                    <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
                     
                     {/* MENU ESPORTAZIONE */}
                     <div className="relative">
@@ -2740,6 +2760,19 @@
           <datalist id="utenti-list">
             {tuttiUtentiUnici.map((u, idx) => <option key={idx} value={u.nome} />)}
           </datalist>
+
+          {/* POPUP DI CONFERMA (TOAST) */}
+          <div className="fixed top-4 right-4 z-[200] flex flex-col gap-2 items-end pointer-events-none">
+            {toasts.map(t => (
+              <div
+                key={t.id}
+                className={`toast-enter pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-semibold text-white max-w-xs ${t.tipo === 'error' ? 'bg-red-600' : 'bg-green-600'}`}
+              >
+                {t.tipo === 'error' ? <InfoIcon size={18} className="shrink-0" /> : <CheckIcon size={18} className="shrink-0" />}
+                <span>{t.messaggio}</span>
+              </div>
+            ))}
+          </div>
 
         </div>
       );
