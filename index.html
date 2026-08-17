@@ -1341,14 +1341,18 @@
                         let testoSfondo = '';
                         if (nomeLivello) {
                           const mostraSoloNome = (info.id === 'acquagym' || info.id === 'propaganda' || info.isFreeTextLevel || livelloInfo?.noNumero);
-                          testoSfondo += `<b>${mostraSoloNome ? nomeLivello : `Liv. ${cell.corso.data.livello} - ${nomeLivello}`}</b><br>`;
+                          const titoloTesto = mostraSoloNome ? nomeLivello : `Liv. ${cell.corso.data.livello} - ${nomeLivello}`;
+                          testoSfondo += `<span style="font-size:10pt; font-weight:normal;">${titoloTesto}</span><br>`;
                         } else {
-                          testoSfondo += `<b>${info ? info.name : ''}</b><br>`;
+                          testoSfondo += `<span style="font-size:10pt; font-weight:normal;">${info ? info.name : ''}</span><br>`;
                         }
                         
-                        if(cell.corso.data.istruttore) testoSfondo += `<i>${cell.corso.data.istruttore}</i><br>`;
-                        testoSfondo += `⏱ ${cell.corso.durata} min`;
-                        if(cell.corso.data.maxUtenti) testoSfondo += ` 👤 ${cell.corso.data.maxUtenti}`;
+                        if(cell.corso.data.istruttore) testoSfondo += `<span style="font-size:9pt; font-style:italic;">${cell.corso.data.istruttore}</span><br>`;
+                        // BUGFIX/RICHIESTA: rimosse le emoji ⏱/👤 (rese in modo incoerente da Excel/Sheets
+                        // a seconda del font di sistema) a favore di un testo semplice e uniforme.
+                        let infoRiga = `${cell.corso.durata} min`;
+                        if(cell.corso.data.maxUtenti) infoRiga += ` &middot; Max ${cell.corso.data.maxUtenti}`;
+                        testoSfondo += `<span style="font-size:9pt;">${infoRiga}</span>`;
                         
                         htmlContent += `<td rowspan="${cell.rowSpan}" colspan="${cell.colSpan}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid #ccc;">${testoSfondo}</td>`;
                     }
