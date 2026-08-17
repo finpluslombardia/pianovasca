@@ -164,8 +164,9 @@
         border: 'border-sky-500',
         hasLevels: true,
         levels: [
-          {val: '1', name: 'Stella Marina'}, {val: '2', name: 'Granchietto'}, {val: '3', name: 'Tartaruga'}, 
-          {val: '4', name: 'Polipetto'}, {val: '5', name: 'Pesce spada'}, {val: '6', name: 'Delfino'}, {val: '7', name: 'Squalo'}
+          {val: '0', name: 'Baby'}, {val: '1', name: 'Stella Marina'}, {val: '2', name: 'Granchietto'}, {val: '3', name: 'Tartaruga'}, 
+          {val: '4', name: 'Polipetto'}, {val: '5', name: 'Pesce spada'}, {val: '6', name: 'Delfino'}, {val: '7', name: 'Squalo'},
+          {val: '8', name: 'Ragazzi Principianti', noNumero: true}, {val: '9', name: 'Ragazzi Intermedi', noNumero: true}
         ]
       },
       { 
@@ -1334,11 +1335,12 @@
                         const info = attivita.find(a => a.id === cell.corso.data.id);
                         const bgColor = getColor(info ? info.color : '');
                         const textColor = getTextColor(info ? info.color : '');
-                        const nomeLivello = info?.isFreeTextLevel ? cell.corso.data.livello : info?.levels?.find(l => l.val === cell.corso.data.livello)?.name;
+                        const livelloInfo = info?.levels?.find(l => l.val === cell.corso.data.livello);
+                        const nomeLivello = info?.isFreeTextLevel ? cell.corso.data.livello : livelloInfo?.name;
                         
                         let testoSfondo = '';
                         if (nomeLivello) {
-                          const mostraSoloNome = (info.id === 'acquagym' || info.id === 'propaganda' || info.isFreeTextLevel);
+                          const mostraSoloNome = (info.id === 'acquagym' || info.id === 'propaganda' || info.isFreeTextLevel || livelloInfo?.noNumero);
                           testoSfondo += `<b>${mostraSoloNome ? nomeLivello : `Liv. ${cell.corso.data.livello} - ${nomeLivello}`}</b><br>`;
                         } else {
                           testoSfondo += `<b>${info ? info.name : ''}</b><br>`;
@@ -1551,7 +1553,9 @@
                                                   >
                                                       {corsiInCella.map((corso, i) => {
                                                           const infoAttivita = attivita.find(a => a.id === corso.data.id);
-                                                          const nomeLivello = infoAttivita?.isFreeTextLevel ? corso.data.livello : infoAttivita?.levels?.find(l => l.val === corso.data.livello)?.name;
+                                                          const livelloInfoCella = infoAttivita?.levels?.find(l => l.val === corso.data.livello);
+                                                          const nomeLivello = infoAttivita?.isFreeTextLevel ? corso.data.livello : livelloInfoCella?.name;
+                                                          const senzaNumeroLivello = infoAttivita?.isFreeTextLevel || ['acquagym', 'propaganda'].includes(corso.data.id) || livelloInfoCella?.noNumero;
                                                           
                                                           const nomeBrev = abbrevia(infoAttivita ? infoAttivita.name : '');
                                                           const livelloBrev = abbrevia(nomeLivello);
@@ -1575,10 +1579,10 @@
                                                                     {nomeLivello ? (
                                                                       <>
                                                                         <span className={`hide-on-pdf ${corso.durata <= 30 ? 'text-xs' : 'text-sm'} font-bold leading-tight truncate w-full px-0.5`}>
-                                                                          {infoAttivita?.isFreeTextLevel || ['acquagym', 'propaganda'].includes(corso.data.id) ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
+                                                                          {senzaNumeroLivello ? nomeLivello : `Liv. ${corso.data.livello} - ${nomeLivello}`}
                                                                         </span>
                                                                         <span className={`show-on-pdf ${corso.durata <= 30 ? 'text-[11px]' : 'text-xs'} font-bold leading-tight truncate w-full px-0.5`}>
-                                                                          {infoAttivita?.isFreeTextLevel || ['acquagym', 'propaganda'].includes(corso.data.id) ? livelloBrev : `L${corso.data.livello}-${livelloBrev}`}
+                                                                          {senzaNumeroLivello ? livelloBrev : `L${corso.data.livello}-${livelloBrev}`}
                                                                         </span>
                                                                       </>
                                                                     ) : (
