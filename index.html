@@ -216,6 +216,14 @@
         return nome;
     };
 
+    // BUGFIX: riferimento stabile e riutilizzabile per un piano "vuoto". Usare {} direttamente
+    // come fallback creerebbe un oggetto NUOVO a ogni singolo render ogni volta che la stagione
+    // selezionata non risulta (ancora) presente in tuttiPiani. Questo instabilizza tutti i calcoli
+    // derivati (elenco corsi, elenco utenti, scadenze...) facendoli ricalcolare ad ogni render,
+    // anche solo digitando in un campo di testo: con un piano vasca grande, il risultato percepito
+    // è che l'app "si impalla" e diventa lenta o non risponde quando si inseriscono corsi o utenti.
+    const PIANO_VUOTO = Object.freeze({});
+
     function App() {
       // --- STATO DELL'APPLICAZIONE ---
       const [stagioni, setStagioni] = useState(['2025/2026']);
@@ -224,7 +232,7 @@
       const [tuttiPiani, setTuttiPiani] = useState({ '2025/2026': {} });
       
       // Il piano corrente deriva dalla stagione selezionata
-      const piano = tuttiPiani[stagioneSelezionata] || {};
+      const piano = tuttiPiani[stagioneSelezionata] || PIANO_VUOTO;
 
       const [vascaSelezionata, setVascaSelezionata] = useState('interna'); // 'interna' o 'esterna'
       const [giornoSelezionato, setGiornoSelezionato] = useState((new Date().getDay() + 6) % 7);
@@ -281,8 +289,11 @@
       const [confermaSvuota, setConfermaSvuota] = useState(false);
       const [confermaEliminaStagione, setConfermaEliminaStagione] = useState(false);
       const [firebaseInstances, setFirebaseInstances] = useState(null);
-      const isDataLoaded = useRef(false); // Blocco per evitare sovrascritture accidentali
-      const lastSavedPiano = useRef(""); 
+      const [isDataLoaded, setIsDataLoaded] = useState(false); // Sblocca il salvataggio automatico solo dopo la prima lettura cloud
+      // Inizializziamo con lo stato locale di partenza (non una stringa vuota): così, finché l'utente
+      // non modifica nulla, il confronto nel debounce (sotto) non segnala un falso "c'è da salvare"
+      // prima ancora che i dati cloud siano arrivati.
+      const lastSavedPiano = useRef(JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita }));
       const initialLoadDone = useRef(false);
       const hasModificheLocaliInSospeso = useRef(false); // true = ci sono modifiche locali non ancora confermate su Firestore
       const ultimoStatoLocaleVisto = useRef(""); // ultima "istantanea" locale osservata dal debounce di salvataggio
@@ -373,7 +384,7 @@
         const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
         
         const unsubscribe = onSnapshot(docRef, (docSnap) => {
-          isDataLoaded.current = true; // Sblocca il salvataggio automatico solo dopo la lettura
+          setIsDataLoaded(true); // Sblocca il salvataggio automatico solo dopo la lettura
 
           // BUGFIX: ignoriamo l'eco locale della nostra stessa scrittura (hasPendingWrites = true).
           // Questo eco può contenere dati già superati da modifiche fatte nel frattempo dall'utente
@@ -477,16 +488,20 @@
       };
 
       useEffect(() => {
-        if (!user || !firebaseInstances || !isDataLoaded.current) return; // Blocco di sicurezza! Impedisce il salvataggio prima della lettura
+        if (!user || !firebaseInstances) return;
         const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita });
         if (currentStateStr === lastSavedPiano.current) return; 
         // Registriamo lo stato locale più recente e segnaliamo che c'è una modifica da salvare:
         // questo impedisce all'onSnapshot di sovrascriverla nel frattempo (vedi BUGFIX sopra).
+        // Alziamo il flag SEMPRE, anche se il caricamento cloud iniziale non è ancora completato:
+        // se l'utente inserisce un corso/utente nei primi istanti (prima che arrivi la prima
+        // lettura da Firestore), quella lettura non deve poter cancellare quanto appena inserito.
         ultimoStatoLocaleVisto.current = currentStateStr;
         hasModificheLocaliInSospeso.current = true;
+        if (!isDataLoaded) return; // Non salviamo ancora, ma il flag resta alzato
         const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita), 1500);
         return () => clearTimeout(timer);
-      }, [tuttiPiani, stagioni, stagionePredefinita, user, firebaseInstances]);
+      }, [tuttiPiani, stagioni, stagionePredefinita, user, firebaseInstances, isDataLoaded]);
 
       // --- CALCOLATORI DI TEMPO E VISTE ---
       const TIME_OPTIONS = useMemo(() => {
