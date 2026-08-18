@@ -96,6 +96,15 @@
       const [y, m, d] = dateStr.split('-');
       return `${d}/${m}/${y}`;
     };
+    // Sotto i 6 anni il certificato medico non è obbligatorio: quindi anche se assente o con data
+    // passata non va segnalato come scaduto/mancante. L'età viene calcolata rispetto all'anno di
+    // inizio della stagione selezionata (così resta coerente per tutta la stagione), con fallback
+    // sull'anno solare corrente se non disponibile.
+    const certificatoObbligatorio = (annoNascita, annoRiferimento) => {
+      if (!annoNascita) return true; // età sconosciuta: per prudenza continuiamo a segnalarlo
+      const rif = annoRiferimento || new Date().getFullYear();
+      return (rif - Number(annoNascita)) >= 6;
+    };
 
     const getStartOfWeek = (date) => {
       const d = new Date(date);
@@ -713,12 +722,13 @@
           oggi.setHours(0,0,0,0);
           const tra30Giorni = new Date(oggi);
           tra30Giorni.setDate(oggi.getDate() + 30);
+          const annoRif = parseInt(String(stagioneSelezionata).slice(0, 4), 10) || oggi.getFullYear();
 
           const mapUtenti = new Map();
 
           // Pass 1: raccogliamo tutti gli utenti garantendo che abbiano l'array 'corsi' vuoto per sicurezza
           tuttiUtentiUnici.forEach(u => {
-              if (!u || !u.nome || !u.scadCertificato) return;
+              if (!u || !u.nome || !u.scadCertificato || !certificatoObbligatorio(u.anno, annoRif)) return;
               const pKey = u.nome.toLowerCase().trim();
               mapUtenti.set(pKey, { ...u, corsi: [] }); // Inizializza SEMPRE l'array corsi vuoto
           });
@@ -732,7 +742,7 @@
               const corsoDettaglio = `${nomeCorsoStr} (${giornoStr} ${c.oraInizio || ''})`.trim();
 
               (c.data.partecipanti || []).forEach(p => {
-                  if (!p || !p.nome || !p.scadCertificato) return;
+                  if (!p || !p.nome || !p.scadCertificato || !certificatoObbligatorio(p.anno, annoRif)) return;
                   const pKey = p.nome.toLowerCase().trim();
                   
                   let utenteMap = mapUtenti.get(pKey);
@@ -768,7 +778,7 @@
           inScadenza.sort((a, b) => new Date(a.scadCertificato) - new Date(b.scadCertificato));
 
           return { scaduti, inScadenza };
-      }, [tuttiCorsiSelect, attivita, tuttiUtentiUnici]);
+      }, [tuttiCorsiSelect, attivita, tuttiUtentiUnici, stagioneSelezionata]);
 
       const giorniConCorsiPerUtenteRapido = useMemo(() => {
         return addUtenteRapido.attivitaId
@@ -1158,39 +1168,32 @@
         // Nuovo formato del titolo principale
         const titoloPrincipale = nomeLivello ? `${giornoNome}, ${editModal.oraInizio} - ${nomeLivello}` : `${giornoNome}, ${editModal.oraInizio}`;
 
-        const getIscrizionePdfStr = (p) => {
-             let validList = [];
-             if (p.iscrizioni && p.iscrizioni.length > 0) {
-                 validList = p.iscrizioni.filter(i => i.inizio || i.fine);
-             } else if (p.scadIscrizione) {
-                 validList = [{ inizio: '', fine: p.scadIscrizione }];
-             }
-             if (validList.length === 0) return { str: '-', scaduta: false };
-
-             const oggi = new Date();
-             oggi.setHours(0,0,0,0);
-             const haValido = validList.some(isc => isc.fine ? new Date(isc.fine) >= oggi : true);
-             
-             const str = validList.map(isc => `${isc.inizio ? formatDate(isc.inizio) : '...'} - ${isc.fine ? formatDate(isc.fine) : '...'}`).join('<br>');
-             
-             return { str, scaduta: !haValido };
-        };
-
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
            alert("Attenzione: Abilita i popup nel browser per visualizzare e stampare il registro.");
            return;
         }
         
+        // Sotto i 6 anni il certificato medico non è obbligatorio: usiamo l'anno di inizio della
+        // stagione selezionata come riferimento per calcolare l'età in modo coerente.
+        const annoRifRegistro = parseInt(String(stagioneSelezionata).slice(0, 4), 10) || new Date().getFullYear();
+
+        // Colonne vuote numerate per segnare le presenze a mano
+        const NUM_COLONNE_PRESENZE = 20;
+        const colonnePresenzeHeader = Array.from({ length: NUM_COLONNE_PRESENZE }, (_, i) => `<th class="presenza">${i + 1}</th>`).join('');
+        const colonnePresenzeBody = `<td class="presenza"></td>`.repeat(NUM_COLONNE_PRESENZE);
+
         // Stampiamo solo i partecipanti attivi nella settimana in cui ci troviamo!
         let tableRows = partecipantiAttiviModal.map(p => {
-          const iscrPdf = getIscrizionePdfStr(p);
+          const certObbligatorio = certificatoObbligatorio(p.anno, annoRifRegistro);
+          const certScaduto = certObbligatorio && isScaduto(p.scadCertificato);
+          const testoCertificato = (!certObbligatorio && !p.scadCertificato) ? 'Non obbligatorio' : formatDate(p.scadCertificato);
           return `
           <tr>
             <td>${p.nome}</td>
             <td style="text-align:center;">${p.anno || '-'}</td>
-            <td style="text-align:center; ${isScaduto(p.scadCertificato) ? 'color:#dc2626; font-weight:bold;' : ''}">${formatDate(p.scadCertificato)}</td>
-            <td style="text-align:center; ${iscrPdf.scaduta ? 'color:#dc2626; font-weight:bold;' : ''}">${iscrPdf.str}</td>
+            <td style="text-align:center; ${certScaduto ? 'color:#dc2626; font-weight:bold;' : ''}">${testoCertificato}</td>
+            ${colonnePresenzeBody}
           </tr>
           `;
         }).join('');
@@ -1200,15 +1203,17 @@
             <head>
               <title>Registro - ${titoloPrincipale}</title>
               <style>
-                @page { size: A4 portrait; margin: 15mm; }
+                @page { size: A4 landscape; margin: 12mm; }
                 body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                h1 { margin: 0 0 5px 0; font-size: 24px; color: #0f172a; }
-                h3 { margin: 0 0 5px 0; color: #64748b; font-weight: 500; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; line-height: 1.5; }
-                table { width: 100%; border-collapse: collapse; font-size: 13px; }
-                th, td { border: 1px solid #cbd5e1; padding: 12px 8px; text-align: left; }
-                th { background-color: #e2e8f0 !important; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 11px; }
+                h1 { margin: 0 0 5px 0; font-size: 22px; color: #0f172a; }
+                h3 { margin: 0 0 5px 0; color: #64748b; font-weight: 500; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; line-height: 1.5; }
+                table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+                th, td { border: 1px solid #cbd5e1; padding: 8px 6px; text-align: left; overflow: hidden; }
+                th { background-color: #e2e8f0 !important; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 10px; }
                 td { color: #334155; }
-                .print-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 10px; }
+                th.presenza, td.presenza { padding: 8px 2px; text-align: center; }
+                td.presenza { height: 26px; }
+                .print-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 8px; }
               </style>
             </head>
             <body>
@@ -1224,10 +1229,10 @@
               <table>
                 <thead>
                   <tr>
-                    <th style="width: 40%;">Cognome e Nome</th>
-                    <th style="text-align:center; width: 10%;">Anno</th>
-                    <th style="text-align:center; width: 25%;">Certificato</th>
-                    <th style="text-align:center; width: 25%;">Iscrizione</th>
+                    <th style="width: 17%;">Cognome e Nome</th>
+                    <th style="text-align:center; width: 5%;">Anno</th>
+                    <th style="text-align:center; width: 11%;">Certificato</th>
+                    ${colonnePresenzeHeader}
                   </tr>
                 </thead>
                 <tbody>
@@ -2357,13 +2362,24 @@
                           const attivi = editModal.partecipanti.filter(p => isAttivoInSettimana(p, inizioSettimana));
                           const inattivi = editModal.partecipanti.filter(p => !isAttivoInSettimana(p, inizioSettimana));
 
-                          const renderRigaPartecipante = (p, i) => (
+                          const annoRifPartecipanti = parseInt(String(stagioneSelezionata).slice(0, 4), 10) || new Date().getFullYear();
+
+                          const renderRigaPartecipante = (p, i) => {
+                            const certObbligatorio = certificatoObbligatorio(p.anno, annoRifPartecipanti);
+                            const scaduto = certObbligatorio && isScaduto(p.scadCertificato);
+                            return (
                             <tr key={i} className={`border-b border-slate-100 transition-colors ${editingPartecipanteIndex === i ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
                               <td className="p-3 font-medium text-slate-800">{p.nome}</td>
                               <td className="p-3 text-center text-slate-600">{p.anno || '-'}</td>
-                              <td className={`p-3 text-center font-bold ${isScaduto(p.scadCertificato) ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
-                                {formatDate(p.scadCertificato)}
-                                {isScaduto(p.scadCertificato) && <span className="ml-1 text-[10px] uppercase block leading-none">Scaduto</span>}
+                              <td className={`p-3 text-center font-bold ${scaduto ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
+                                {!certObbligatorio && !p.scadCertificato ? (
+                                  <span className="text-[10px] uppercase font-semibold text-slate-400">Non obbligatorio</span>
+                                ) : (
+                                  <>
+                                    {formatDate(p.scadCertificato)}
+                                    {scaduto && <span className="ml-1 text-[10px] uppercase block leading-none">Scaduto</span>}
+                                  </>
+                                )}
                               </td>
                               <td className="p-3 text-center font-bold">
                                 {(() => {
@@ -2398,6 +2414,7 @@
                               </td>
                             </tr>
                           );
+                          };
 
                           return (
                             <div className="flex flex-col min-h-full">
