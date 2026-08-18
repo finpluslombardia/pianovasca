@@ -18,6 +18,9 @@
   <!-- Libreria per generare il PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
+  <!-- Libreria per leggere file Excel/CSV (importazione soci) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
   <style>
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
@@ -123,6 +126,46 @@
         });
       });
       return map;
+    };
+
+    // --- IMPORTAZIONE SOCI DA FILE (Excel/CSV del gestionale) ---
+    // Formatta "COGNOME" + "NOME" in "Cognome Nome" (prima lettera di ogni parola maiuscola),
+    // così il risultato è coerente con come i nomi vengono digitati normalmente nell'app.
+    const formattaNomeProprio = (str) => {
+      return String(str || '').trim().replace(/\s+/g, ' ').toLowerCase()
+        .split(' ').map(w => w ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(' ');
+    };
+
+    // Estrae l'anno di nascita da vari possibili formati: GG/MM/AAAA, GG-MM-AAAA, AAAA-MM-GG,
+    // un oggetto Date (se il foglio Excel usa celle data vere), un numero seriale Excel, o un
+    // anno a 4 cifre da solo.
+    const estraiAnnoDaData = (valore) => {
+      if (!valore) return '';
+      if (valore instanceof Date && !isNaN(valore)) return String(valore.getFullYear());
+      const s = String(valore).trim();
+      let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+      if (m) return m[3];
+      m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+      if (m) return m[1];
+      m = s.match(/^(\d{4})$/);
+      if (m) return m[1];
+      const num = Number(s);
+      if (!isNaN(num) && num > 1000 && num < 60000) {
+        const d = new Date(Math.round((num - 25569) * 86400 * 1000));
+        if (!isNaN(d)) return String(d.getUTCFullYear());
+      }
+      return '';
+    };
+
+    // Parsing CSV generico: rileva automaticamente il separatore più probabile tra virgola,
+    // punto e virgola e tabulazione (i gestionali italiani usano spesso il punto e virgola).
+    const parseCSV = (testo) => {
+      const righeTesto = testo.split(/\r?\n/).filter(r => r.trim() !== '');
+      if (righeTesto.length === 0) return [];
+      const primaRiga = righeTesto[0];
+      const separatore = [';', ',', '\t'].reduce((migliore, sep) =>
+        (primaRiga.split(sep).length > primaRiga.split(migliore).length ? sep : migliore), ';');
+      return righeTesto.map(riga => riga.split(separatore).map(c => c.trim().replace(/^"|"$/g, '')));
     };
 
     const getStartOfWeek = (date) => {
@@ -272,6 +315,7 @@
       const [tuttiPiani, setTuttiPiani] = useState({ '2025/2026': {} });
       // Archivio soci permanente (indipendente dalla stagione): { [nomeMinuscolo]: {nome, anno, scadCertificato} }
       const [archivioSoci, setArchivioSoci] = useState({});
+      const [importaSociPreview, setImportaSociPreview] = useState(null);
       
       // Il piano corrente deriva dalla stagione selezionata
       const piano = tuttiPiani[stagioneSelezionata] || PIANO_VUOTO;
@@ -769,6 +813,92 @@
               };
           });
       }, []);
+
+      // --- IMPORTAZIONE SOCI DA FILE (Excel/CSV) ---
+      // Elabora le righe già lette dal file (array di array: [cognome, nome, dataNascita, ...])
+      // e costruisce un'anteprima da mostrare all'utente PRIMA di scrivere qualunque cosa
+      // nell'archivio: niente viene salvato finché non viene confermato esplicitamente.
+      const elaboraRigheImportazioneSoci = useCallback((righe) => {
+          if (!righe || righe.length === 0) {
+              alert("Il file sembra vuoto o non leggibile.");
+              return;
+          }
+          // Rileva ed esclude un'eventuale riga di intestazione: se la terza colonna della
+          // prima riga non contiene una data riconoscibile, la trattiamo come intestazione.
+          let startIdx = 0;
+          if (!estraiAnnoDaData(righe[0] ? righe[0][2] : '')) startIdx = 1;
+
+          const map = {};
+          let nuovi = 0, aggiornati = 0, scartati = 0;
+          const esempi = [];
+
+          for (let i = startIdx; i < righe.length; i++) {
+              const riga = righe[i] || [];
+              const cognome = (riga[0] || '').toString().trim();
+              const nomeProprio = (riga[1] || '').toString().trim();
+              const anno = estraiAnnoDaData(riga[2]);
+
+              if (!cognome && !nomeProprio) continue; // riga vuota: ignorata silenziosamente
+              if (!cognome || !nomeProprio) { scartati++; continue; }
+
+              const nomeCompleto = formattaNomeProprio(`${cognome} ${nomeProprio}`);
+              const key = nomeCompleto.toLowerCase().trim();
+              if (map[key]) continue; // doppione nel file stesso: teniamo la prima occorrenza
+
+              const esisteGia = archivioSoci[key];
+              map[key] = {
+                  nome: esisteGia ? esisteGia.nome : nomeCompleto,
+                  anno: anno || (esisteGia ? esisteGia.anno : ''),
+                  scadCertificato: esisteGia ? esisteGia.scadCertificato : ''
+              };
+
+              if (esisteGia) aggiornati++; else nuovi++;
+              if (esempi.length < 8) esempi.push({ nome: map[key].nome, anno: map[key].anno });
+          }
+
+          if (Object.keys(map).length === 0) {
+              alert("Non ho trovato righe valide da importare in questo file. Controlla che le colonne siano nell'ordine Cognome, Nome, Data di nascita.");
+              return;
+          }
+
+          setImportaSociPreview({ map, nuovi, aggiornati, scartati, esempi, totale: nuovi + aggiornati });
+      }, [archivioSoci]);
+
+      const gestisciFileSoci = (event) => {
+          const file = event.target.files[0];
+          if (!file) return;
+          const nomeFile = file.name.toLowerCase();
+          const reader = new FileReader();
+
+          if (nomeFile.endsWith('.csv')) {
+              reader.onload = (e) => elaboraRigheImportazioneSoci(parseCSV(e.target.result));
+              reader.readAsText(file, 'UTF-8');
+          } else {
+              reader.onload = (e) => {
+                  try {
+                      const wb = XLSX.read(e.target.result, { type: 'array' });
+                      const foglio = wb.Sheets[wb.SheetNames[0]];
+                      const righe = XLSX.utils.sheet_to_json(foglio, { header: 1, raw: true, defval: '' });
+                      elaboraRigheImportazioneSoci(righe);
+                  } catch (err) {
+                      console.error("Errore lettura file soci:", err);
+                      alert("Non riesco a leggere questo file. Assicurati che sia un file Excel (.xlsx/.xls) o CSV valido.");
+                  }
+              };
+              reader.readAsArrayBuffer(file);
+          }
+          event.target.value = null;
+      };
+
+      const confermaImportazioneSoci = () => {
+          if (!importaSociPreview) return;
+          setArchivioSoci(prev => ({ ...prev, ...importaSociPreview.map }));
+          mostraToast(`${importaSociPreview.totale} soci importati con successo!`);
+          setImportaSociPreview(null);
+          setIsExportMenuOpen(false);
+      };
+
+      const annullaImportazioneSoci = () => setImportaSociPreview(null);
 
       const tuttiCorsiSelect = useMemo(() => {
           const list = [];
@@ -2060,6 +2190,57 @@
             </div>
           )}
 
+          {/* --- MODALE ANTEPRIMA IMPORTAZIONE SOCI --- */}
+          {importaSociPreview && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
+                  <h3 className="font-bold text-lg flex items-center gap-2">Anteprima Importazione Soci</h3>
+                  <button onClick={annullaImportazioneSoci} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                </div>
+                <div className="p-5 flex flex-col gap-4 bg-slate-50 overflow-y-auto">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white border border-slate-200 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-slate-800">{importaSociPreview.totale}</div>
+                      <div className="text-[11px] uppercase font-semibold text-slate-500 tracking-wide">Totale</div>
+                    </div>
+                    <div className="bg-white border border-green-200 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-green-600">{importaSociPreview.nuovi}</div>
+                      <div className="text-[11px] uppercase font-semibold text-slate-500 tracking-wide">Nuovi</div>
+                    </div>
+                    <div className="bg-white border border-blue-200 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-blue-600">{importaSociPreview.aggiornati}</div>
+                      <div className="text-[11px] uppercase font-semibold text-slate-500 tracking-wide">Aggiornati</div>
+                    </div>
+                  </div>
+                  {importaSociPreview.scartati > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-700 rounded-lg p-3 text-sm">
+                      ⚠️ {importaSociPreview.scartati} righe scartate (mancava cognome o nome).
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-[11px] uppercase font-semibold text-slate-500 tracking-wide mb-1.5">Esempio (prime voci)</div>
+                    <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+                      {importaSociPreview.esempi.map((s, idx) => (
+                        <div key={idx} className="px-3 py-2 text-sm flex justify-between items-center">
+                          <span className="font-medium text-slate-700">{s.nome}</span>
+                          <span className="text-slate-400">{s.anno || '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Verranno salvati solo nome e anno di nascita. Il certificato medico va inserito a mano, come già fate ora; per i soci già presenti in archivio, un eventuale certificato già registrato non verrà toccato.
+                  </p>
+                </div>
+                <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 bg-white">
+                  <button onClick={annullaImportazioneSoci} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold transition-all">Annulla</button>
+                  <button onClick={confermaImportazioneSoci} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all">Conferma Importazione</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* --- MODALE AGGIUNGI CORSO --- */}
           {isAddModalOpen && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2706,6 +2887,11 @@
                       {isExportMenuOpen && (
                         <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 min-w-[220px] flex flex-col">
                           <button onClick={esportaExcel} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📊 Esporta in Excel / Fogli</button>
+                          <div className="h-px bg-slate-200 my-1"></div>
+                          <label className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium cursor-pointer">
+                            <UploadIcon size={16} /> Importa Soci (Excel/CSV)
+                            <input type="file" accept=".xlsx,.xls,.csv" onChange={gestisciFileSoci} className="hidden" />
+                          </label>
                           <div className="h-px bg-slate-200 my-1"></div>
                           <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
                           <label className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium cursor-pointer">
