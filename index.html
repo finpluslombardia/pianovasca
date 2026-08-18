@@ -560,17 +560,21 @@
       };
 
       useEffect(() => {
-        if (!user || !firebaseInstances) return;
+        // CORREZIONE CRITICA: non facciamo NULLA (nemmeno alzare la bandierina "modifiche in
+        // sospeso") finché il primo caricamento dei dati dal cloud non è completato. Prima,
+        // questo controllo veniva fatto DOPO aver già alzato la bandierina: lo stato vuoto di
+        // partenza (prima ancora di leggere Firestore) risultava sempre "diverso" dall'ultimo
+        // salvato (anch'esso vuoto all'avvio), quindi la bandierina veniva alzata comunque. Il
+        // guardiano nell'effetto di lettura cloud, vedendola alzata, rifiutava poi di applicare
+        // i dati reali appena letti da Firestore — e il salvataggio automatico, sbloccato subito
+        // dopo, finiva per scrivere lo stato ancora vuoto sopra ai dati reali, cancellandoli.
+        if (!user || !firebaseInstances || !isDataLoaded) return;
         const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita, arch: archivioSoci });
         if (currentStateStr === lastSavedPiano.current) return; 
         // Registriamo lo stato locale più recente e segnaliamo che c'è una modifica da salvare:
         // questo impedisce all'onSnapshot di sovrascriverla nel frattempo (vedi BUGFIX sopra).
-        // Alziamo il flag SEMPRE, anche se il caricamento cloud iniziale non è ancora completato:
-        // se l'utente inserisce un corso/utente nei primi istanti (prima che arrivi la prima
-        // lettura da Firestore), quella lettura non deve poter cancellare quanto appena inserito.
         ultimoStatoLocaleVisto.current = currentStateStr;
         hasModificheLocaliInSospeso.current = true;
-        if (!isDataLoaded) return; // Non salviamo ancora, ma il flag resta alzato
         const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita, archivioSoci), 1500);
         return () => clearTimeout(timer);
       }, [tuttiPiani, stagioni, stagionePredefinita, archivioSoci, user, firebaseInstances, isDataLoaded]);
