@@ -623,6 +623,23 @@
         return () => clearTimeout(timer);
       }, [tuttiPiani, stagioni, stagionePredefinita, archivioSoci, user, firebaseInstances, isDataLoaded]);
 
+      // --- AVVISO DI USCITA CON MODIFICHE NON SALVATE ---
+      // Il salvataggio è "debounced" (aspetta ~1,5s di inattività prima di scrivere su
+      // Firestore): se l'utente chiude o ricarica la pagina troppo in fretta dopo una modifica
+      // (es. subito dopo aver creato una nuova stagione), quella modifica rischia di non fare
+      // in tempo a salvarsi. Il browser mostrerà un avviso nativo in quel caso.
+      useEffect(() => {
+        const handleBeforeUnload = (e) => {
+          if (hasModificheLocaliInSospeso.current) {
+            e.preventDefault();
+            e.returnValue = '';
+            return '';
+          }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+      }, []);
+
       // --- CALCOLATORI DI TEMPO E VISTE ---
       const TIME_OPTIONS = useMemo(() => {
         const opts = [];
