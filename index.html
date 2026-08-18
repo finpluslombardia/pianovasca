@@ -106,6 +106,25 @@
       return (rif - Number(annoNascita)) >= 6;
     };
 
+    // --- ARCHIVIO SOCI PERMANENTE ---
+    // Costruisce l'archivio soci unendo tutti i partecipanti già presenti in TUTTE le stagioni
+    // salvate. Usata come migrazione automatica la prima volta (quando l'archivio non esiste
+    // ancora su Firestore), così i nomi già inseriti in passato non vanno ridigitati da capo.
+    const costruisciArchivioDaPiani = (tuttiPianiObj) => {
+      const map = {};
+      Object.values(tuttiPianiObj || {}).forEach(piano => {
+        Object.values(piano || {}).forEach(cell => {
+          (cell?.partecipanti || []).forEach(p => {
+            if (p && p.nome && p.nome.trim()) {
+              const key = p.nome.toLowerCase().trim();
+              map[key] = { nome: p.nome.trim(), anno: p.anno || '', scadCertificato: p.scadCertificato || '' };
+            }
+          });
+        });
+      });
+      return map;
+    };
+
     const getStartOfWeek = (date) => {
       const d = new Date(date);
       const day = d.getDay();
@@ -251,6 +270,8 @@
       const [stagioneSelezionata, setStagioneSelezionata] = useState('2025/2026');
       const [stagionePredefinita, setStagionePredefinita] = useState('2025/2026');
       const [tuttiPiani, setTuttiPiani] = useState({ '2025/2026': {} });
+      // Archivio soci permanente (indipendente dalla stagione): { [nomeMinuscolo]: {nome, anno, scadCertificato} }
+      const [archivioSoci, setArchivioSoci] = useState({});
       
       // Il piano corrente deriva dalla stagione selezionata
       const piano = tuttiPiani[stagioneSelezionata] || PIANO_VUOTO;
@@ -439,6 +460,12 @@
             if (data.tuttiPiani) {
               setTuttiPiani(data.tuttiPiani);
               
+              // Archivio soci permanente: se non esiste ancora su Firestore (prima attivazione
+              // della funzione), lo costruiamo automaticamente unendo tutti i partecipanti già
+              // presenti in tutte le stagioni salvate, così non si riparte da zero.
+              const archivioCaricato = data.archivioSoci || costruisciArchivioDaPiani(data.tuttiPiani);
+              setArchivioSoci(archivioCaricato);
+              
               let defaultSeason = data.stagionePredefinita;
               
               if (data.stagioni && data.stagioni.length > 0) {
@@ -465,8 +492,8 @@
                      return data.stagioni.includes(prev) ? prev : defaultSeason;
                  });
               }
-              // Salviamo anche l'ordine delle stagioni nel riferimento per riconoscerne le modifiche
-              lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni, def: defaultSeason });
+              // Salviamo anche l'ordine delle stagioni e l'archivio soci nel riferimento per riconoscerne le modifiche
+              lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni, def: defaultSeason, arch: archivioCaricato });
             } 
             // Migrazione automatica dal vecchio formato singolo a Stagioni
             else if (data.piano) {
@@ -484,6 +511,9 @@
               setStagioni([defaultSeason]);
               setStagionePredefinita(defaultSeason);
               
+              const archivioCaricato = data.archivioSoci || costruisciArchivioDaPiani(initialTuttiPiani);
+              setArchivioSoci(archivioCaricato);
+              
               // BUGFIX: vedi nota sopra, stessa correzione (catturare il valore prima di
               // aggiornare il ref, invece di leggerlo dentro la funzione di aggiornamento).
               const eraPrimoCaricamento = !initialLoadDone.current;
@@ -494,7 +524,7 @@
                   return prev;
               });
               
-              lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason], def: defaultSeason });
+              lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason], def: defaultSeason, arch: archivioCaricato });
             }
           }
         }, (error) => console.error("Errore sync Cloud:", error));
@@ -502,7 +532,7 @@
       }, [user, firebaseInstances]);
 
       // --- FUNZIONE DI SALVATAGGIO CLOUD ---
-      const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare, stagionePredef) => {
+      const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare, stagionePredef, archivioDaSalvare) => {
         if (!user || !firebaseInstances) {
             setStatoSalvataggio('error');
             setTimeout(() => setStatoSalvataggio('idle'), 4000);
@@ -512,8 +542,8 @@
         try {
             const { db, appId, doc, setDoc } = firebaseInstances;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
-            await setDoc(docRef, { tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, updatedAt: new Date().toISOString() });
-            const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef });
+            await setDoc(docRef, { tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, archivioSoci: archivioDaSalvare, updatedAt: new Date().toISOString() });
+            const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef, arch: archivioDaSalvare });
             lastSavedPiano.current = statoAppenaSalvato;
             // Abbassiamo il flag "modifiche in sospeso" solo se, durante il salvataggio (che è
             // asincrono), l'utente non ha nel frattempo fatto altre modifiche: in tal caso il
@@ -531,7 +561,7 @@
 
       useEffect(() => {
         if (!user || !firebaseInstances) return;
-        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita });
+        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita, arch: archivioSoci });
         if (currentStateStr === lastSavedPiano.current) return; 
         // Registriamo lo stato locale più recente e segnaliamo che c'è una modifica da salvare:
         // questo impedisce all'onSnapshot di sovrascriverla nel frattempo (vedi BUGFIX sopra).
@@ -541,9 +571,9 @@
         ultimoStatoLocaleVisto.current = currentStateStr;
         hasModificheLocaliInSospeso.current = true;
         if (!isDataLoaded) return; // Non salviamo ancora, ma il flag resta alzato
-        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita), 1500);
+        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita, archivioSoci), 1500);
         return () => clearTimeout(timer);
-      }, [tuttiPiani, stagioni, stagionePredefinita, user, firebaseInstances, isDataLoaded]);
+      }, [tuttiPiani, stagioni, stagionePredefinita, archivioSoci, user, firebaseInstances, isDataLoaded]);
 
       // --- CALCOLATORI DI TEMPO E VISTE ---
       const TIME_OPTIONS = useMemo(() => {
@@ -695,6 +725,47 @@
           return Array.from(map.values()).sort((a,b) => a.nome.localeCompare(b.nome));
       }, [piano]);
 
+      // Lista per l'autocompletamento nomi: unione dell'archivio soci permanente (tutte le
+      // stagioni) e degli iscritti della stagione corrente, deduplicata per nome.
+      const listaAutocompletamentoSoci = useMemo(() => {
+          const map = new Map();
+          Object.values(archivioSoci).forEach(u => {
+              if (u && u.nome) map.set(u.nome.toLowerCase().trim(), u);
+          });
+          tuttiUtentiUnici.forEach(u => {
+              const key = u.nome.toLowerCase().trim();
+              if (u && u.nome && !map.has(key)) map.set(key, u);
+          });
+          return Array.from(map.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+      }, [archivioSoci, tuttiUtentiUnici]);
+
+      // Cerca un socio già noto (per nome, senza distinguere maiuscole/spazi) nell'archivio
+      // permanente o, in mancanza, tra gli iscritti della stagione corrente.
+      const cercaSocioArchivio = useCallback((val) => {
+          if (!val) return null;
+          const key = val.toLowerCase().trim();
+          return archivioSoci[key] || tuttiUtentiUnici.find(u => u.nome.toLowerCase().trim() === key) || null;
+      }, [archivioSoci, tuttiUtentiUnici]);
+
+      // Crea o aggiorna la scheda di un socio nell'archivio permanente. Se l'anno di nascita o
+      // il certificato vengono lasciati vuoti, mantiene il valore già presente in archivio
+      // invece di cancellarlo: evita di perdere dati già noti per una semplice dimenticanza.
+      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato) => {
+          if (!nome || !nome.trim()) return;
+          const key = nome.toLowerCase().trim();
+          setArchivioSoci(prev => {
+              const esistente = prev[key];
+              return {
+                  ...prev,
+                  [key]: {
+                      nome: nome.trim(),
+                      anno: anno || (esistente ? esistente.anno : '') || '',
+                      scadCertificato: scadCertificato || (esistente ? esistente.scadCertificato : '') || ''
+                  }
+              };
+          });
+      }, []);
+
       const tuttiCorsiSelect = useMemo(() => {
           const list = [];
           Object.keys(piano).forEach(k => {
@@ -803,6 +874,10 @@
         
         const iscrizioniPulite = (addUtenteRapido.iscrizioni || []).filter(i => i.inizio || i.fine);
         let corsiNonPiuDisponibili = 0;
+        
+        // Archivio soci permanente: memorizziamo/aggiorniamo questo socio così non andrà
+        // ridigitato da capo la prossima volta (anche in un'altra stagione).
+        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato);
         
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
@@ -1094,6 +1169,13 @@
             finalPartecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
         }
         
+        // Archivio soci permanente: aggiorniamo la scheda di ogni iscritto di questo corso,
+        // così i loro dati (anno, certificato) restano disponibili per l'autocompletamento
+        // anche in altre stagioni o altri corsi, senza doverli ridigitare.
+        finalPartecipanti.forEach(p => {
+            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato);
+        });
+        
         setTuttiPiani(prevTutti => {
           const prevSeason = prevTutti[stagioneSelezionata] || {};
           const nuovoPiano = { ...prevSeason };
@@ -1180,7 +1262,7 @@
 
         // Colonne vuote numerate per segnare le presenze a mano
         const NUM_COLONNE_PRESENZE = 20;
-        const colonnePresenzeHeader = Array.from({ length: NUM_COLONNE_PRESENZE }, (_, i) => `<th class="presenza">${i + 1}</th>`).join('');
+        const colonnePresenzeHeader = `<th class="presenza"></th>`.repeat(NUM_COLONNE_PRESENZE);
         const colonnePresenzeBody = `<td class="presenza"></td>`.repeat(NUM_COLONNE_PRESENZE);
 
         // Stampiamo solo i partecipanti attivi nella settimana in cui ci troviamo!
@@ -1207,13 +1289,13 @@
                 body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 h1 { margin: 0 0 5px 0; font-size: 22px; color: #0f172a; }
                 h3 { margin: 0 0 5px 0; color: #64748b; font-weight: 500; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; line-height: 1.5; }
-                table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
-                th, td { border: 1px solid #cbd5e1; padding: 8px 6px; text-align: left; overflow: hidden; }
+                table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                th, td { border: 1px solid #64748b; padding: 8px 6px; text-align: left; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 th { background-color: #e2e8f0 !important; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 10px; }
                 td { color: #334155; }
                 th.presenza, td.presenza { padding: 8px 2px; text-align: center; }
                 td.presenza { height: 26px; }
-                .print-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-bottom: 8px; }
+                .print-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #64748b; padding-bottom: 8px; margin-bottom: 8px; }
               </style>
             </head>
             <body>
@@ -1848,7 +1930,7 @@
                                 placeholder="Inizia a scrivere il nome..."
                                 onChange={e => {
                                     const val = e.target.value;
-                                    const existing = tuttiUtentiUnici.find(u => u.nome.toLowerCase() === val.toLowerCase().trim());
+                                    const existing = cercaSocioArchivio(val);
                                     if (existing) {
                                         setAddUtenteRapido({
                                             ...addUtenteRapido, 
@@ -2292,7 +2374,7 @@
                                     placeholder="Inizia a scrivere..."
                                     onChange={e => {
                                         const val = e.target.value;
-                                        const existing = tuttiUtentiUnici.find(u => u.nome.toLowerCase() === val.toLowerCase().trim());
+                                        const existing = cercaSocioArchivio(val);
                                         if (existing && editingPartecipanteIndex === null) {
                                             setNuovoPartecipante({
                                                 ...nuovoPartecipante, 
@@ -2783,7 +2865,7 @@
 
           {/* DATALIST PER AUTOSUGGERIMENTO UTENTI */}
           <datalist id="utenti-list">
-            {tuttiUtentiUnici.map((u, idx) => <option key={idx} value={u.nome} />)}
+            {listaAutocompletamentoSoci.map((u, idx) => <option key={idx} value={u.nome} />)}
           </datalist>
 
           {/* POPUP DI CONFERMA (TOAST) */}
