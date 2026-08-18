@@ -1607,7 +1607,7 @@
                                                                     )}
                                                                   </div>
 
-                                                                  {corso.durata > 30 && (
+                                                                  {corso.durata >= 30 && (
                                                                     <div className="w-full bg-black/10 border-t border-white/30 py-0.5 px-1.5 flex justify-between items-center text-[11px] font-medium shrink-0">
                                                                       <span className="truncate pr-1 hide-on-pdf">{nomeLivello ? infoAttivita?.name : ''}</span>
                                                                       <span className="truncate pr-1 show-on-pdf">{nomeLivello ? nomeBrev : ''}</span>
