@@ -216,6 +216,26 @@
 
     // --- CONFIGURAZIONE INIZIALE ---
     const GIORNI = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+
+    // Periodi di iscrizione preimpostati (stagione 2026/2027), selezionabili con un click
+    // invece di doverli scrivere a mano ogni volta.
+    const PRESET_ISCRIZIONI = [
+      { label: '14/09/2026 - 27/01/2027', inizio: '2026-09-14', fine: '2027-01-27' },
+      { label: '14/09/2026 - 01/06/2027', inizio: '2026-09-14', fine: '2027-06-01' },
+      { label: '28/01/2027 - 01/06/2027', inizio: '2027-01-28', fine: '2027-06-01' },
+    ];
+    // Applica un preset alla prima riga vuota (Dal e Al entrambi vuoti); se non ce n'è
+    // nessuna, aggiunge una nuova riga con i valori del preset.
+    const applicaPresetIscrizione = (iscrizioniAttuali, preset) => {
+      const lista = [...(iscrizioniAttuali && iscrizioniAttuali.length > 0 ? iscrizioniAttuali : [{ inizio: '', fine: '' }])];
+      const idxVuoto = lista.findIndex(isc => !isc.inizio && !isc.fine);
+      if (idxVuoto !== -1) {
+        lista[idxVuoto] = { inizio: preset.inizio, fine: preset.fine };
+      } else {
+        lista.push({ inizio: preset.inizio, fine: preset.fine });
+      }
+      return lista;
+    };
     const ORE_INIZIO = 6;  
     const MINUTI_INIZIO = 0;
     const ORE_FINE = 22;   
@@ -2113,6 +2133,18 @@
                              <label className="block text-sm font-semibold text-slate-700">Periodi Iscrizione <span className="normal-case text-[10px] font-normal text-slate-400">(Si allineano a Lun/Dom)</span></label>
                              <button type="button" onClick={() => setAddUtenteRapido({...addUtenteRapido, iscrizioni: [...(addUtenteRapido.iscrizioni || []), {inizio:'', fine:''}]})} className="text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg font-bold transition-colors flex items-center gap-1"><PlusIcon size={14}/> Aggiungi Periodo</button>
                            </div>
+                           <div className="flex flex-wrap gap-2 mb-3">
+                             {PRESET_ISCRIZIONI.map((preset, pIdx) => (
+                               <button
+                                 key={pIdx}
+                                 type="button"
+                                 onClick={() => setAddUtenteRapido({...addUtenteRapido, iscrizioni: applicaPresetIscrizione(addUtenteRapido.iscrizioni, preset)})}
+                                 className="text-xs bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-600 px-3 py-1.5 rounded-full font-semibold transition-colors border border-slate-200"
+                               >
+                                 {preset.label}
+                               </button>
+                             ))}
+                           </div>
                            <div className="flex flex-col gap-3">
                              {(addUtenteRapido.iscrizioni || [{inizio:'', fine:''}]).map((isc, idx) => (
                                 <div key={idx} className="flex gap-2 items-center">
@@ -2606,6 +2638,18 @@
                                <div className="flex justify-between items-center mb-2">
                                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">Periodi Iscrizione</label>
                                  <button type="button" onClick={() => setNuovoPartecipante({...nuovoPartecipante, iscrizioni: [...(nuovoPartecipante.iscrizioni || []), {inizio:'', fine:''}]})} className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded font-bold transition-colors flex items-center gap-1"><PlusIcon size={12}/> Aggiungi Periodo</button>
+                               </div>
+                               <div className="flex flex-wrap gap-1.5 mb-2">
+                                 {PRESET_ISCRIZIONI.map((preset, pIdx) => (
+                                   <button
+                                     key={pIdx}
+                                     type="button"
+                                     onClick={() => setNuovoPartecipante({...nuovoPartecipante, iscrizioni: applicaPresetIscrizione(nuovoPartecipante.iscrizioni, preset)})}
+                                     className="text-[11px] bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-600 px-2 py-1 rounded-full font-semibold transition-colors border border-slate-200"
+                                   >
+                                     {preset.label}
+                                   </button>
+                                 ))}
                                </div>
                                <div className="flex flex-col gap-2">
                                  {(nuovoPartecipante.iscrizioni || [{inizio:'', fine:''}]).map((isc, idx) => (
