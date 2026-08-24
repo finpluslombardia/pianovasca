@@ -1600,12 +1600,12 @@
                         if (nomeLivello) {
                           const mostraSoloNome = (info.id === 'acquagym' || info.id === 'propaganda' || info.isFreeTextLevel || livelloInfo?.noNumero);
                           const titoloTesto = mostraSoloNome ? nomeLivello : `Liv. ${cell.corso.data.livello} - ${nomeLivello}`;
-                          testoSfondo += `<span style="font-size:10pt; font-weight:normal;">${titoloTesto}</span><br>`;
+                          testoSfondo += `<span style="font-size:10pt; font-weight:bold;">${titoloTesto}</span><br>`;
                         } else {
-                          testoSfondo += `<span style="font-size:10pt; font-weight:normal;">${info ? info.name : ''}</span><br>`;
+                          testoSfondo += `<span style="font-size:10pt; font-weight:bold;">${info ? info.name : ''}</span><br>`;
                         }
                         
-                        if(cell.corso.data.istruttore) testoSfondo += `<span style="font-size:9pt; font-style:italic;">${cell.corso.data.istruttore}</span><br>`;
+                        if(cell.corso.data.istruttore) testoSfondo += `<span style="font-size:10pt; font-style:italic;">${cell.corso.data.istruttore}</span><br>`;
                         // BUGFIX/RICHIESTA: rimosse le emoji ⏱/👤 (rese in modo incoerente da Excel/Sheets
                         // a seconda del font di sistema) a favore di un testo semplice e uniforme.
                         let infoRiga = `${cell.corso.durata} min`;
