@@ -1148,51 +1148,41 @@
         const nomeAttivitaFiltro = filtroScadenzeAttivita ? (attivita.find(a => a.id === filtroScadenzeAttivita)?.name || '') : '';
         const sottotitoloFiltri = [nomeGiornoFiltro, nomeAttivitaFiltro].filter(Boolean).join(' · ') || 'Tutti i corsi, tutti i giorni';
 
-        const rigaTabella = (u, tipo) => `
+        const rigaTabella = (u) => `
           <tr>
             <td>${u.nome}</td>
             <td>${(u.corsi || []).map(co => co.testo).join(', ')}</td>
-            <td style="text-align:right; font-weight:bold; color:${tipo === 'scaduto' ? '#dc2626' : '#c2410c'};">${tipo === 'scaduto' ? 'Scaduto il' : 'Scade il'} ${formatDate(u.scadCertificato)}</td>
+            <td style="text-align:right; font-weight:bold; color:#dc2626;">Scaduto il ${formatDate(u.scadCertificato)}</td>
           </tr>
         `;
 
         printWindow.document.write(`
           <html>
             <head>
-              <title>Scadenze Certificati Medici</title>
+              <title>Certificati Medici Scaduti</title>
               <style>
                 @page { size: A4 portrait; margin: 15mm; }
-                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                h1 { margin: 0 0 4px 0; font-size: 22px; color: #0f172a; }
-                h3 { margin: 0 0 16px 0; color: #64748b; font-weight: 500; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
-                h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #64748b; }
-                h2.scaduti { color: #dc2626; }
-                h2.in-scadenza { color: #c2410c; }
-                table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
-                th, td { border: 1px solid #64748b; padding: 6px 8px; text-align: left; }
-                th { background-color: #e2e8f0 !important; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 10px; }
-                .empty { color: #94a3b8; font-style: italic; font-size: 12px; margin-bottom: 8px; }
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; font-size: 10pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                h1 { margin: 0 0 4px 0; font-size: 18pt; color: #0f172a; }
+                h3 { margin: 0 0 16px 0; color: #64748b; font-weight: 500; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px; }
+                h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #64748b; color: #dc2626; }
+                table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 8px; }
+                th, td { border: 1px solid #64748b; padding: 6px 8px; text-align: left; font-size: 10pt; }
+                th { background-color: #e2e8f0 !important; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 9pt; }
+                .empty { color: #94a3b8; font-style: italic; font-size: 10pt; margin-bottom: 8px; }
               </style>
             </head>
             <body>
-              <h1>Scadenze Certificati Medici</h1>
+              <h1>Certificati Medici Scaduti</h1>
               <h3>${sottotitoloFiltri}</h3>
 
-              <h2 class="scaduti">Certificati Scaduti (${scadenzeScadutiFiltrati.length})</h2>
+              <h2>Certificati Scaduti (${scadenzeScadutiFiltrati.length})</h2>
               ${scadenzeScadutiFiltrati.length > 0 ? `
                 <table>
                   <thead><tr><th style="width:25%;">Nominativo</th><th style="width:45%;">Corsi</th><th style="width:30%;">Scadenza</th></tr></thead>
-                  <tbody>${scadenzeScadutiFiltrati.map(u => rigaTabella(u, 'scaduto')).join('')}</tbody>
+                  <tbody>${scadenzeScadutiFiltrati.map(u => rigaTabella(u)).join('')}</tbody>
                 </table>
               ` : `<div class="empty">Nessun certificato scaduto.</div>`}
-
-              <h2 class="in-scadenza">In Scadenza nei prossimi 30 giorni (${scadenzeInScadenzaFiltrati.length})</h2>
-              ${scadenzeInScadenzaFiltrati.length > 0 ? `
-                <table>
-                  <thead><tr><th style="width:25%;">Nominativo</th><th style="width:45%;">Corsi</th><th style="width:30%;">Scadenza</th></tr></thead>
-                  <tbody>${scadenzeInScadenzaFiltrati.map(u => rigaTabella(u, 'scadenza')).join('')}</tbody>
-                </table>
-              ` : `<div class="empty">Nessun certificato in scadenza nei prossimi 30 giorni.</div>`}
 
               <script>
                 window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }
