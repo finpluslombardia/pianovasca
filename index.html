@@ -89,6 +89,8 @@
     const StarIcon = (p) => <Icon {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Icon>;
     const AlertCircleIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Icon>;
     const ClipboardListIcon = (p) => <Icon {...p}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="9.01" y2="12"/><line x1="13" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="9.01" y2="16"/><line x1="13" y1="16" x2="15" y2="16"/></Icon>;
+    const CheckCircleIcon = (p) => <Icon {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></Icon>;
+    const RotateCcwIcon = (p) => <Icon {...p}><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></Icon>;
     const PhoneIcon = (p) => <Icon {...p}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></Icon>;
     const MailIcon = (p) => <Icon {...p}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></Icon>;
 
@@ -391,11 +393,12 @@
       const [editandoContattoAttesaId, setEditandoContattoAttesaId] = useState(null);
       const [isFormAttesaOpen, setIsFormAttesaOpen] = useState(false);
       const [dettaglioContattoAttesa, setDettaglioContattoAttesa] = useState(null);
+      const [isCompletatiOpen, setIsCompletatiOpen] = useState(false);
       const creaContattoAttesaVuoto = () => ({
         nome: '', eta: '', telefono: '', email: '', nomeGenitore: '',
         dataCreazione: new Date().toISOString().split('T')[0], dataScadenza: '',
         motivazione: '', corsoRichiesto: '', note: '',
-        operatore: '', andrea: '', istruttore: ''
+        operatore: '', andrea: '', istruttore: '', completato: false
       });
       const [nuovoContattoAttesa, setNuovoContattoAttesa] = useState(creaContattoAttesaVuoto());
 
@@ -1009,10 +1012,25 @@
         setIsFormAttesaOpen(false);
       };
 
+      const segnaCompletatoContatto = (id) => {
+        setListaAttesa(prev => prev.map(c => c.id === id ? { ...c, completato: true } : c));
+        if (dettaglioContattoAttesa && dettaglioContattoAttesa.id === id) setDettaglioContattoAttesa(null);
+        mostraToast("Contatto segnato come completato!");
+      };
+
+      const riattivaContatto = (id) => {
+        setListaAttesa(prev => prev.map(c => c.id === id ? { ...c, completato: false } : c));
+        if (dettaglioContattoAttesa && dettaglioContattoAttesa.id === id) setDettaglioContattoAttesa(null);
+        mostraToast("Contatto riportato in lista d'attesa.");
+      };
+
+      const contattiAttesaAttivi = useMemo(() => listaAttesa.filter(c => !c.completato), [listaAttesa]);
+      const contattiAttesaCompletati = useMemo(() => listaAttesa.filter(c => c.completato), [listaAttesa]);
+
       const contattiAttesaScaduti = useMemo(() => {
         const oggi = new Date();
         oggi.setHours(0,0,0,0);
-        return listaAttesa.filter(c => c.dataScadenza && new Date(c.dataScadenza) < oggi).length;
+        return listaAttesa.filter(c => !c.completato && c.dataScadenza && new Date(c.dataScadenza) < oggi).length;
       }, [listaAttesa]);
 
       const tuttiCorsiSelect = useMemo(() => {
@@ -2107,8 +2125,13 @@
                 <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center gap-3">
                   <h3 className="font-bold text-xl flex items-center gap-2"><ClipboardListIcon size={24}/> Lista d'Attesa</h3>
                   <div className="flex items-center gap-2">
-                    <button onClick={apriNuovoContattoAttesa} className="flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 rounded-lg text-sm font-bold transition-colors">
-                      <PlusIcon size={16}/> Nuovo Contatto
+                    {!isCompletatiOpen && (
+                      <button onClick={apriNuovoContattoAttesa} className="flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 rounded-lg text-sm font-bold transition-colors">
+                        <PlusIcon size={16}/> Nuovo Contatto
+                      </button>
+                    )}
+                    <button onClick={() => setIsCompletatiOpen(!isCompletatiOpen)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-colors ${isCompletatiOpen ? 'bg-white text-slate-800' : 'bg-white/15 hover:bg-white/25'}`}>
+                      {isCompletatiOpen ? <><ClipboardListIcon size={16}/> Attivi</> : <><CheckCircleIcon size={16}/> Completati ({contattiAttesaCompletati.length})</>}
                     </button>
                     <button onClick={() => setIsListaAttesaOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                   </div>
@@ -2118,10 +2141,10 @@
                   {/* ELENCO CONTATTI */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center sticky top-0">
-                      <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Contatti in Attesa</h4>
-                      <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{listaAttesa.length}</span>
+                      <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">{isCompletatiOpen ? 'Contatti Completati' : 'Contatti in Attesa'}</h4>
+                      <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{isCompletatiOpen ? contattiAttesaCompletati.length : contattiAttesaAttivi.length}</span>
                     </div>
-                    {listaAttesa.length > 0 ? (
+                    {(isCompletatiOpen ? contattiAttesaCompletati : contattiAttesaAttivi).length > 0 ? (
                       <div className="max-h-[60vh] overflow-y-auto">
                         <table className="w-full text-left text-sm">
                           <thead>
@@ -2135,12 +2158,12 @@
                             </tr>
                           </thead>
                           <tbody>
-                            {listaAttesa.map(c => {
+                            {(isCompletatiOpen ? contattiAttesaCompletati : contattiAttesaAttivi).map(c => {
                               const scaduto = c.dataScadenza && new Date(c.dataScadenza) < new Date(new Date().setHours(0,0,0,0));
                               const infoCorso = c.motivazione === 'corso' ? attivita.find(a => a.id === c.corsoRichiesto) : null;
                               const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Corso: ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
                               return (
-                                <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                                <tr key={c.id} className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors ${c.completato ? 'opacity-60' : ''}`}>
                                   <td className="p-3">
                                     <button type="button" onClick={() => setDettaglioContattoAttesa(c)} className="font-semibold text-blue-700 hover:underline text-left">{c.nome}</button>
                                   </td>
@@ -2153,6 +2176,11 @@
                                   </td>
                                   <td className="p-3">
                                     <div className="flex items-center justify-center gap-2">
+                                      {isCompletatiOpen ? (
+                                        <button type="button" onClick={() => riattivaContatto(c.id)} title="Riattiva" className="text-amber-500 hover:text-amber-700 transition-colors p-1.5 bg-amber-50 hover:bg-amber-100 rounded-md"><RotateCcwIcon size={16}/></button>
+                                      ) : (
+                                        <button type="button" onClick={() => segnaCompletatoContatto(c.id)} title="Segna come completato" className="text-green-500 hover:text-green-700 transition-colors p-1.5 bg-green-50 hover:bg-green-100 rounded-md"><CheckCircleIcon size={16}/></button>
+                                      )}
                                       <button type="button" onClick={() => avviaModificaContattoAttesa(c)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
                                       <button type="button" onClick={() => eliminaContattoAttesa(c.id)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
                                     </div>
@@ -2164,7 +2192,7 @@
                         </table>
                       </div>
                     ) : (
-                      <div className="p-6 text-center text-slate-500 text-sm">Nessun contatto in lista d'attesa.</div>
+                      <div className="p-6 text-center text-slate-500 text-sm">{isCompletatiOpen ? 'Nessun contatto completato.' : 'Nessun contatto in lista d\'attesa.'}</div>
                     )}
                   </div>
 
