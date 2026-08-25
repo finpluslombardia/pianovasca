@@ -394,7 +394,8 @@
       const creaContattoAttesaVuoto = () => ({
         nome: '', eta: '', telefono: '', email: '', nomeGenitore: '',
         dataCreazione: new Date().toISOString().split('T')[0], dataScadenza: '',
-        motivazione: '', corsoRichiesto: '', note: ''
+        motivazione: '', corsoRichiesto: '', note: '',
+        operatore: '', andrea: '', istruttore: ''
       });
       const [nuovoContattoAttesa, setNuovoContattoAttesa] = useState(creaContattoAttesaVuoto());
 
@@ -2219,6 +2220,18 @@
                         <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Data Scadenza</div>
                         <div className={`text-sm font-bold ${scaduto ? 'text-red-600' : 'text-slate-700'}`}>{c.dataScadenza ? formatDate(c.dataScadenza) : '-'}{scaduto && ' (da ricontattare)'}</div>
                       </div>
+                      <div>
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Operatore</div>
+                        <div className="text-sm text-slate-700">{c.operatore || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Istruttore</div>
+                        <div className="text-sm text-slate-700">{c.istruttore || '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Andrea da informare?</div>
+                        <div className="text-sm text-slate-700">{c.andrea === 'si' ? 'Sì' : c.andrea === 'no' ? 'No' : '-'}</div>
+                      </div>
                     </div>
                     <div>
                       <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">Note</div>
@@ -2277,6 +2290,22 @@
                     <div>
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Data Scadenza</label>
                       <input type="date" value={nuovoContattoAttesa.dataScadenza} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, dataScadenza: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"/>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Operatore</label>
+                      <input type="text" value={nuovoContattoAttesa.operatore} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, operatore: e.target.value})} placeholder="Chi ha creato il contatto" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"/>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Istruttore</label>
+                      <input type="text" value={nuovoContattoAttesa.istruttore} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, istruttore: e.target.value})} placeholder="Istruttore di riferimento" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"/>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Andrea <span className="normal-case font-normal text-slate-400">(da informare?)</span></label>
+                      <select value={nuovoContattoAttesa.andrea} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, andrea: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
+                        <option value="">-- Seleziona --</option>
+                        <option value="si">Sì</option>
+                        <option value="no">No</option>
+                      </select>
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Motivazione</label>
