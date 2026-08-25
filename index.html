@@ -389,6 +389,7 @@
       const [listaAttesa, setListaAttesa] = useState([]);
       const [isListaAttesaOpen, setIsListaAttesaOpen] = useState(false);
       const [editandoContattoAttesaId, setEditandoContattoAttesaId] = useState(null);
+      const [showFormAttesa, setShowFormAttesa] = useState(false);
       const creaContattoAttesaVuoto = () => ({
         nome: '', eta: '', telefono: '', email: '', nomeGenitore: '',
         dataCreazione: new Date().toISOString().split('T')[0], dataScadenza: '',
@@ -406,7 +407,6 @@
       const [password, setPassword] = useState('');
       const [loginError, setLoginError] = useState('');
       const [statoSalvataggio, setStatoSalvataggio] = useState('idle');
-      const [confermaSvuota, setConfermaSvuota] = useState(false);
       const [confermaEliminaStagione, setConfermaEliminaStagione] = useState(false);
       const [firebaseInstances, setFirebaseInstances] = useState(null);
       const [isDataLoaded, setIsDataLoaded] = useState(false); // Sblocca il salvataggio automatico solo dopo la prima lettura cloud
@@ -973,11 +973,15 @@
         }
         setNuovoContattoAttesa(creaContattoAttesaVuoto());
         setEditandoContattoAttesaId(null);
+        // Chiudiamo il pannello del form dopo il salvataggio: così l'elenco qui sotto, con il
+        // contatto appena aggiunto/aggiornato, resta subito visibile senza dover scorrere oltre il form.
+        setShowFormAttesa(false);
       };
 
       const avviaModificaContattoAttesa = (contatto) => {
         setNuovoContattoAttesa({ ...contatto });
         setEditandoContattoAttesaId(contatto.id);
+        setShowFormAttesa(true);
       };
 
       const eliminaContattoAttesa = (id) => {
@@ -985,6 +989,7 @@
         if (editandoContattoAttesaId === id) {
           setNuovoContattoAttesa(creaContattoAttesaVuoto());
           setEditandoContattoAttesaId(null);
+          setShowFormAttesa(false);
         }
         mostraToast("Contatto rimosso.");
       };
@@ -992,6 +997,7 @@
       const annullaModificaContattoAttesa = () => {
         setNuovoContattoAttesa(creaContattoAttesaVuoto());
         setEditandoContattoAttesaId(null);
+        setShowFormAttesa(false);
       };
 
       const contattiAttesaScaduti = useMemo(() => {
@@ -1753,16 +1759,6 @@
         event.target.value = null;
       };
 
-      const svuotaPiano = () => {
-        if (!confermaSvuota) {
-          setConfermaSvuota(true);
-          setTimeout(() => setConfermaSvuota(false), 3000);
-          return;
-        }
-        setTuttiPiani(prev => ({ ...prev, [stagioneSelezionata]: {} }));
-        setConfermaSvuota(false);
-      };
-
       const eliminaStagione = () => {
         if (stagioni.length === 1) return; // Non elimina se c'è una sola stagione
         
@@ -2105,11 +2101,28 @@
                 </div>
                 <div className="overflow-y-auto flex-1 bg-slate-50 p-6 flex flex-col gap-6" style={{ minHeight: '300px' }}>
 
-                  {/* FORM INSERIMENTO/MODIFICA CONTATTO */}
-                  <form onSubmit={salvaContattoAttesa} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                    <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
-                      {editandoContattoAttesaId ? <><EditIcon size={16}/> Modifica Contatto</> : <><PlusIcon size={16}/> Nuovo Contatto</>}
-                    </h4>
+                  {/* FORM INSERIMENTO/MODIFICA CONTATTO (collassabile) */}
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div
+                      className={`p-4 flex justify-between items-center cursor-pointer select-none transition-colors ${showFormAttesa ? 'bg-slate-50 border-b border-slate-200' : 'hover:bg-slate-50'}`}
+                      onClick={() => {
+                        if (editandoContattoAttesaId !== null) {
+                          annullaModificaContattoAttesa();
+                        } else {
+                          setShowFormAttesa(!showFormAttesa);
+                        }
+                      }}
+                    >
+                      <h4 className={`text-sm font-bold flex items-center gap-2 ${showFormAttesa ? 'text-blue-700' : 'text-slate-800'}`}>
+                        {editandoContattoAttesaId ? <EditIcon size={18}/> : <PlusIcon size={18} className={`transition-transform duration-200 ${showFormAttesa ? 'rotate-45' : ''}`}/>}
+                        {editandoContattoAttesaId ? 'Modifica Contatto' : 'Nuovo Contatto'}
+                      </h4>
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${showFormAttesa ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 hover:bg-blue-200 text-blue-700'}`}>
+                        {editandoContattoAttesaId ? 'Annulla Modifica' : (showFormAttesa ? 'Chiudi' : 'Apri')}
+                      </span>
+                    </div>
+                    {showFormAttesa && (
+                    <form onSubmit={salvaContattoAttesa} className="p-5 animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                       <div className="sm:col-span-3">
                         <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Nominativo</label>
@@ -2170,7 +2183,9 @@
                         <CheckIcon size={16}/> {editandoContattoAttesaId ? 'Aggiorna Contatto' : 'Aggiungi alla Lista'}
                       </button>
                     </div>
-                  </form>
+                    </form>
+                    )}
+                  </div>
 
                   {/* ELENCO CONTATTI */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -3181,8 +3196,6 @@
                       )}
                     </div>
 
-                    <button onClick={svuotaPiano} className="flex items-center gap-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-medium transition-colors min-w-[100px] justify-center"><Trash2Icon size={16} /> {confermaSvuota ? "Sicuro?" : "Svuota"}</button>
-                    <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
                     <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci"><LogOutIcon size={16} /></button>
                   </div>
                 </div>
