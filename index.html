@@ -88,6 +88,9 @@
     const ArrowDownIcon = (p) => <Icon {...p}><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></Icon>;
     const StarIcon = (p) => <Icon {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></Icon>;
     const AlertCircleIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></Icon>;
+    const ClipboardListIcon = (p) => <Icon {...p}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="9.01" y2="12"/><line x1="13" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="9.01" y2="16"/><line x1="13" y1="16" x2="15" y2="16"/></Icon>;
+    const PhoneIcon = (p) => <Icon {...p}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></Icon>;
+    const MailIcon = (p) => <Icon {...p}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></Icon>;
 
     // --- UTILITY DATE PER PARTECIPANTI E CALENDARIO ---
     const isScaduto = (dateStr) => {
@@ -382,6 +385,17 @@
       // --- STATI GESTIONE SCADENZE ---
       const [isScadenzeModalOpen, setIsScadenzeModalOpen] = useState(false);
 
+      // --- STATI LISTA D'ATTESA (contatti da ricontattare, indipendente dal piano vasca) ---
+      const [listaAttesa, setListaAttesa] = useState([]);
+      const [isListaAttesaOpen, setIsListaAttesaOpen] = useState(false);
+      const [editandoContattoAttesaId, setEditandoContattoAttesaId] = useState(null);
+      const creaContattoAttesaVuoto = () => ({
+        nome: '', eta: '', telefono: '', email: '', nomeGenitore: '',
+        dataCreazione: new Date().toISOString().split('T')[0], dataScadenza: '',
+        motivazione: '', corsoRichiesto: '', note: ''
+      });
+      const [nuovoContattoAttesa, setNuovoContattoAttesa] = useState(creaContattoAttesaVuoto());
+
       // --- STATI GESTIONE STAGIONI ---
       const [isGestioneStagioniOpen, setIsGestioneStagioniOpen] = useState(false);
 
@@ -416,7 +430,7 @@
 
       // --- BLOCCO SCORRIMENTO SFONDO ---
       useEffect(() => {
-          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen;
+          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen;
           if (isAnyModalOpen) {
               document.body.style.overflow = 'hidden';
           } else {
@@ -425,7 +439,7 @@
           return () => {
               document.body.style.overflow = '';
           };
-      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen]);
+      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen, isListaAttesaOpen]);
 
       const partecipantiAttiviModal = useMemo(() => {
           return editModal ? (editModal.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)) : [];
@@ -530,6 +544,9 @@
               const archivioCaricato = data.archivioSoci || costruisciArchivioDaPiani(data.tuttiPiani);
               setArchivioSoci(archivioCaricato);
               
+              // Lista d'attesa (contatti da ricontattare): indipendente dalle stagioni.
+              setListaAttesa(data.listaAttesa || []);
+              
               let defaultSeason = data.stagionePredefinita;
               
               if (data.stagioni && data.stagioni.length > 0) {
@@ -557,7 +574,7 @@
                  });
               }
               // Salviamo anche l'ordine delle stagioni e l'archivio soci nel riferimento per riconoscerne le modifiche
-              lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni, def: defaultSeason, arch: archivioCaricato });
+              lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni, def: defaultSeason, arch: archivioCaricato, la: data.listaAttesa || [] });
             } 
             // Migrazione automatica dal vecchio formato singolo a Stagioni
             else if (data.piano) {
@@ -578,6 +595,8 @@
               const archivioCaricato = data.archivioSoci || costruisciArchivioDaPiani(initialTuttiPiani);
               setArchivioSoci(archivioCaricato);
               
+              setListaAttesa(data.listaAttesa || []);
+              
               // BUGFIX: vedi nota sopra, stessa correzione (catturare il valore prima di
               // aggiornare il ref, invece di leggerlo dentro la funzione di aggiornamento).
               const eraPrimoCaricamento = !initialLoadDone.current;
@@ -588,7 +607,7 @@
                   return prev;
               });
               
-              lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason], def: defaultSeason, arch: archivioCaricato });
+              lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason], def: defaultSeason, arch: archivioCaricato, la: data.listaAttesa || [] });
             }
           }
         }, (error) => console.error("Errore sync Cloud:", error));
@@ -596,7 +615,7 @@
       }, [user, firebaseInstances]);
 
       // --- FUNZIONE DI SALVATAGGIO CLOUD ---
-      const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare, stagionePredef, archivioDaSalvare) => {
+      const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare, stagionePredef, archivioDaSalvare, listaAttesaDaSalvare) => {
         if (!user || !firebaseInstances) {
             setStatoSalvataggio('error');
             setTimeout(() => setStatoSalvataggio('idle'), 4000);
@@ -606,8 +625,8 @@
         try {
             const { db, appId, doc, setDoc } = firebaseInstances;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
-            await setDoc(docRef, { tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, archivioSoci: archivioDaSalvare, updatedAt: new Date().toISOString() });
-            const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef, arch: archivioDaSalvare });
+            await setDoc(docRef, { tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, archivioSoci: archivioDaSalvare, listaAttesa: listaAttesaDaSalvare, updatedAt: new Date().toISOString() });
+            const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef, arch: archivioDaSalvare, la: listaAttesaDaSalvare });
             lastSavedPiano.current = statoAppenaSalvato;
             // Abbassiamo il flag "modifiche in sospeso" solo se, durante il salvataggio (che è
             // asincrono), l'utente non ha nel frattempo fatto altre modifiche: in tal caso il
@@ -633,15 +652,15 @@
         // i dati reali appena letti da Firestore — e il salvataggio automatico, sbloccato subito
         // dopo, finiva per scrivere lo stato ancora vuoto sopra ai dati reali, cancellandoli.
         if (!user || !firebaseInstances || !isDataLoaded) return;
-        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita, arch: archivioSoci });
+        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita, arch: archivioSoci, la: listaAttesa });
         if (currentStateStr === lastSavedPiano.current) return; 
         // Registriamo lo stato locale più recente e segnaliamo che c'è una modifica da salvare:
         // questo impedisce all'onSnapshot di sovrascriverla nel frattempo (vedi BUGFIX sopra).
         ultimoStatoLocaleVisto.current = currentStateStr;
         hasModificheLocaliInSospeso.current = true;
-        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita, archivioSoci), 1500);
+        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa), 1500);
         return () => clearTimeout(timer);
-      }, [tuttiPiani, stagioni, stagionePredefinita, archivioSoci, user, firebaseInstances, isDataLoaded]);
+      }, [tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, user, firebaseInstances, isDataLoaded]);
 
       // --- AVVISO DI USCITA CON MODIFICHE NON SALVATE ---
       // Il salvataggio è "debounced" (aspetta ~1,5s di inattività prima di scrivere su
@@ -936,6 +955,50 @@
       };
 
       const annullaImportazioneSoci = () => setImportaSociPreview(null);
+
+      // --- LISTA D'ATTESA (contatti da ricontattare) ---
+      const salvaContattoAttesa = (e) => {
+        e.preventDefault();
+        if (!nuovoContattoAttesa.nome.trim()) { alert("Inserisci il nominativo!"); return; }
+        if (nuovoContattoAttesa.motivazione === 'corso' && !nuovoContattoAttesa.corsoRichiesto) {
+          alert("Seleziona il corso di interesse!");
+          return;
+        }
+        if (editandoContattoAttesaId) {
+          setListaAttesa(prev => prev.map(c => c.id === editandoContattoAttesaId ? { ...nuovoContattoAttesa, id: editandoContattoAttesaId } : c));
+          mostraToast("Contatto aggiornato!");
+        } else {
+          setListaAttesa(prev => [...prev, { ...nuovoContattoAttesa, id: Date.now() + Math.random() }]);
+          mostraToast("Contatto aggiunto alla lista d'attesa!");
+        }
+        setNuovoContattoAttesa(creaContattoAttesaVuoto());
+        setEditandoContattoAttesaId(null);
+      };
+
+      const avviaModificaContattoAttesa = (contatto) => {
+        setNuovoContattoAttesa({ ...contatto });
+        setEditandoContattoAttesaId(contatto.id);
+      };
+
+      const eliminaContattoAttesa = (id) => {
+        setListaAttesa(prev => prev.filter(c => c.id !== id));
+        if (editandoContattoAttesaId === id) {
+          setNuovoContattoAttesa(creaContattoAttesaVuoto());
+          setEditandoContattoAttesaId(null);
+        }
+        mostraToast("Contatto rimosso.");
+      };
+
+      const annullaModificaContattoAttesa = () => {
+        setNuovoContattoAttesa(creaContattoAttesaVuoto());
+        setEditandoContattoAttesaId(null);
+      };
+
+      const contattiAttesaScaduti = useMemo(() => {
+        const oggi = new Date();
+        oggi.setHours(0,0,0,0);
+        return listaAttesa.filter(c => c.dataScadenza && new Date(c.dataScadenza) < oggi).length;
+      }, [listaAttesa]);
 
       const tuttiCorsiSelect = useMemo(() => {
           const list = [];
@@ -1600,19 +1663,19 @@
                         if (nomeLivello) {
                           const mostraSoloNome = (info.id === 'acquagym' || info.id === 'propaganda' || info.isFreeTextLevel || livelloInfo?.noNumero);
                           const titoloTesto = mostraSoloNome ? nomeLivello : `Liv. ${cell.corso.data.livello} - ${nomeLivello}`;
-                          testoSfondo += `<span style="font-size:10pt; font-weight:bold;">${titoloTesto}</span><br>`;
+                          testoSfondo += `${titoloTesto}<br>`;
                         } else {
-                          testoSfondo += `<span style="font-size:10pt; font-weight:bold;">${info ? info.name : ''}</span><br>`;
+                          testoSfondo += `${info ? info.name : ''}<br>`;
                         }
                         
-                        if(cell.corso.data.istruttore) testoSfondo += `<span style="font-size:10pt; font-style:italic;">${cell.corso.data.istruttore}</span><br>`;
+                        if(cell.corso.data.istruttore) testoSfondo += `${cell.corso.data.istruttore}<br>`;
                         // BUGFIX/RICHIESTA: rimosse le emoji ⏱/👤 (rese in modo incoerente da Excel/Sheets
                         // a seconda del font di sistema) a favore di un testo semplice e uniforme.
                         let infoRiga = `${cell.corso.durata} min`;
                         if(cell.corso.data.maxUtenti) infoRiga += ` &middot; Max ${cell.corso.data.maxUtenti}`;
-                        testoSfondo += `<span style="font-size:9pt;">${infoRiga}</span>`;
+                        testoSfondo += infoRiga;
                         
-                        htmlContent += `<td rowspan="${cell.rowSpan}" colspan="${cell.colSpan}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid #ccc;">${testoSfondo}</td>`;
+                        htmlContent += `<td rowspan="${cell.rowSpan}" colspan="${cell.colSpan}" style="background-color: ${bgColor}; color: ${textColor}; border: 1px solid #ccc; font-size: 10pt; font-weight: normal; font-style: normal;">${testoSfondo}</td>`;
                     }
                 });
                 htmlContent += `</tr>`;
@@ -2027,6 +2090,150 @@
                 </div>
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
                   <button onClick={() => setIsScadenzeModalOpen(false)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- MODALE LISTA D'ATTESA (contatti da ricontattare) --- */}
+          {isListaAttesaOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
+                  <h3 className="font-bold text-xl flex items-center gap-2"><ClipboardListIcon size={24}/> Lista d'Attesa</h3>
+                  <button onClick={() => setIsListaAttesaOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                </div>
+                <div className="overflow-y-auto flex-1 bg-slate-50 p-6 flex flex-col gap-6" style={{ minHeight: '300px' }}>
+
+                  {/* FORM INSERIMENTO/MODIFICA CONTATTO */}
+                  <form onSubmit={salvaContattoAttesa} className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                    <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2">
+                      {editandoContattoAttesaId ? <><EditIcon size={16}/> Modifica Contatto</> : <><PlusIcon size={16}/> Nuovo Contatto</>}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                      <div className="sm:col-span-3">
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Nominativo</label>
+                        <input type="text" value={nuovoContattoAttesa.nome} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, nome: e.target.value})} placeholder="Cognome e Nome" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"/>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Età</label>
+                        <input type="number" min="0" value={nuovoContattoAttesa.eta} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, eta: e.target.value})} placeholder="Es. 7" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"/>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Telefono</label>
+                        <input type="tel" value={nuovoContattoAttesa.telefono} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, telefono: e.target.value})} placeholder="Es. 333 1234567" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"/>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Email</label>
+                        <input type="email" value={nuovoContattoAttesa.email} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, email: e.target.value})} placeholder="nome@esempio.it" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"/>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Nome Genitore <span className="normal-case font-normal text-slate-400">(eventuale)</span></label>
+                        <input type="text" value={nuovoContattoAttesa.nomeGenitore} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, nomeGenitore: e.target.value})} placeholder="Se minorenne" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"/>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Data Creazione</label>
+                        <input type="date" value={nuovoContattoAttesa.dataCreazione} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, dataCreazione: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"/>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Data Scadenza</label>
+                        <input type="date" value={nuovoContattoAttesa.dataScadenza} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, dataScadenza: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none"/>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Motivazione</label>
+                        <select value={nuovoContattoAttesa.motivazione} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, motivazione: e.target.value, corsoRichiesto: e.target.value === 'corso' ? nuovoContattoAttesa.corsoRichiesto : ''})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
+                          <option value="">-- Seleziona --</option>
+                          <option value="private">Private</option>
+                          <option value="corso">Apertura/Inserimento Corso</option>
+                          <option value="altro">Informazioni/Altro</option>
+                        </select>
+                      </div>
+                      {nuovoContattoAttesa.motivazione === 'corso' && (
+                        <div className="sm:col-span-3">
+                          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Corso di Interesse</label>
+                          <select value={nuovoContattoAttesa.corsoRichiesto} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, corsoRichiesto: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
+                            <option value="">-- Seleziona un corso --</option>
+                            {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </select>
+                        </div>
+                      )}
+                      <div className="sm:col-span-3">
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Note</label>
+                        <textarea value={nuovoContattoAttesa.note} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, note: e.target.value})} placeholder="Appunti liberi..." rows={3} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-400 outline-none resize-none"/>
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      {editandoContattoAttesaId && (
+                        <button type="button" onClick={annullaModificaContattoAttesa} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-sm transition-colors">Annulla Modifica</button>
+                      )}
+                      <button type="submit" className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors flex items-center gap-2">
+                        <CheckIcon size={16}/> {editandoContattoAttesaId ? 'Aggiorna Contatto' : 'Aggiungi alla Lista'}
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* ELENCO CONTATTI */}
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center sticky top-0">
+                      <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Contatti in Attesa</h4>
+                      <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{listaAttesa.length}</span>
+                    </div>
+                    {listaAttesa.length > 0 ? (
+                      <div className="max-h-96 overflow-y-auto">
+                        <table className="w-full text-left text-sm">
+                          <thead>
+                            <tr className="bg-slate-50 text-[11px] uppercase text-slate-500 sticky top-0">
+                              <th className="p-3 font-bold">Nominativo</th>
+                              <th className="p-3 font-bold text-center">Età</th>
+                              <th className="p-3 font-bold">Contatti</th>
+                              <th className="p-3 font-bold">Motivazione</th>
+                              <th className="p-3 font-bold text-center">Scadenza</th>
+                              <th className="p-3 font-bold text-center">Azioni</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {listaAttesa.map(c => {
+                              const scaduto = c.dataScadenza && new Date(c.dataScadenza) < new Date(new Date().setHours(0,0,0,0));
+                              const infoCorso = c.motivazione === 'corso' ? attivita.find(a => a.id === c.corsoRichiesto) : null;
+                              const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Corso: ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
+                              return (
+                                <tr key={c.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
+                                  <td className="p-3">
+                                    <div className="font-semibold text-slate-800">{c.nome}</div>
+                                    {c.nomeGenitore && <div className="text-[11px] text-slate-500">Genitore: {c.nomeGenitore}</div>}
+                                    {c.note && <div className="text-[11px] text-slate-400 italic mt-0.5 max-w-xs truncate" title={c.note}>{c.note}</div>}
+                                  </td>
+                                  <td className="p-3 text-center text-slate-600">{c.eta || '-'}</td>
+                                  <td className="p-3 text-slate-600">
+                                    {c.telefono && <div className="text-xs">{c.telefono}</div>}
+                                    {c.email && <div className="text-xs">{c.email}</div>}
+                                    {!c.telefono && !c.email && '-'}
+                                  </td>
+                                  <td className="p-3 text-slate-600 text-xs">{etichettaMotivazione}</td>
+                                  <td className={`p-3 text-center font-bold ${scaduto ? 'text-red-600' : 'text-slate-600'}`}>
+                                    {c.dataScadenza ? formatDate(c.dataScadenza) : '-'}
+                                    {scaduto && <span className="block text-[9px] uppercase font-bold">Da ricontattare</span>}
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="flex items-center justify-center gap-2">
+                                      <button type="button" onClick={() => avviaModificaContattoAttesa(c)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
+                                      <button type="button" onClick={() => eliminaContattoAttesa(c.id)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="p-6 text-center text-slate-500 text-sm">Nessun contatto in lista d'attesa.</div>
+                    )}
+                  </div>
+
+                </div>
+                <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
+                  <button onClick={() => setIsListaAttesaOpen(false)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
                 </div>
               </div>
             </div>
@@ -2936,6 +3143,17 @@
                       className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
                     >
                       <PlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Corso</span>
+                    </button>
+
+                    {/* TASTO LISTA D'ATTESA */}
+                    <button
+                      onClick={() => setIsListaAttesaOpen(true)}
+                      className="relative flex items-center gap-2 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-md text-sm font-medium transition-colors"
+                    >
+                      <ClipboardListIcon size={16} /> <span className="hidden sm:inline">Lista d'Attesa</span>
+                      {contattiAttesaScaduti > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center absolute -top-1.5 -right-1.5">{contattiAttesaScaduti}</span>
+                      )}
                     </button>
 
                     <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
