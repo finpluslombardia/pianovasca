@@ -352,7 +352,8 @@
       const [editModal, setEditModal] = useState(null); 
       const [isExportMenuOpen, setIsExportMenuOpen] = useState(false); // Menu esportazione
       const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
-      const [filtriAttivita, setFiltriAttivita] = useState(ATTIVITA_DI_BASE.map(a => a.id));
+      const [corsiEsclusiFiltro, setCorsiEsclusiFiltro] = useState([]); // chiavi "attivitaId::livello" nascoste/attenuate dal filtro
+      const [modalitaFiltro, setModalitaFiltro] = useState('nascondi'); // 'nascondi' | 'evidenzia'
       const [inizioSettimana, setInizioSettimana] = useState(getStartOfWeek(new Date()));
 
       // --- STATI AGGIUNTA CORSO ---
@@ -723,6 +724,24 @@
         return fasce;
       }, [intervallo]);
 
+      // Identifica in modo univoco un "corso" specifico (attività + livello/nome), con la stessa
+      // etichetta mostrata nel riquadro sulla griglia. Usata per il filtro granulare per corso.
+      const chiaveELabelCorso = useCallback((cellData) => {
+          if (!cellData || !cellData.id) return null;
+          const key = `${cellData.id}::${cellData.livello || ''}`;
+          const info = attivita.find(a => a.id === cellData.id);
+          const livelloInfo = info?.levels?.find(l => l.val === cellData.livello);
+          const nomeLivello = info?.isFreeTextLevel ? cellData.livello : livelloInfo?.name;
+          const mostraSoloNome = (cellData.id === 'acquagym' || cellData.id === 'propaganda' || info?.isFreeTextLevel || livelloInfo?.noNumero);
+          let label;
+          if (nomeLivello) {
+              label = mostraSoloNome ? nomeLivello : `Liv. ${cellData.livello} - ${nomeLivello}`;
+          } else {
+              label = info ? info.name : cellData.id;
+          }
+          return { key, label, attivitaId: cellData.id, attivitaNome: info ? info.name : cellData.id };
+      }, [attivita]);
+
       // --- LOGICA RICOSTRUZIONE ASSOLUTA CORSI ---
       const getCorsiForDay = useCallback((giornoIdx) => {
           const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
@@ -745,7 +764,10 @@
                   const startMin = h * 60 + m;
                   const cell = piano[k];
                   
-                  if (!filtriAttivita.includes(cell.id)) return;
+                  // In modalità "nascondi" i corsi non selezionati vengono esclusi dalla griglia
+                  // (comportamento originale). In modalità "evidenzia" restano tutti visibili: verranno
+                  // solo attenuati graficamente in fase di rendering, senza spezzare la struttura della griglia.
+                  if (modalitaFiltro === 'nascondi' && corsiEsclusiFiltro.includes(chiaveELabelCorso(cell)?.key)) return;
 
                   // --- FILTRO CALENDARIO ---
                   const isInizioValido = !cell.dataInizio || cell.dataInizio <= dataGiornoYMD;
@@ -814,7 +836,7 @@
           });
 
           return corsiUnici;
-      }, [piano, vascaSelezionata, filtriAttivita, inizioSettimana]);
+      }, [piano, vascaSelezionata, corsiEsclusiFiltro, modalitaFiltro, chiaveELabelCorso, inizioSettimana]);
 
       const corsiOggi = useMemo(() => {
           if (giornoSelezionato === 7) return [];
@@ -822,6 +844,27 @@
       }, [getCorsiForDay, giornoSelezionato]);
 
       // --- LOGICA UTENTE RAPIDO E AUTOSUGGERIMENTO ---
+      // Elenco dei corsi realmente presenti nel piano della stagione corrente, raggruppati per
+      // attività, da usare come opzioni nel filtro (così riflette sempre "come sono ora").
+      const corsiRaggruppatiPerFiltro = useMemo(() => {
+          const map = new Map();
+          Object.values(piano).forEach(cell => {
+              const info = chiaveELabelCorso(cell);
+              if (info && !map.has(info.key)) map.set(info.key, info);
+          });
+          const lista = Array.from(map.values()).sort((a, b) => {
+              const c = a.attivitaNome.localeCompare(b.attivitaNome);
+              return c !== 0 ? c : a.label.localeCompare(b.label, undefined, { numeric: true });
+          });
+          const gruppi = [];
+          lista.forEach(c => {
+              let gruppo = gruppi.find(g => g.attivitaNome === c.attivitaNome);
+              if (!gruppo) { gruppo = { attivitaNome: c.attivitaNome, corsi: [] }; gruppi.push(gruppo); }
+              gruppo.corsi.push(c);
+          });
+          return gruppi;
+      }, [piano, chiaveELabelCorso]);
+
       const tuttiUtentiUnici = useMemo(() => {
           const map = new Map();
           Object.values(piano).forEach(cell => {
@@ -2021,6 +2064,10 @@
                                                           const nomeBrev = abbrevia(infoAttivita ? infoAttivita.name : '');
                                                           const livelloBrev = abbrevia(nomeLivello);
 
+                                                          // Modalità "evidenzia": i corsi non selezionati nel filtro restano visibili
+                                                          // ma vengono attenuati (opacità ridotta e desaturati), invece di sparire.
+                                                          const attenuato = modalitaFiltro === 'evidenzia' && corsiEsclusiFiltro.includes(chiaveELabelCorso(corso.data)?.key);
+
                                                           // Applicazione dello zoom dinamico sui box
                                                           const topOffset = (corso.startMin - fasciaStartMin) * pixelsPerMin;
                                                           const altezzaPX = corso.durata * pixelsPerMin;
@@ -2030,7 +2077,7 @@
                                                               <div 
                                                                   key={i}
                                                                   onClick={(e) => handleClickCorso(e, corso)}
-                                                                  className={`absolute z-10 left-0 rounded-lg flex flex-col shadow-md cursor-pointer hover:brightness-95 hover:shadow-lg transition-all overflow-hidden border border-white/20 ${infoAttivita?.color || 'bg-slate-500 text-white'}`}
+                                                                  className={`absolute z-10 left-0 rounded-lg flex flex-col shadow-md cursor-pointer hover:brightness-95 hover:shadow-lg transition-all overflow-hidden border border-white/20 ${infoAttivita?.color || 'bg-slate-500 text-white'} ${attenuato ? 'opacity-25 grayscale saturate-50' : ''}`}
                                                                   style={{ top: `${topOffset}px`, height: `${altezzaPX}px`, width: larghezzaCalc, minHeight: '24px' }}
                                                               >
                                                                   <span className="absolute top-1 left-1.5 text-[9px] font-bold opacity-80 leading-none tracking-tight">
@@ -3526,44 +3573,72 @@
                       onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
                       className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
                     >
-                      <FilterIcon size={16} className={filtriAttivita.length < attivita.length ? "text-blue-500 fill-blue-100" : "text-slate-500"} />
+                      <FilterIcon size={16} className={corsiEsclusiFiltro.length > 0 ? "text-blue-500 fill-blue-100" : "text-slate-500"} />
                       <span className="hidden sm:inline">Filtri:</span>
                       <span className="font-bold text-slate-800">
-                        {filtriAttivita.length === attivita.length ? 'Tutte' : `${filtriAttivita.length}`}
+                        {corsiEsclusiFiltro.length === 0 ? 'Tutti' : `${corsiRaggruppatiPerFiltro.reduce((n, g) => n + g.corsi.length, 0) - corsiEsclusiFiltro.length}`}
                       </span>
+                      {corsiEsclusiFiltro.length > 0 && modalitaFiltro === 'evidenzia' && (
+                        <span className="hidden sm:inline text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">EVIDENZIA</span>
+                      )}
                     </button>
                     
                     {isFilterMenuOpen && (
-                      <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 z-50 min-w-[220px] flex flex-col gap-2">
+                      <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 z-50 min-w-[260px] flex flex-col gap-2">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtra Attività</span>
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtra Corsi</span>
                           <button 
-                            onClick={() => setFiltriAttivita(attivita.map(a => a.id))}
+                            onClick={() => setCorsiEsclusiFiltro([])}
                             className="text-xs font-bold text-blue-600 hover:underline"
                           >
-                            Tutte
+                            Tutti
+                          </button>
+                        </div>
+                        <div className="flex bg-slate-100 rounded-lg p-1 mb-1">
+                          <button
+                            type="button"
+                            onClick={() => setModalitaFiltro('nascondi')}
+                            className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${modalitaFiltro === 'nascondi' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                          >
+                            Nascondi
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setModalitaFiltro('evidenzia')}
+                            className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${modalitaFiltro === 'evidenzia' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                          >
+                            Evidenzia
                           </button>
                         </div>
                         <div className="h-px bg-slate-200 mb-1"></div>
-                        <div className="max-h-60 overflow-y-auto flex flex-col gap-1.5 pr-1">
-                          {attivita.map(a => (
-                            <label key={a.id} className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-slate-700 hover:bg-slate-50 p-1.5 rounded transition-colors">
-                              <input 
-                                type="checkbox" 
-                                checked={filtriAttivita.includes(a.id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setFiltriAttivita([...filtriAttivita, a.id]);
-                                  } else {
-                                    setFiltriAttivita(filtriAttivita.filter(id => id !== a.id));
-                                  }
-                                }}
-                                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                              />
-                              <div className={`w-3 h-3 rounded-full ${a.color.split(' ')[0]}`}></div>
-                              {a.name}
-                            </label>
+                        <div className="max-h-72 overflow-y-auto flex flex-col gap-3 pr-1">
+                          {corsiRaggruppatiPerFiltro.map(gruppo => (
+                            <div key={gruppo.attivitaNome}>
+                              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">{gruppo.attivitaNome}</div>
+                              <div className="flex flex-col gap-1">
+                                {gruppo.corsi.map(c => (
+                                  <label key={c.key} className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-slate-700 hover:bg-slate-50 p-1.5 rounded transition-colors">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={!corsiEsclusiFiltro.includes(c.key)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setCorsiEsclusiFiltro(corsiEsclusiFiltro.filter(k => k !== c.key));
+                                        } else {
+                                          setCorsiEsclusiFiltro([...corsiEsclusiFiltro, c.key]);
+                                        }
+                                      }}
+                                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                    />
+                                    {c.label}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
                           ))}
+                          {corsiRaggruppatiPerFiltro.length === 0 && (
+                            <div className="text-sm text-slate-400 italic p-2">Nessun corso ancora presente in questa stagione.</div>
+                          )}
                         </div>
                       </div>
                     )}
