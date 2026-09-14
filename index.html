@@ -353,6 +353,15 @@
       const [isExportMenuOpen, setIsExportMenuOpen] = useState(false); // Menu esportazione
       const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
       const headerFissoRef = useRef(null);
+      // Intestazione delle corsie ora COMPLETAMENTE SEPARATA dalla tabella che scorre (non più
+      // "sticky" al suo interno): elimina ogni possibile sovrapposizione con i riquadri dei corsi,
+      // che sono posizionati in modo assoluto e possono estendersi oltre la propria cella. Lo
+      // scorrimento orizzontale viene sincronizzato via JS tra l'intestazione e l'area scorrevole.
+      const corsieHeaderRef = useRef(null);
+      const mainScrollRef = useRef(null);
+      const sincronizzaScrollOrizzontale = useCallback((e) => {
+        if (corsieHeaderRef.current) corsieHeaderRef.current.scrollLeft = e.target.scrollLeft;
+      }, []);
       const [corsiEsclusiFiltro, setCorsiEsclusiFiltro] = useState([]); // chiavi "attivitaId::livello" nascoste/attenuate dal filtro
       const [modalitaFiltro, setModalitaFiltro] = useState('nascondi'); // 'nascondi' | 'evidenzia'
       const [inizioSettimana, setInizioSettimana] = useState(getStartOfWeek(new Date()));
@@ -2021,12 +2030,6 @@
                   )}
                   <div className="pb-4">
                       <table className="w-full border-separate border-spacing-0 select-none">
-                          <thead>
-                              <tr>
-                                  <th className="sticky top-0 left-0 z-30 bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Orario</th>
-                                  {activeCorsie.map(corsia => <th key={corsia} className="sticky top-0 z-20 bg-slate-50 border-b border-r border-slate-200 p-2 min-w-[80px] text-center text-xs font-bold text-slate-700">Corsia {corsia}</th>)}
-                              </tr>
-                          </thead>
                           <tbody>
                               {fasce.map((fascia) => {
                                   const [h, m] = fascia.id.split(':').map(Number);
@@ -3661,10 +3664,28 @@
               </div>
             </div>
 
+            {/* INTESTAZIONE FISSA DELLE CORSIE — separata dalla tabella che scorre, niente più
+                sovrapposizioni con i riquadri dei corsi. Lo scorrimento orizzontale è nascosto qui
+                e sincronizzato via JS con l'area sottostante (vedi sincronizzaScrollOrizzontale). */}
+            <div ref={corsieHeaderRef} className="bg-white border-t border-slate-200 overflow-hidden">
+              <div className="px-4 md:px-6 w-full mx-auto">
+                <table className="w-full border-separate border-spacing-0 select-none">
+                  <thead>
+                    <tr>
+                      <th className="bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Orario</th>
+                      {(vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA).map(corsia => (
+                        <th key={corsia} className="bg-slate-50 border-b border-r border-slate-200 p-2 min-w-[80px] text-center text-xs font-bold text-slate-700">Corsia {corsia}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+            </div>
+
           </div>
           {/* FINE WRAPPER STICKY */}
 
-          <main className="flex-1 w-full mx-auto p-4 md:p-6 pt-4 md:pt-6 flex flex-col gap-6 overflow-auto">
+          <main ref={mainScrollRef} onScroll={sincronizzaScrollOrizzontale} className="flex-1 w-full mx-auto p-4 md:p-6 pt-4 md:pt-6 flex flex-col gap-6 overflow-auto">
             {/* TABELLA UNICA - Esportata intera in un singolo foglio PDF */}
             <div id="griglia-piano-vasca" className="bg-transparent relative w-full">
               {giornoSelezionato === 7 ? (
