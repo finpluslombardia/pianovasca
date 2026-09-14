@@ -2029,7 +2029,7 @@
                       </div>
                   )}
                   <div className="pb-4">
-                      <table className="w-full border-separate border-spacing-0 select-none">
+                      <table className="w-full table-fixed border-separate border-spacing-0 select-none">
                           <tbody>
                               {fasce.map((fascia) => {
                                   const [h, m] = fascia.id.split(':').map(Number);
@@ -2037,7 +2037,7 @@
                                   
                                   return (
                                       <tr key={fascia.id} className="hover:bg-slate-50/50 group">
-                                          <td className="sticky left-0 z-20 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]"
+                                          <td className="sticky left-0 z-20 bg-slate-50/90 backdrop-blur-sm border-b border-r border-slate-200 p-3 w-24 text-sm font-semibold text-slate-600 text-center whitespace-nowrap shadow-[1px_0_0_0_rgba(226,232,240,1)]"
                                               style={{ height: `${ROW_HEIGHT}px` }}>
                                               {fascia.label}
                                           </td>
@@ -2052,8 +2052,7 @@
                                               return (
                                                   <td 
                                                       key={corsia} 
-                                                      className="border-b border-r border-slate-200 relative p-0 cursor-pointer hover:bg-blue-50/30 transition-colors" 
-                                                      style={{ minWidth: '80px' }}
+                                                      className="w-20 border-b border-r border-slate-200 relative p-0 cursor-pointer hover:bg-blue-50/30 transition-colors" 
                                                       onDoubleClick={() => {
                                                           setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [gIdx], oraInizio: fascia.id, corsie: [corsia]}));
                                                           setIsAddModalOpen(true);
@@ -3669,12 +3668,12 @@
                 e sincronizzato via JS con l'area sottostante (vedi sincronizzaScrollOrizzontale). */}
             <div ref={corsieHeaderRef} className="bg-white border-t border-slate-200 overflow-hidden">
               <div className="px-4 md:px-6 w-full mx-auto">
-                <table className="w-full border-separate border-spacing-0 select-none">
+                <table className="w-full table-fixed border-separate border-spacing-0 select-none">
                   <thead>
                     <tr>
                       <th className="bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Orario</th>
                       {(vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA).map(corsia => (
-                        <th key={corsia} className="bg-slate-50 border-b border-r border-slate-200 p-2 min-w-[80px] text-center text-xs font-bold text-slate-700">Corsia {corsia}</th>
+                        <th key={corsia} className="bg-slate-50 border-b border-r border-slate-200 p-2 w-20 text-center text-xs font-bold text-slate-700">Corsia {corsia}</th>
                       ))}
                     </tr>
                   </thead>
