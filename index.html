@@ -352,6 +352,11 @@
       const [editModal, setEditModal] = useState(null); 
       const [isExportMenuOpen, setIsExportMenuOpen] = useState(false); // Menu esportazione
       const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+      // Riferimento e altezza dell'header fisso in cima alla pagina (logo, stagione, giorni...):
+      // serve per agganciare l'intestazione della griglia (nomi corsie) subito sotto di esso
+      // quando si scorre in basso, invece di farla scomparire.
+      const headerFissoRef = useRef(null);
+      const [headerFissoHeight, setHeaderFissoHeight] = useState(0);
       const [corsiEsclusiFiltro, setCorsiEsclusiFiltro] = useState([]); // chiavi "attivitaId::livello" nascoste/attenuate dal filtro
       const [modalitaFiltro, setModalitaFiltro] = useState('nascondi'); // 'nascondi' | 'evidenzia'
       const [inizioSettimana, setInizioSettimana] = useState(getStartOfWeek(new Date()));
@@ -686,6 +691,26 @@
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+      }, []);
+
+      // Misura l'altezza dell'header fisso (cambia in base a viewport/contenuto, es. su mobile
+      // va su più righe) così l'intestazione della griglia si aggancia sempre subito sotto,
+      // senza sovrapposizioni né spazi vuoti.
+      useEffect(() => {
+        const misura = () => {
+          if (headerFissoRef.current) setHeaderFissoHeight(headerFissoRef.current.offsetHeight);
+        };
+        misura();
+        window.addEventListener('resize', misura);
+        let observer;
+        if (typeof ResizeObserver !== 'undefined' && headerFissoRef.current) {
+          observer = new ResizeObserver(misura);
+          observer.observe(headerFissoRef.current);
+        }
+        return () => {
+          window.removeEventListener('resize', misura);
+          if (observer) observer.disconnect();
+        };
       }, []);
 
       // --- CALCOLATORI DI TEMPO E VISTE ---
@@ -2022,8 +2047,8 @@
                       <table className="w-full border-collapse select-none">
                           <thead>
                               <tr>
-                                  <th className="sticky left-0 z-20 bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Orario</th>
-                                  {activeCorsie.map(corsia => <th key={corsia} className="bg-slate-50 border-b border-r border-slate-200 p-2 min-w-[80px] text-center text-xs font-bold text-slate-700">Corsia {corsia}</th>)}
+                                  <th className="sticky left-0 z-30 bg-slate-100 border-b border-r border-slate-200 p-3 w-24 text-left text-xs font-bold text-slate-500 uppercase tracking-wider" style={{ top: headerFissoHeight }}>Orario</th>
+                                  {activeCorsie.map(corsia => <th key={corsia} className="sticky z-20 bg-slate-50 border-b border-r border-slate-200 p-2 min-w-[80px] text-center text-xs font-bold text-slate-700" style={{ top: headerFissoHeight }}>Corsia {corsia}</th>)}
                               </tr>
                           </thead>
                           <tbody>
@@ -3352,7 +3377,7 @@
           )}
 
           {/* WRAPPER STICKY PER HEADER E SECONDO BANNER */}
-          <div className="sticky top-0 z-30 shadow-sm flex flex-col">
+          <div ref={headerFissoRef} className="sticky top-0 z-30 shadow-sm flex flex-col">
             
             {/* HEADER E CONTROLLI */}
             <header className="bg-white border-b border-slate-200 p-4 relative z-20">
