@@ -2371,9 +2371,14 @@
           {isListaAttesaOpen && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center gap-3">
+                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center gap-3 flex-wrap">
                   <h3 className="font-bold text-xl flex items-center gap-2"><ClipboardListIcon size={24}/> Lista d'Attesa</h3>
                   <div className="flex items-center gap-2">
+                    <select value={ordinamentoAttesa} onChange={e => setOrdinamentoAttesa(e.target.value)} className="px-3 py-2 bg-white/15 hover:bg-white/25 rounded-lg text-sm font-bold text-white outline-none cursor-pointer [&>option]:text-slate-800">
+                      <option value="creazione">Ordina: Data Creazione</option>
+                      <option value="scadenza">Ordina: Data Scadenza</option>
+                      <option value="motivazione">Ordina: Motivazione</option>
+                    </select>
                     {!isCompletatiOpen && (
                       <button onClick={apriNuovoContattoAttesa} className="flex items-center gap-2 px-3 py-2 bg-white/15 hover:bg-white/25 rounded-lg text-sm font-bold transition-colors">
                         <PlusIcon size={16}/> Nuovo Contatto
@@ -2386,16 +2391,6 @@
                   </div>
                 </div>
                 <div className="overflow-y-auto flex-1 bg-slate-50 p-6" style={{ minHeight: '300px' }}>
-
-                  {/* FILTRO ORDINAMENTO */}
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex items-center gap-3 mb-4">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide shrink-0">Ordina Per</label>
-                    <select value={ordinamentoAttesa} onChange={e => setOrdinamentoAttesa(e.target.value)} className="p-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
-                      <option value="creazione">Data di Creazione</option>
-                      <option value="scadenza">Data di Scadenza</option>
-                      <option value="motivazione">Motivazione</option>
-                    </select>
-                  </div>
 
                   {/* ELENCO CONTATTI */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
