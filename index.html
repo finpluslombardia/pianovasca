@@ -1384,7 +1384,20 @@
           setIsSearchModalOpen(false);
           const info = attivita.find(a => a.id === c.data.id);
           const vascaOriginale = c.vasca;
-          const partecipantiOrdinati = [...(c.data.partecipanti || [])].sort((a, b) => a.nome.localeCompare(b.nome));
+          // BUGFIX: stessa correzione di handleClickCorso — rinfreschiamo anno/certificato con
+          // l'archivio soci permanente, per non ripropagare dati superati (vedi nota lì per il dettaglio).
+          const partecipantiOrdinati = [...(c.data.partecipanti || [])]
+            .map(p => {
+                if (!p || !p.nome) return p;
+                const inArchivio = archivioSoci[p.nome.toLowerCase().trim()];
+                if (!inArchivio) return p;
+                return {
+                    ...p,
+                    anno: inArchivio.anno || p.anno,
+                    scadCertificato: inArchivio.scadCertificato || p.scadCertificato
+                };
+            })
+            .sort((a, b) => a.nome.localeCompare(b.nome));
 
           setEditModal({
               corsoOriginale: c,
@@ -1474,8 +1487,24 @@
         const vascaOriginale = corso.keys[0].split('-')[0];
         const giornoOriginale = Number(corso.keys[0].split('-')[1]);
         
-        // Ordina alfabeticamente all'apertura per sicurezza
-        const partecipantiOrdinati = [...(corso.data.partecipanti || [])].sort((a, b) => a.nome.localeCompare(b.nome));
+        // BUGFIX: prima di mostrare la lista iscritti, la "rinfreschiamo" con i dati più
+        // recenti dell'archivio soci permanente. Senza questo, se il certificato di una persona
+        // era stato aggiornato in UN ALTRO corso, qui si vedrebbe ancora il valore vecchio
+        // salvato in QUESTO corso — e salvando (anche senza toccare quella persona), quel valore
+        // vecchio veniva ripropagato ovunque dalla sincronizzazione globale, cancellando
+        // l'aggiornamento più recente fatto altrove.
+        const partecipantiOrdinati = [...(corso.data.partecipanti || [])]
+          .map(p => {
+              if (!p || !p.nome) return p;
+              const inArchivio = archivioSoci[p.nome.toLowerCase().trim()];
+              if (!inArchivio) return p;
+              return {
+                  ...p,
+                  anno: inArchivio.anno || p.anno,
+                  scadCertificato: inArchivio.scadCertificato || p.scadCertificato
+              };
+          })
+          .sort((a, b) => a.nome.localeCompare(b.nome));
 
         setEditModal({
           corsoOriginale: corso,
