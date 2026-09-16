@@ -1087,6 +1087,7 @@
       const etichettaMotivazioneAttesa = useCallback((c) => {
           if (c.motivazione === 'private') return 'Private';
           if (c.motivazione === 'corso') return `Corso: ${attivita.find(a => a.id === c.corsoRichiesto)?.name || '-'}`;
+          if (c.motivazione === 'prova') return 'Prova';
           if (c.motivazione === 'altro') return 'Informazioni/Altro';
           return '';
       }, [attivita]);
@@ -2415,7 +2416,7 @@
                             {ordinaContattiAttesa(isCompletatiOpen ? contattiAttesaCompletati : contattiAttesaAttivi).map(c => {
                               const scaduto = c.dataScadenza && new Date(c.dataScadenza) < new Date(new Date().setHours(0,0,0,0));
                               const infoCorso = c.motivazione === 'corso' ? attivita.find(a => a.id === c.corsoRichiesto) : null;
-                              const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Corso: ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
+                              const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Corso: ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'prova' ? 'Prova' : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
                               return (
                                 <tr key={c.id} className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors ${c.completato ? 'opacity-60' : ''}`}>
                                   <td className="p-3">
@@ -2463,7 +2464,7 @@
             const c = dettaglioContattoAttesa;
             const scaduto = c.dataScadenza && new Date(c.dataScadenza) < new Date(new Date().setHours(0,0,0,0));
             const infoCorso = c.motivazione === 'corso' ? attivita.find(a => a.id === c.corsoRichiesto) : null;
-            const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Apertura/Inserimento Corso — ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
+            const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Apertura/Inserimento Corso — ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'prova' ? 'Prova' : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
             return (
               <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
@@ -2595,6 +2596,7 @@
                         <option value="">-- Seleziona --</option>
                         <option value="private">Private</option>
                         <option value="corso">Apertura/Inserimento Corso</option>
+                        <option value="prova">Prova</option>
                         <option value="altro">Informazioni/Altro</option>
                       </select>
                     </div>
