@@ -95,9 +95,18 @@
     const MailIcon = (p) => <Icon {...p}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></Icon>;
 
     // --- UTILITY DATE PER PARTECIPANTI E CALENDARIO ---
+    // BUGFIX: confrontiamo giorno contro giorno (entrambe le date normalizzate a mezzanotte),
+    // non data contro ora esatta corrente. Prima, un certificato con scadenza "oggi" risultava
+    // già scaduto appena passata la mezzanotte del giorno stesso, in contrasto con il pannello
+    // Scadenze (che già usava questo confronto corretto) — un certificato in scadenza oggi resta
+    // valido fino alla fine della giornata odierna.
     const isScaduto = (dateStr) => {
       if (!dateStr) return false;
-      return new Date(dateStr) < new Date();
+      const data = new Date(dateStr);
+      data.setHours(0, 0, 0, 0);
+      const oggi = new Date();
+      oggi.setHours(0, 0, 0, 0);
+      return data < oggi;
     };
     const formatDate = (dateStr) => {
       if (!dateStr) return '-';
