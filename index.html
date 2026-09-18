@@ -392,13 +392,13 @@
       });
 
       // --- STATO NUOVO PARTECIPANTE ---
-      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
       const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
       const [showAddForm, setShowAddForm] = useState(false);
 
       // --- STATI AGGIUNTA UTENTE RAPIDO ---
       const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
 
       // --- STATI RICERCA SOCIO ---
       const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -1384,7 +1384,7 @@
 
         const nomeAggiunto = addUtenteRapido.nome.trim();
         setIsAddUserModalOpen(false);
-        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
 
         if (corsiNonPiuDisponibili > 0) {
             mostraToast("Alcuni corsi selezionati non erano più disponibili e sono stati saltati.", 'error');
@@ -1452,7 +1452,7 @@
               partecipanti: partecipantiOrdinati,
               tab: 'iscritti'
           });
-          setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+          setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
           setEditingPartecipanteIndex(null);
           setShowAddForm(false);
       };
@@ -1559,7 +1559,7 @@
           partecipanti: partecipantiOrdinati,
           tab: 'iscritti' // Apre di default la scheda degli iscritti
         });
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1586,7 +1586,7 @@
           return { ...prev, partecipanti: nuoviPartecipanti };
         });
         
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1600,7 +1600,7 @@
       };
 
       const annullaModificaPartecipante = () => {
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1681,10 +1681,10 @@
           // Elimina chiavi vecchie
           editModal.corsoOriginale.keys.forEach(k => delete nuovoPiano[k]);
           
-          // --- Sincronizzazione globale dei certificati medici e anagrafica ---
+          // --- Sincronizzazione globale dei certificati medici, anagrafica e documenti firmati ---
           const mapAggiornamenti = new Map();
           finalPartecipanti.forEach(p => {
-              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato, anno: p.anno });
+              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato, anno: p.anno, documentiFirmati: p.documentiFirmati });
           });
 
           Object.keys(nuovoPiano).forEach(k => {
@@ -1694,9 +1694,9 @@
                       if (!esistente || !esistente.nome) return esistente;
                       const updateInfo = mapAggiornamenti.get(esistente.nome.toLowerCase().trim());
                       if (updateInfo) {
-                          if (updateInfo.scadCertificato !== esistente.scadCertificato || updateInfo.anno !== esistente.anno) {
+                          if (updateInfo.scadCertificato !== esistente.scadCertificato || updateInfo.anno !== esistente.anno || updateInfo.documentiFirmati !== esistente.documentiFirmati) {
                               changed = true;
-                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno };
+                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, documentiFirmati: updateInfo.documentiFirmati };
                           }
                       }
                       return esistente;
@@ -1723,7 +1723,7 @@
         });
         
         setEditModal(null);
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
         mostraToast("Modifiche salvate con successo!");
@@ -1768,11 +1768,14 @@
           const certObbligatorio = certificatoObbligatorio(p.anno, annoRifRegistro);
           const certScaduto = certObbligatorio && isScaduto(p.scadCertificato);
           const testoCertificato = (!certObbligatorio && !p.scadCertificato) ? 'Non obbligatorio' : formatDate(p.scadCertificato);
+          const docFirmati = p.documentiFirmati === 'si';
+          const testoDocumenti = p.documentiFirmati === 'si' ? 'Sì' : p.documentiFirmati === 'no' ? 'No' : 'Da verificare';
           return `
           <tr>
             <td>${p.nome}</td>
             <td style="text-align:center;">${p.anno || '-'}</td>
             <td style="text-align:center; ${certScaduto ? 'color:#dc2626; font-weight:bold;' : ''}">${testoCertificato}</td>
+            <td style="text-align:center; ${!docFirmati ? 'color:#dc2626; font-weight:bold;' : ''}">${testoDocumenti}</td>
             ${colonnePresenzeBody}
           </tr>
           `;
@@ -1809,9 +1812,10 @@
               <table>
                 <thead>
                   <tr>
-                    <th style="width: 17%;">Cognome e Nome</th>
-                    <th style="text-align:center; width: 5%;">Anno</th>
-                    <th style="text-align:center; width: 11%;">Certificato</th>
+                    <th style="width: 15%;">Cognome e Nome</th>
+                    <th style="text-align:center; width: 4%;">Anno</th>
+                    <th style="text-align:center; width: 9%;">Certificato</th>
+                    <th style="text-align:center; width: 6%;">Doc.</th>
                     ${colonnePresenzeHeader}
                   </tr>
                 </thead>
@@ -2728,6 +2732,14 @@
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Certificato</label>
                               <input type="date" value={addUtenteRapido.scadCertificato} onChange={e => setAddUtenteRapido({...addUtenteRapido, scadCertificato: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
                            </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Documenti Firmati</label>
+                              <select value={addUtenteRapido.documentiFirmati} onChange={e => setAddUtenteRapido({...addUtenteRapido, documentiFirmati: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer">
+                                <option value="">-- Seleziona --</option>
+                                <option value="si">Sì</option>
+                                <option value="no">No</option>
+                              </select>
+                           </div>
                         </div>
 
                         <div className="mt-1 border-t border-slate-200 pt-4">
@@ -3234,6 +3246,14 @@
                                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Scadenza Certificato</label>
                                  <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer" />
                               </div>
+                              <div>
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Documenti Firmati</label>
+                                 <select value={nuovoPartecipante.documentiFirmati} onChange={e => setNuovoPartecipante({...nuovoPartecipante, documentiFirmati: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer">
+                                   <option value="">-- Seleziona --</option>
+                                   <option value="si">Sì</option>
+                                   <option value="no">No</option>
+                                 </select>
+                              </div>
                             </div>
 
                             <div className="mt-3 border-t border-slate-200 pt-3">
@@ -3338,6 +3358,9 @@
                                    );
                                 })()}
                               </td>
+                              <td className={`p-3 text-center font-bold ${p.documentiFirmati !== 'si' ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
+                                {p.documentiFirmati === 'si' ? 'Sì' : p.documentiFirmati === 'no' ? 'No' : <span className="text-[10px] uppercase font-semibold">Da verificare</span>}
+                              </td>
                               <td className="p-3 flex items-center justify-center gap-2">
                                 <button type="button" onClick={() => avviaModificaPartecipante(i)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
                                 <button type="button" onClick={() => rimuoviPartecipante(i)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
@@ -3357,17 +3380,18 @@
                                 <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
                                   <thead className="bg-slate-100 border-b border-slate-200">
                                     <tr>
-                                      <th className="p-3 font-semibold text-slate-700 w-1/4">Cognome e Nome</th>
+                                      <th className="p-3 font-semibold text-slate-700 w-1/5">Cognome e Nome</th>
                                       <th className="p-3 font-semibold text-center text-slate-700 w-1/6">Anno</th>
-                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/4">Scad. Certificato</th>
-                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/4">Scad. Iscrizione</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/5">Scad. Certificato</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/5">Scad. Iscrizione</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/6">Documenti</th>
                                       <th className="p-3 text-center w-20"></th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {editModal.partecipanti.map((p, i) => isAttivoInSettimana(p, inizioSettimana) ? renderRigaPartecipante(p, i) : null)}
                                     {attivi.length === 0 && (
-                                      <tr><td colSpan="5" className="p-6 text-center text-slate-400 italic">Nessun iscritto attivo in questa settimana.</td></tr>
+                                      <tr><td colSpan="6" className="p-6 text-center text-slate-400 italic">Nessun iscritto attivo in questa settimana.</td></tr>
                                     )}
                                   </tbody>
                                 </table>
@@ -3385,10 +3409,11 @@
                                       {/* Intestazione nascosta per mantenere allineate le colonne con la prima tabella */}
                                       <thead className="invisible h-0">
                                         <tr>
-                                          <th className="w-1/4"></th>
+                                          <th className="w-1/5"></th>
                                           <th className="w-1/6"></th>
-                                          <th className="w-1/4"></th>
-                                          <th className="w-1/4"></th>
+                                          <th className="w-1/5"></th>
+                                          <th className="w-1/5"></th>
+                                          <th className="w-1/6"></th>
                                           <th className="w-20"></th>
                                         </tr>
                                       </thead>
