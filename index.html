@@ -409,6 +409,7 @@
       const [filtroScadenzeGiorno, setFiltroScadenzeGiorno] = useState('');
       const [filtroScadenzeAttivita, setFiltroScadenzeAttivita] = useState('');
       const [ordinamentoScadenze, setOrdinamentoScadenze] = useState('scadenza');
+      const [tipoEsportazioneScadenze, setTipoEsportazioneScadenze] = useState('certificati'); // 'certificati' | 'documenti'
 
       // --- STATI LISTA D'ATTESA (contatti da ricontattare, indipendente dal piano vasca) ---
       const [listaAttesa, setListaAttesa] = useState([]);
@@ -1317,24 +1318,36 @@
         const nomeAttivitaFiltro = filtroScadenzeAttivita ? (attivita.find(a => a.id === filtroScadenzeAttivita)?.name || '') : '';
         const sottotitoloFiltri = [nomeGiornoFiltro, nomeAttivitaFiltro].filter(Boolean).join(' · ') || 'Tutti i corsi, tutti i giorni';
 
-        const rigaTabella = (u) => `
+        const esportaDocumenti = tipoEsportazioneScadenze === 'documenti';
+
+        const titoloPagina = esportaDocumenti ? 'Documenti Non Firmati / Da Verificare' : 'Certificati Medici Scaduti';
+        const coloreAccento = esportaDocumenti ? '#7e22ce' : '#dc2626';
+        const listaEsportata = esportaDocumenti ? documentiMancantiFiltrati : scadenzeScadutiFiltrati;
+
+        const rigaTabella = (u) => esportaDocumenti ? `
           <tr>
             <td>${u.nome}</td>
             <td>${(u.corsi || []).map(co => co.testo).join(', ')}</td>
-            <td style="text-align:right; font-weight:bold; color:#dc2626;">Scaduto il ${formatDate(u.scadCertificato)}</td>
+            <td style="text-align:right; font-weight:bold; color:${coloreAccento};">${u.documentiFirmati === 'no' ? 'Non firmati' : 'Da verificare'}</td>
+          </tr>
+        ` : `
+          <tr>
+            <td>${u.nome}</td>
+            <td>${(u.corsi || []).map(co => co.testo).join(', ')}</td>
+            <td style="text-align:right; font-weight:bold; color:${coloreAccento};">Scaduto il ${formatDate(u.scadCertificato)}</td>
           </tr>
         `;
 
         printWindow.document.write(`
           <html>
             <head>
-              <title>Certificati Medici Scaduti</title>
+              <title>${titoloPagina}</title>
               <style>
                 @page { size: A4 landscape; margin: 15mm; }
                 body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; font-size: 10pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 h1 { margin: 0 0 4px 0; font-size: 18pt; color: #0f172a; }
                 h3 { margin: 0 0 16px 0; color: #64748b; font-weight: 500; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px; }
-                h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #64748b; color: #dc2626; }
+                h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #64748b; color: ${coloreAccento}; }
                 table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 8px; }
                 th, td { border: 1px solid #64748b; padding: 6px 8px; text-align: left; font-size: 10pt; }
                 th { background-color: #e2e8f0 !important; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 9pt; }
@@ -1342,16 +1355,16 @@
               </style>
             </head>
             <body>
-              <h1>Certificati Medici Scaduti</h1>
+              <h1>${titoloPagina}</h1>
               <h3>${sottotitoloFiltri}</h3>
 
-              <h2>Certificati Scaduti (${scadenzeScadutiFiltrati.length})</h2>
-              ${scadenzeScadutiFiltrati.length > 0 ? `
+              <h2>${titoloPagina} (${listaEsportata.length})</h2>
+              ${listaEsportata.length > 0 ? `
                 <table>
-                  <thead><tr><th style="width:25%;">Nominativo</th><th style="width:45%;">Corsi</th><th style="width:30%;">Scadenza</th></tr></thead>
-                  <tbody>${scadenzeScadutiFiltrati.map(u => rigaTabella(u)).join('')}</tbody>
+                  <thead><tr><th style="width:25%;">Nominativo</th><th style="width:45%;">Corsi</th><th style="width:30%;">${esportaDocumenti ? 'Stato' : 'Scadenza'}</th></tr></thead>
+                  <tbody>${listaEsportata.map(u => rigaTabella(u)).join('')}</tbody>
                 </table>
-              ` : `<div class="empty">Nessun certificato scaduto.</div>`}
+              ` : `<div class="empty">${esportaDocumenti ? 'Nessun documento mancante.' : 'Nessun certificato scaduto.'}</div>`}
 
               <script>
                 window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }
@@ -2358,6 +2371,13 @@
                     {(filtroScadenzeGiorno || filtroScadenzeAttivita || ordinamentoScadenze !== 'scadenza') && (
                       <button onClick={() => { setFiltroScadenzeGiorno(''); setFiltroScadenzeAttivita(''); setOrdinamentoScadenze('scadenza'); }} className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5"><XIcon size={14}/> Azzera filtri</button>
                     )}
+                    <div className="flex-1 min-w-[160px]">
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Esporta</label>
+                      <select value={tipoEsportazioneScadenze} onChange={e => setTipoEsportazioneScadenze(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
+                        <option value="certificati">Certificati Scaduti</option>
+                        <option value="documenti">Documenti Non Firmati</option>
+                      </select>
+                    </div>
                     <button onClick={esportaScadenzePDF} className="px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5"><DownloadIcon size={14}/> Esporta PDF</button>
                   </div>
 
