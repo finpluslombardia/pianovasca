@@ -1318,25 +1318,45 @@
         const nomeAttivitaFiltro = filtroScadenzeAttivita ? (attivita.find(a => a.id === filtroScadenzeAttivita)?.name || '') : '';
         const sottotitoloFiltri = [nomeGiornoFiltro, nomeAttivitaFiltro].filter(Boolean).join(' · ') || 'Tutti i corsi, tutti i giorni';
 
-        const esportaDocumenti = tipoEsportazioneScadenze === 'documenti';
+        const includeCertificati = tipoEsportazioneScadenze === 'certificati' || tipoEsportazioneScadenze === 'entrambi';
+        const includeDocumenti = tipoEsportazioneScadenze === 'documenti' || tipoEsportazioneScadenze === 'entrambi';
 
-        const titoloPagina = esportaDocumenti ? 'Documenti Non Firmati / Da Verificare' : 'Certificati Medici Scaduti';
-        const coloreAccento = esportaDocumenti ? '#7e22ce' : '#dc2626';
-        const listaEsportata = esportaDocumenti ? documentiMancantiFiltrati : scadenzeScadutiFiltrati;
-
-        const rigaTabella = (u) => esportaDocumenti ? `
+        const rigaCertificato = (u) => `
           <tr>
             <td>${u.nome}</td>
             <td>${(u.corsi || []).map(co => co.testo).join(', ')}</td>
-            <td style="text-align:right; font-weight:bold; color:${coloreAccento};">${u.documentiFirmati === 'no' ? 'Non firmati' : 'Da verificare'}</td>
-          </tr>
-        ` : `
-          <tr>
-            <td>${u.nome}</td>
-            <td>${(u.corsi || []).map(co => co.testo).join(', ')}</td>
-            <td style="text-align:right; font-weight:bold; color:${coloreAccento};">Scaduto il ${formatDate(u.scadCertificato)}</td>
+            <td style="text-align:right; font-weight:bold; color:#dc2626;">Scaduto il ${formatDate(u.scadCertificato)}</td>
           </tr>
         `;
+        const rigaDocumento = (u) => `
+          <tr>
+            <td>${u.nome}</td>
+            <td>${(u.corsi || []).map(co => co.testo).join(', ')}</td>
+            <td style="text-align:right; font-weight:bold; color:#7e22ce;">${u.documentiFirmati === 'no' ? 'Non firmati' : 'Da verificare'}</td>
+          </tr>
+        `;
+
+        const sezioneCertificati = includeCertificati ? `
+          <h2 class="sez-certificati">Certificati Medici Scaduti (${scadenzeScadutiFiltrati.length})</h2>
+          ${scadenzeScadutiFiltrati.length > 0 ? `
+            <table>
+              <thead><tr><th style="width:25%;">Nominativo</th><th style="width:45%;">Corsi</th><th style="width:30%;">Scadenza</th></tr></thead>
+              <tbody>${scadenzeScadutiFiltrati.map(rigaCertificato).join('')}</tbody>
+            </table>
+          ` : `<div class="empty">Nessun certificato scaduto.</div>`}
+        ` : '';
+
+        const sezioneDocumenti = includeDocumenti ? `
+          <h2 class="sez-documenti">Documenti Non Firmati / Da Verificare (${documentiMancantiFiltrati.length})</h2>
+          ${documentiMancantiFiltrati.length > 0 ? `
+            <table>
+              <thead><tr><th style="width:25%;">Nominativo</th><th style="width:45%;">Corsi</th><th style="width:30%;">Stato</th></tr></thead>
+              <tbody>${documentiMancantiFiltrati.map(rigaDocumento).join('')}</tbody>
+            </table>
+          ` : `<div class="empty">Nessun documento mancante.</div>`}
+        ` : '';
+
+        const titoloPagina = tipoEsportazioneScadenze === 'entrambi' ? 'Certificati e Documenti' : (includeDocumenti ? 'Documenti Non Firmati / Da Verificare' : 'Certificati Medici Scaduti');
 
         printWindow.document.write(`
           <html>
@@ -1347,7 +1367,9 @@
                 body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 0; margin: 0; color: #1e293b; font-size: 10pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                 h1 { margin: 0 0 4px 0; font-size: 18pt; color: #0f172a; }
                 h3 { margin: 0 0 16px 0; color: #64748b; font-weight: 500; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.5px; }
-                h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #64748b; color: ${coloreAccento}; }
+                h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.5px; margin: 24px 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #64748b; }
+                h2.sez-certificati { color: #dc2626; }
+                h2.sez-documenti { color: #7e22ce; }
                 table { width: 100%; border-collapse: collapse; font-size: 10pt; margin-bottom: 8px; }
                 th, td { border: 1px solid #64748b; padding: 6px 8px; text-align: left; font-size: 10pt; }
                 th { background-color: #e2e8f0 !important; font-weight: 600; color: #475569; text-transform: uppercase; font-size: 9pt; }
@@ -1358,13 +1380,8 @@
               <h1>${titoloPagina}</h1>
               <h3>${sottotitoloFiltri}</h3>
 
-              <h2>${titoloPagina} (${listaEsportata.length})</h2>
-              ${listaEsportata.length > 0 ? `
-                <table>
-                  <thead><tr><th style="width:25%;">Nominativo</th><th style="width:45%;">Corsi</th><th style="width:30%;">${esportaDocumenti ? 'Stato' : 'Scadenza'}</th></tr></thead>
-                  <tbody>${listaEsportata.map(u => rigaTabella(u)).join('')}</tbody>
-                </table>
-              ` : `<div class="empty">${esportaDocumenti ? 'Nessun documento mancante.' : 'Nessun certificato scaduto.'}</div>`}
+              ${sezioneCertificati}
+              ${sezioneDocumenti}
 
               <script>
                 window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }
@@ -2344,7 +2361,7 @@
                 <div className="overflow-y-auto flex-1 bg-slate-50 p-6 flex flex-col gap-6" style={{ minHeight: '300px' }}>
 
                   {/* FILTRI */}
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-nowrap gap-2 items-end overflow-x-auto">
+                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-nowrap gap-2 items-end">
                     <div className="min-w-[130px]">
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 whitespace-nowrap">Giorno della Settimana</label>
                       <select value={filtroScadenzeGiorno} onChange={e => setFiltroScadenzeGiorno(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
@@ -2373,6 +2390,7 @@
                       <select value={tipoEsportazioneScadenze} onChange={e => setTipoEsportazioneScadenze(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
                         <option value="certificati">Certificati Scaduti</option>
                         <option value="documenti">Documenti Non Firmati</option>
+                        <option value="entrambi">Entrambi</option>
                       </select>
                     </div>
                     {(filtroScadenzeGiorno || filtroScadenzeAttivita || ordinamentoScadenze !== 'scadenza') && (
