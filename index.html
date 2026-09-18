@@ -2357,7 +2357,7 @@
                 <div className="overflow-y-auto flex-1 bg-slate-50 p-6 flex flex-col gap-6" style={{ minHeight: '300px' }}>
 
                   {/* FILTRI */}
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-nowrap gap-2 items-end">
+                  <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-nowrap gap-2 items-end">
                     <div className="min-w-[130px]">
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 whitespace-nowrap">Giorno della Settimana</label>
                       <select value={filtroScadenzeGiorno} onChange={e => setFiltroScadenzeGiorno(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
@@ -2396,7 +2396,7 @@
                   </div>
 
                   {/* SEZIONE SCADUTI */}
-                  <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
+                  <div className="shrink-0 bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
                       <div className="bg-red-50 px-4 py-3 border-b border-red-100 flex justify-between items-center sticky top-0">
                           <h4 className="font-bold text-red-700 uppercase tracking-wider text-sm flex items-center gap-2"><XIcon size={16}/> Certificati Scaduti</h4>
                           <span className="bg-red-200 text-red-800 text-xs font-bold px-2.5 py-1 rounded-full">{scadenzeScadutiFiltrati.length}</span>
@@ -2423,7 +2423,7 @@
                   </div>
 
                   {/* SEZIONE IN SCADENZA */}
-                  <div className="bg-white rounded-xl shadow-sm border border-orange-200 overflow-hidden">
+                  <div className="shrink-0 bg-white rounded-xl shadow-sm border border-orange-200 overflow-hidden">
                       <div className="bg-orange-50 px-4 py-3 border-b border-orange-100 flex justify-between items-center sticky top-0">
                           <h4 className="font-bold text-orange-700 uppercase tracking-wider text-sm flex items-center gap-2"><ClockIcon size={16}/> In Scadenza (nei prossimi 30 giorni)</h4>
                           <span className="bg-orange-200 text-orange-800 text-xs font-bold px-2.5 py-1 rounded-full">{scadenzeInScadenzaFiltrati.length}</span>
@@ -2450,7 +2450,7 @@
                   </div>
 
                   {/* SEZIONE DOCUMENTI NON FIRMATI */}
-                  <div className="bg-white rounded-xl shadow-sm border border-purple-200 overflow-hidden">
+                  <div className="shrink-0 bg-white rounded-xl shadow-sm border border-purple-200 overflow-hidden">
                       <div className="bg-purple-50 px-4 py-3 border-b border-purple-100 flex justify-between items-center sticky top-0">
                           <h4 className="font-bold text-purple-700 uppercase tracking-wider text-sm flex items-center gap-2"><EditIcon size={16}/> Documenti Non Firmati / Da Verificare</h4>
                           <span className="bg-purple-200 text-purple-800 text-xs font-bold px-2.5 py-1 rounded-full">{documentiMancantiFiltrati.length}</span>
