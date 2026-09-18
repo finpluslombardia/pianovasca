@@ -2474,7 +2474,7 @@
 
                     if (isCompletatiOpen) {
                         return (
-                          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                          <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center sticky top-0">
                               <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Contatti Completati</h4>
                               <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{contattiAttesaCompletati.length}</span>
@@ -2493,7 +2493,7 @@
                     return (
                       <>
                         {/* SEZIONE SCADUTI */}
-                        <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
+                        <div className="shrink-0 bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
                           <div className="bg-red-50 px-4 py-3 border-b border-red-100 flex justify-between items-center sticky top-0">
                             <h4 className="font-bold text-red-700 uppercase tracking-wider text-sm flex items-center gap-2"><XIcon size={16}/> Scaduti</h4>
                             <span className="bg-red-200 text-red-800 text-xs font-bold px-2.5 py-1 rounded-full">{scadutiList.length}</span>
@@ -2504,7 +2504,7 @@
                         </div>
 
                         {/* SEZIONE DA FARE OGGI */}
-                        <div className="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+                        <div className="shrink-0 bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
                           <div className="bg-amber-50 px-4 py-3 border-b border-amber-100 flex justify-between items-center sticky top-0">
                             <h4 className="font-bold text-amber-700 uppercase tracking-wider text-sm flex items-center gap-2"><ClockIcon size={16}/> Da Fare Oggi</h4>
                             <span className="bg-amber-200 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full">{oggiList.length}</span>
@@ -2515,7 +2515,7 @@
                         </div>
 
                         {/* SEZIONE LISTA D'ATTESA (tutti gli altri) */}
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                           <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center sticky top-0">
                             <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Lista d'Attesa</h4>
                             <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{altriList.length}</span>
