@@ -2404,66 +2404,129 @@
                     <button onClick={() => setIsListaAttesaOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                   </div>
                 </div>
-                <div className="overflow-y-auto flex-1 bg-slate-50 p-6" style={{ minHeight: '300px' }}>
+                <div className="overflow-y-auto flex-1 bg-slate-50 p-6 flex flex-col gap-4" style={{ minHeight: '300px' }}>
+                  {(() => {
+                    const oggiRif = new Date(); oggiRif.setHours(0,0,0,0);
+                    const classificaScadenza = (c) => {
+                        const d = c.dataScadenza ? new Date(c.dataScadenza) : null;
+                        if (d) d.setHours(0,0,0,0);
+                        if (!d) return 'altri';
+                        if (d < oggiRif) return 'scaduti';
+                        if (d.getTime() === oggiRif.getTime()) return 'oggi';
+                        return 'altri';
+                    };
 
-                  {/* ELENCO CONTATTI */}
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center sticky top-0">
-                      <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">{isCompletatiOpen ? 'Contatti Completati' : 'Contatti in Attesa'}</h4>
-                      <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{isCompletatiOpen ? contattiAttesaCompletati.length : contattiAttesaAttivi.length}</span>
-                    </div>
-                    {(isCompletatiOpen ? contattiAttesaCompletati : contattiAttesaAttivi).length > 0 ? (
-                      <div className="max-h-[60vh] overflow-y-auto">
-                        <table className="w-full text-left text-sm">
-                          <thead>
-                            <tr className="bg-slate-50 text-[11px] uppercase text-slate-500 sticky top-0">
-                              <th className="p-3 font-bold">Nome e Cognome</th>
-                              <th className="p-3 font-bold text-center">Età</th>
-                              <th className="p-3 font-bold">Motivazione</th>
-                              <th className="p-3 font-bold text-center">Data Creazione</th>
-                              <th className="p-3 font-bold text-center">Data Scadenza</th>
-                              <th className="p-3 font-bold text-center">Azioni</th>
+                    const renderRigaAttesa = (c) => {
+                        const oggiRifRiga = new Date(); oggiRifRiga.setHours(0,0,0,0);
+                        const dataScadRif = c.dataScadenza ? new Date(c.dataScadenza) : null;
+                        if (dataScadRif) dataScadRif.setHours(0,0,0,0);
+                        const scaduto = dataScadRif && dataScadRif < oggiRifRiga;
+                        const scadeOggi = dataScadRif && dataScadRif.getTime() === oggiRifRiga.getTime();
+                        const infoCorso = c.motivazione === 'corso' ? attivita.find(a => a.id === c.corsoRichiesto) : null;
+                        const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Corso: ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'prova' ? 'Prova' : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
+                        return (
+                            <tr key={c.id} className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors ${c.completato ? 'opacity-60' : ''}`}>
+                              <td className="p-3">
+                                <button type="button" onClick={() => setDettaglioContattoAttesa(c)} className="font-semibold text-blue-700 hover:underline text-left">{c.nome}</button>
+                              </td>
+                              <td className="p-3 text-center text-slate-600">{c.eta || '-'}</td>
+                              <td className="p-3 text-slate-600 text-xs">{etichettaMotivazione}</td>
+                              <td className="p-3 text-center text-slate-600">{c.dataCreazione ? formatDate(c.dataCreazione) : '-'}</td>
+                              <td className={`p-3 text-center font-bold ${scaduto ? 'text-red-600' : scadeOggi ? 'text-amber-600' : 'text-slate-600'}`}>
+                                {c.dataScadenza ? formatDate(c.dataScadenza) : '-'}
+                                {scaduto && <span className="block text-[9px] uppercase font-bold">Da ricontattare</span>}
+                                {scadeOggi && <span className="block text-[9px] uppercase font-bold">Da fare oggi</span>}
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center justify-center gap-2">
+                                  {isCompletatiOpen ? (
+                                    <button type="button" onClick={() => riattivaContatto(c.id)} title="Riattiva" className="text-amber-500 hover:text-amber-700 transition-colors p-1.5 bg-amber-50 hover:bg-amber-100 rounded-md"><RotateCcwIcon size={16}/></button>
+                                  ) : (
+                                    <button type="button" onClick={() => segnaCompletatoContatto(c.id)} title="Segna come completato" className="text-green-500 hover:text-green-700 transition-colors p-1.5 bg-green-50 hover:bg-green-100 rounded-md"><CheckCircleIcon size={16}/></button>
+                                  )}
+                                  <button type="button" onClick={() => avviaModificaContattoAttesa(c)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
+                                  <button type="button" onClick={() => eliminaContattoAttesa(c.id)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
+                                </div>
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {ordinaContattiAttesa(isCompletatiOpen ? contattiAttesaCompletati : contattiAttesaAttivi).map(c => {
-                              const scaduto = c.dataScadenza && new Date(c.dataScadenza) < new Date(new Date().setHours(0,0,0,0));
-                              const infoCorso = c.motivazione === 'corso' ? attivita.find(a => a.id === c.corsoRichiesto) : null;
-                              const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Corso: ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'prova' ? 'Prova' : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
-                              return (
-                                <tr key={c.id} className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors ${c.completato ? 'opacity-60' : ''}`}>
-                                  <td className="p-3">
-                                    <button type="button" onClick={() => setDettaglioContattoAttesa(c)} className="font-semibold text-blue-700 hover:underline text-left">{c.nome}</button>
-                                  </td>
-                                  <td className="p-3 text-center text-slate-600">{c.eta || '-'}</td>
-                                  <td className="p-3 text-slate-600 text-xs">{etichettaMotivazione}</td>
-                                  <td className="p-3 text-center text-slate-600">{c.dataCreazione ? formatDate(c.dataCreazione) : '-'}</td>
-                                  <td className={`p-3 text-center font-bold ${scaduto ? 'text-red-600' : 'text-slate-600'}`}>
-                                    {c.dataScadenza ? formatDate(c.dataScadenza) : '-'}
-                                    {scaduto && <span className="block text-[9px] uppercase font-bold">Da ricontattare</span>}
-                                  </td>
-                                  <td className="p-3">
-                                    <div className="flex items-center justify-center gap-2">
-                                      {isCompletatiOpen ? (
-                                        <button type="button" onClick={() => riattivaContatto(c.id)} title="Riattiva" className="text-amber-500 hover:text-amber-700 transition-colors p-1.5 bg-amber-50 hover:bg-amber-100 rounded-md"><RotateCcwIcon size={16}/></button>
-                                      ) : (
-                                        <button type="button" onClick={() => segnaCompletatoContatto(c.id)} title="Segna come completato" className="text-green-500 hover:text-green-700 transition-colors p-1.5 bg-green-50 hover:bg-green-100 rounded-md"><CheckCircleIcon size={16}/></button>
-                                      )}
-                                      <button type="button" onClick={() => avviaModificaContattoAttesa(c)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
-                                      <button type="button" onClick={() => eliminaContattoAttesa(c.id)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className="p-6 text-center text-slate-500 text-sm">{isCompletatiOpen ? 'Nessun contatto completato.' : 'Nessun contatto in lista d\'attesa.'}</div>
-                    )}
-                  </div>
+                        );
+                    };
 
+                    const renderTabellaAttesa = (lista) => (
+                        <div className="max-h-[40vh] overflow-y-auto">
+                          <table className="w-full text-left text-sm">
+                            <thead>
+                              <tr className="bg-slate-50 text-[11px] uppercase text-slate-500 sticky top-0">
+                                <th className="p-3 font-bold">Nome e Cognome</th>
+                                <th className="p-3 font-bold text-center">Età</th>
+                                <th className="p-3 font-bold">Motivazione</th>
+                                <th className="p-3 font-bold text-center">Data Creazione</th>
+                                <th className="p-3 font-bold text-center">Data Scadenza</th>
+                                <th className="p-3 font-bold text-center">Azioni</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {ordinaContattiAttesa(lista).map(renderRigaAttesa)}
+                            </tbody>
+                          </table>
+                        </div>
+                    );
+
+                    if (isCompletatiOpen) {
+                        return (
+                          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center sticky top-0">
+                              <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Contatti Completati</h4>
+                              <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{contattiAttesaCompletati.length}</span>
+                            </div>
+                            {contattiAttesaCompletati.length > 0 ? renderTabellaAttesa(contattiAttesaCompletati) : (
+                              <div className="p-6 text-center text-slate-500 text-sm">Nessun contatto completato.</div>
+                            )}
+                          </div>
+                        );
+                    }
+
+                    const scadutiList = contattiAttesaAttivi.filter(c => classificaScadenza(c) === 'scaduti');
+                    const oggiList = contattiAttesaAttivi.filter(c => classificaScadenza(c) === 'oggi');
+                    const altriList = contattiAttesaAttivi.filter(c => classificaScadenza(c) === 'altri');
+
+                    return (
+                      <>
+                        {/* SEZIONE SCADUTI */}
+                        <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
+                          <div className="bg-red-50 px-4 py-3 border-b border-red-100 flex justify-between items-center sticky top-0">
+                            <h4 className="font-bold text-red-700 uppercase tracking-wider text-sm flex items-center gap-2"><XIcon size={16}/> Scaduti</h4>
+                            <span className="bg-red-200 text-red-800 text-xs font-bold px-2.5 py-1 rounded-full">{scadutiList.length}</span>
+                          </div>
+                          {scadutiList.length > 0 ? renderTabellaAttesa(scadutiList) : (
+                            <div className="p-6 text-center text-slate-500 text-sm">Nessuna scadenza passata.</div>
+                          )}
+                        </div>
+
+                        {/* SEZIONE DA FARE OGGI */}
+                        <div className="bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
+                          <div className="bg-amber-50 px-4 py-3 border-b border-amber-100 flex justify-between items-center sticky top-0">
+                            <h4 className="font-bold text-amber-700 uppercase tracking-wider text-sm flex items-center gap-2"><ClockIcon size={16}/> Da Fare Oggi</h4>
+                            <span className="bg-amber-200 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full">{oggiList.length}</span>
+                          </div>
+                          {oggiList.length > 0 ? renderTabellaAttesa(oggiList) : (
+                            <div className="p-6 text-center text-slate-500 text-sm">Nessuna scadenza oggi.</div>
+                          )}
+                        </div>
+
+                        {/* SEZIONE LISTA D'ATTESA (tutti gli altri) */}
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                          <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center sticky top-0">
+                            <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Lista d'Attesa</h4>
+                            <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{altriList.length}</span>
+                          </div>
+                          {altriList.length > 0 ? renderTabellaAttesa(altriList) : (
+                            <div className="p-6 text-center text-slate-500 text-sm">Nessun altro contatto in lista d'attesa.</div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
                   <button onClick={() => setIsListaAttesaOpen(false)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
@@ -2475,7 +2538,11 @@
           {/* --- MODALE DETTAGLIO CONTATTO ATTESA --- */}
           {dettaglioContattoAttesa && (() => {
             const c = dettaglioContattoAttesa;
-            const scaduto = c.dataScadenza && new Date(c.dataScadenza) < new Date(new Date().setHours(0,0,0,0));
+            const oggiRif = new Date(); oggiRif.setHours(0,0,0,0);
+            const dataScadRif = c.dataScadenza ? new Date(c.dataScadenza) : null;
+            if (dataScadRif) dataScadRif.setHours(0,0,0,0);
+            const scaduto = dataScadRif && dataScadRif < oggiRif;
+            const scadeOggi = dataScadRif && dataScadRif.getTime() === oggiRif.getTime();
             const infoCorso = c.motivazione === 'corso' ? attivita.find(a => a.id === c.corsoRichiesto) : null;
             const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Apertura/Inserimento Corso — ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'prova' ? 'Prova' : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
             return (
@@ -2514,7 +2581,7 @@
                       </div>
                       <div>
                         <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Data Scadenza</div>
-                        <div className={`text-sm font-bold ${scaduto ? 'text-red-600' : 'text-slate-700'}`}>{c.dataScadenza ? formatDate(c.dataScadenza) : '-'}{scaduto && ' (da ricontattare)'}</div>
+                        <div className={`text-sm font-bold ${scaduto ? 'text-red-600' : scadeOggi ? 'text-amber-600' : 'text-slate-700'}`}>{c.dataScadenza ? formatDate(c.dataScadenza) : '-'}{scaduto && ' (da ricontattare)'}{scadeOggi && ' (da fare oggi)'}</div>
                       </div>
                       <div>
                         <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Operatore</div>
