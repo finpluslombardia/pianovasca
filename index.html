@@ -1157,14 +1157,9 @@
 
           const mapUtenti = new Map();
 
-          // Pass 1: raccogliamo tutti gli utenti garantendo che abbiano l'array 'corsi' vuoto per sicurezza
-          tuttiUtentiUnici.forEach(u => {
-              if (!u || !u.nome || !u.scadCertificato || !certificatoObbligatorio(u.anno, annoRif)) return;
-              const pKey = u.nome.toLowerCase().trim();
-              mapUtenti.set(pKey, { ...u, corsi: [] }); // Inizializza SEMPRE l'array corsi vuoto
-          });
-
-          // Pass 2: popoliamo l'array 'corsi' per ogni utente in base ai corsi a cui sono iscritti
+          // Raccogliamo TUTTI i corsi di ogni persona in un solo passaggio, indipendentemente dal
+          // valore del certificato salvato in quello specifico corso (che potrebbe essere superato
+          // se quel corso non è stato più riaperto/salvato dopo un aggiornamento fatto altrove).
           tuttiCorsiSelect.forEach(c => {
               const infoAtt = attivita.find(a => a.id === c.data.id);
               const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
@@ -1173,20 +1168,17 @@
               const corsoDettaglio = `${nomeCorsoStr} (${giornoStr} ${c.oraInizio || ''})`.trim();
 
               (c.data.partecipanti || []).forEach(p => {
-                  if (!p || !p.nome || !p.scadCertificato || !certificatoObbligatorio(p.anno, annoRif)) return;
+                  if (!p || !p.nome) return;
                   const pKey = p.nome.toLowerCase().trim();
-                  
+
                   let utenteMap = mapUtenti.get(pKey);
                   if (!utenteMap) {
-                      utenteMap = { ...p, corsi: [] };
+                      // scadCertificatoCorso/annoCorso sono solo un ripiego, usati esclusivamente
+                      // se la persona non si trovasse nell'archivio soci (caso raro/di sicurezza).
+                      utenteMap = { nome: p.nome, scadCertificatoCorso: p.scadCertificato || '', annoCorso: p.anno || '', corsi: [] };
                       mapUtenti.set(pKey, utenteMap);
                   }
-                  
-                  // Se l'elenco corsi non esiste ancora, forziamo la creazione (non dovrebbe mai accadere, ma blindiamo il codice)
-                  if (!utenteMap.corsi) utenteMap.corsi = [];
-                  
-                  // Manteniamo sia il testo da mostrare sia i dati strutturati (giorno, attività),
-                  // così l'elenco può essere filtrato per giorno della settimana e/o tipo di corso.
+
                   if (!utenteMap.corsi.some(co => co.testo === corsoDettaglio)) {
                       utenteMap.corsi.push({ testo: corsoDettaglio, giorno: c.giorno, attivitaId: c.data.id, oraInizio: c.oraInizio || '', nomeCorso: nomeCorsoStr });
                   }
@@ -1196,14 +1188,29 @@
           const scaduti = [];
           const inScadenza = [];
 
-          Array.from(mapUtenti.values()).forEach(u => {
-              const dataScad = new Date(u.scadCertificato);
+          mapUtenti.forEach((u, pKey) => {
+              // BUGFIX: usiamo SEMPRE il certificato più aggiornato conosciuto dal sistema
+              // (l'archivio soci centralizzato) invece del valore trovato nel primo corso
+              // incontrato. Senza questo, se una persona è iscritta a più corsi e solo uno di
+              // questi viene riaperto/salvato dopo un aggiornamento del certificato, gli ALTRI
+              // corsi continuano a mostrare il dato vecchio — e il pannello Scadenze poteva
+              // pescare proprio quel valore superato, segnalando come "scaduto" un certificato
+              // in realtà già rinnovato e in regola.
+              const inArchivio = archivioSoci[pKey];
+              const scadCertificatoEffettivo = (inArchivio && inArchivio.scadCertificato) || u.scadCertificatoCorso;
+              const annoEffettivo = (inArchivio && inArchivio.anno) || u.annoCorso;
+
+              if (!scadCertificatoEffettivo || !certificatoObbligatorio(annoEffettivo, annoRif)) return;
+
+              const dataScad = new Date(scadCertificatoEffettivo);
               dataScad.setHours(0,0,0,0);
 
+              const voce = { nome: u.nome, anno: annoEffettivo, scadCertificato: scadCertificatoEffettivo, corsi: u.corsi };
+
               if (dataScad < oggi) {
-                  scaduti.push(u);
+                  scaduti.push(voce);
               } else if (dataScad <= tra30Giorni) {
-                  inScadenza.push(u);
+                  inScadenza.push(voce);
               }
           });
 
@@ -1211,7 +1218,7 @@
           inScadenza.sort((a, b) => new Date(a.scadCertificato) - new Date(b.scadCertificato));
 
           return { scaduti, inScadenza };
-      }, [tuttiCorsiSelect, attivita, tuttiUtentiUnici, stagioneSelezionata]);
+      }, [tuttiCorsiSelect, attivita, archivioSoci, stagioneSelezionata]);
 
       // Elenco di chi non ha "documentiFirmati" a "sì" (quindi "no" oppure ancora da verificare),
       // indipendentemente dal certificato medico. Stessa logica di raccolta corsi delle scadenze.
