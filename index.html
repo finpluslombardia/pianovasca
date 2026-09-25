@@ -1094,6 +1094,7 @@
       const contattiAttesaCompletati = useMemo(() => listaAttesa.filter(c => c.completato), [listaAttesa]);
 
       const [ordinamentoAttesa, setOrdinamentoAttesa] = useState('creazione');
+      const [ricercaAttesa, setRicercaAttesa] = useState('');
       const etichettaMotivazioneAttesa = useCallback((c) => {
           if (c.motivazione === 'private') return 'Private';
           if (c.motivazione === 'corso') return `Corso: ${attivita.find(a => a.id === c.corsoRichiesto)?.name || '-'}`;
@@ -2498,6 +2499,16 @@
                 <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center gap-3 flex-wrap rounded-t-2xl">
                   <h3 className="font-bold text-xl flex items-center gap-2"><ClipboardListIcon size={24}/> Lista d'Attesa</h3>
                   <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <SearchIcon size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={ricercaAttesa}
+                        onChange={e => setRicercaAttesa(e.target.value)}
+                        placeholder="Cerca nominativo..."
+                        className="pl-8 pr-3 py-2 bg-white/15 hover:bg-white/20 focus:bg-white focus:text-slate-800 rounded-lg text-sm font-medium text-white placeholder-white/60 outline-none transition-colors w-40 focus:w-56"
+                      />
+                    </div>
                     <select value={ordinamentoAttesa} onChange={e => setOrdinamentoAttesa(e.target.value)} className="px-3 py-2 bg-white/15 hover:bg-white/25 rounded-lg text-sm font-bold text-white outline-none cursor-pointer [&>option]:text-slate-800">
                       <option value="creazione">Ordina: Data Creazione</option>
                       <option value="scadenza">Ordina: Data Scadenza</option>
@@ -2508,8 +2519,11 @@
                         <PlusIcon size={16}/> Nuovo Contatto
                       </button>
                     )}
-                    <button onClick={() => setIsCompletatiOpen(!isCompletatiOpen)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-colors ${isCompletatiOpen ? 'bg-white text-slate-800' : 'bg-white/15 hover:bg-white/25'}`}>
-                      {isCompletatiOpen ? <><ClipboardListIcon size={16}/> Attivi</> : <><CheckCircleIcon size={16}/> Completati ({contattiAttesaCompletati.length})</>}
+                    <button onClick={() => setIsCompletatiOpen(!isCompletatiOpen)} title={isCompletatiOpen ? 'Torna agli attivi' : `Completati (${contattiAttesaCompletati.length})`} className={`relative flex items-center justify-center p-2 rounded-lg transition-colors ${isCompletatiOpen ? 'bg-white text-slate-800' : 'bg-white/15 hover:bg-white/25'}`}>
+                      {isCompletatiOpen ? <ClipboardListIcon size={16}/> : <CheckCircleIcon size={16}/>}
+                      {!isCompletatiOpen && contattiAttesaCompletati.length > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-blue-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-slate-800">{contattiAttesaCompletati.length}</span>
+                      )}
                     </button>
                     <button onClick={() => setIsListaAttesaOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                   </div>
@@ -2582,23 +2596,28 @@
                         </div>
                     );
 
+                    const termine = ricercaAttesa.trim().toLowerCase();
+                    const passaRicerca = (c) => !termine || (c.nome || '').toLowerCase().includes(termine);
+
                     if (isCompletatiOpen) {
+                        const completatiFiltrati = contattiAttesaCompletati.filter(passaRicerca);
                         return (
                           <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center sticky top-0">
                               <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Contatti Completati</h4>
-                              <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{contattiAttesaCompletati.length}</span>
+                              <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{completatiFiltrati.length}</span>
                             </div>
-                            {contattiAttesaCompletati.length > 0 ? renderTabellaAttesa(contattiAttesaCompletati) : (
-                              <div className="p-6 text-center text-slate-500 text-sm">Nessun contatto completato.</div>
+                            {completatiFiltrati.length > 0 ? renderTabellaAttesa(completatiFiltrati) : (
+                              <div className="p-6 text-center text-slate-500 text-sm">{termine ? 'Nessun contatto completato corrisponde alla ricerca.' : 'Nessun contatto completato.'}</div>
                             )}
                           </div>
                         );
                     }
 
-                    const scadutiList = contattiAttesaAttivi.filter(c => classificaScadenza(c) === 'scaduti');
-                    const oggiList = contattiAttesaAttivi.filter(c => classificaScadenza(c) === 'oggi');
-                    const altriList = contattiAttesaAttivi.filter(c => classificaScadenza(c) === 'altri');
+                    const attiviFiltrati = contattiAttesaAttivi.filter(passaRicerca);
+                    const scadutiList = attiviFiltrati.filter(c => classificaScadenza(c) === 'scaduti');
+                    const oggiList = attiviFiltrati.filter(c => classificaScadenza(c) === 'oggi');
+                    const altriList = attiviFiltrati.filter(c => classificaScadenza(c) === 'altri');
 
                     return (
                       <>
@@ -2609,7 +2628,7 @@
                             <span className="bg-red-200 text-red-800 text-xs font-bold px-2.5 py-1 rounded-full">{scadutiList.length}</span>
                           </div>
                           {scadutiList.length > 0 ? renderTabellaAttesa(scadutiList) : (
-                            <div className="p-6 text-center text-slate-500 text-sm">Nessuna scadenza passata.</div>
+                            <div className="p-6 text-center text-slate-500 text-sm">{termine ? 'Nessun risultato per la ricerca.' : 'Nessuna scadenza passata.'}</div>
                           )}
                         </div>
 
@@ -2620,7 +2639,7 @@
                             <span className="bg-amber-200 text-amber-800 text-xs font-bold px-2.5 py-1 rounded-full">{oggiList.length}</span>
                           </div>
                           {oggiList.length > 0 ? renderTabellaAttesa(oggiList) : (
-                            <div className="p-6 text-center text-slate-500 text-sm">Nessuna scadenza oggi.</div>
+                            <div className="p-6 text-center text-slate-500 text-sm">{termine ? 'Nessun risultato per la ricerca.' : 'Nessuna scadenza oggi.'}</div>
                           )}
                         </div>
 
@@ -2631,7 +2650,7 @@
                             <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{altriList.length}</span>
                           </div>
                           {altriList.length > 0 ? renderTabellaAttesa(altriList) : (
-                            <div className="p-6 text-center text-slate-500 text-sm">Nessun altro contatto in lista d'attesa.</div>
+                            <div className="p-6 text-center text-slate-500 text-sm">{termine ? 'Nessun risultato per la ricerca.' : 'Nessun altro contatto in lista d\'attesa.'}</div>
                           )}
                         </div>
                       </>
