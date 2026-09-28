@@ -1500,7 +1500,20 @@
           return results;
       }, [searchQuery, tuttiCorsiSelect]);
 
-      const apriCorsoDaRicerca = (c) => {
+      // Quando si apre un corso dalla ricerca, la persona cercata viene evidenziata nell'elenco
+      // iscritti (e l'elenco scorre fino a lei). L'informazione vive dentro editModal: quando il
+      // box del corso viene chiuso (editModal torna null) l'evidenziazione sparisce da sola.
+      const socioEvidenziatoKey = editModal && editModal.socioEvidenziato ? editModal.socioEvidenziato : null;
+      useEffect(() => {
+          if (!socioEvidenziatoKey) return;
+          const t = setTimeout(() => {
+              const el = document.getElementById('riga-socio-evidenziato');
+              if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 150);
+          return () => clearTimeout(t);
+      }, [socioEvidenziatoKey]);
+
+      const apriCorsoDaRicerca = (c, nomeSocio) => {
           setIsSearchModalOpen(false);
           const info = attivita.find(a => a.id === c.data.id);
           const vascaOriginale = c.vasca;
@@ -1535,6 +1548,7 @@
               dataFine: c.data.dataFine || '',
               infoAttivita: info,
               partecipanti: partecipantiOrdinati,
+              socioEvidenziato: nomeSocio ? nomeSocio.toLowerCase().trim() : null,
               tab: 'iscritti'
           });
           setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
@@ -2332,11 +2346,31 @@
                         const infoAtt = attivita.find(a => a.id === res.corso.data.id);
                         const nomeLiv = infoAtt?.isFreeTextLevel ? res.corso.data.livello : infoAtt?.levels?.find(l => l.val === res.corso.data.livello)?.name;
                         const nomeCompleto = nomeLiv ? `${infoAtt?.name} - ${nomeLiv}` : infoAtt?.name;
-                        
+
+                        // Dati anagrafici più aggiornati: archivio soci, con ripiego sul dato del corso.
+                        const inArchivioRic = archivioSoci[(res.partecipante.nome || '').toLowerCase().trim()];
+                        const annoNascitaRic = (inArchivioRic && inArchivioRic.anno) || res.partecipante.anno || '';
+                        const scadCertRic = (inArchivioRic && inArchivioRic.scadCertificato) || res.partecipante.scadCertificato || '';
+                        const annoRifRic = parseInt(String(stagioneSelezionata).slice(0, 4), 10) || new Date().getFullYear();
+                        const certObblRic = certificatoObbligatorio(annoNascitaRic, annoRifRic);
+                        const certScadutoRic = certObblRic && !!scadCertRic && isScaduto(scadCertRic);
+                        const docRic = res.partecipante.documentiFirmati;
+                        const docOkRic = docRic === 'si';
+                        const chipBase = 'px-2 py-0.5 rounded font-bold border text-sm';
+
                         return (
-                          <li key={i} className="hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between p-4 group" onClick={() => apriCorsoDaRicerca(res.corso)}>
+                          <li key={i} className="hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between p-4 group" onClick={() => apriCorsoDaRicerca(res.corso, res.partecipante.nome)}>
                             <div>
-                              <div className="font-bold text-slate-800 text-lg mb-1">{res.partecipante.nome}</div>
+                              <div className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2 flex-wrap">
+                                <span>{res.partecipante.nome}</span>
+                                {annoNascitaRic && <span className="font-medium text-slate-500 text-base">({annoNascitaRic})</span>}
+                                <span className={`${chipBase} ${certScadutoRic ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                                  Certificato: {!certObblRic && !scadCertRic ? 'non obbligatorio' : scadCertRic ? formatDate(scadCertRic) : '-'}{certScadutoRic ? ' (scaduto)' : ''}
+                                </span>
+                                <span className={`${chipBase} ${docOkRic ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
+                                  Documenti: {docRic === 'si' ? 'Sì' : docRic === 'no' ? 'No' : 'Da verificare'}
+                                </span>
+                              </div>
                               <div className="text-sm font-medium text-slate-500 flex items-center gap-2">
                                 <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200">{GIORNI[res.corso.giorno]} {res.corso.oraInizio}</span>
                                 <span>{res.corso.vasca === 'interna' ? 'V. Interna' : 'V. Esterna'}</span>
@@ -3537,9 +3571,10 @@
                           const renderRigaPartecipante = (p, i) => {
                             const certObbligatorio = certificatoObbligatorio(p.anno, annoRifPartecipanti);
                             const scaduto = certObbligatorio && isScaduto(p.scadCertificato);
+                            const evidenziato = !!editModal.socioEvidenziato && (p.nome || '').toLowerCase().trim() === editModal.socioEvidenziato;
                             return (
-                            <tr key={i} className={`border-b border-slate-100 transition-colors ${editingPartecipanteIndex === i ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-                              <td className="p-3 font-medium text-slate-800">{p.nome}</td>
+                            <tr key={i} id={evidenziato ? 'riga-socio-evidenziato' : undefined} className={`border-b border-slate-100 transition-colors ${editingPartecipanteIndex === i ? 'bg-blue-50' : evidenziato ? 'bg-amber-50' : 'hover:bg-slate-50'}`}>
+                              <td className={`p-3 font-medium text-slate-800 ${evidenziato ? 'border-l-4 border-amber-400' : ''}`}>{p.nome}</td>
                               <td className="p-3 text-center text-slate-600">{p.anno || '-'}</td>
                               <td className={`p-3 text-center font-bold ${scaduto ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
                                 {!certObbligatorio && !p.scadCertificato ? (
