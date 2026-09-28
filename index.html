@@ -134,7 +134,7 @@
           (cell?.partecipanti || []).forEach(p => {
             if (p && p.nome && p.nome.trim()) {
               const key = p.nome.toLowerCase().trim();
-              map[key] = { nome: p.nome.trim(), anno: p.anno || '', scadCertificato: p.scadCertificato || '' };
+              map[key] = { nome: p.nome.trim(), anno: p.anno || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '' };
             }
           });
         });
@@ -392,13 +392,13 @@
       });
 
       // --- STATO NUOVO PARTECIPANTE ---
-      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
       const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
       const [showAddForm, setShowAddForm] = useState(false);
 
       // --- STATI AGGIUNTA UTENTE RAPIDO ---
       const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
 
       // --- STATI RICERCA SOCIO ---
       const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -925,7 +925,7 @@
       // Crea o aggiorna la scheda di un socio nell'archivio permanente. Se l'anno di nascita o
       // il certificato vengono lasciati vuoti, mantiene il valore già presente in archivio
       // invece di cancellarlo: evita di perdere dati già noti per una semplice dimenticanza.
-      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato) => {
+      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card) => {
           if (!nome || !nome.trim()) return;
           const key = nome.toLowerCase().trim();
           setArchivioSoci(prev => {
@@ -935,7 +935,8 @@
                   [key]: {
                       nome: nome.trim(),
                       anno: anno || (esistente ? esistente.anno : '') || '',
-                      scadCertificato: scadCertificato || (esistente ? esistente.scadCertificato : '') || ''
+                      scadCertificato: scadCertificato || (esistente ? esistente.scadCertificato : '') || '',
+                      card: card || (esistente ? esistente.card : '') || ''
                   }
               };
           });
@@ -976,7 +977,8 @@
               map[key] = {
                   nome: esisteGia ? esisteGia.nome : nomeCompleto,
                   anno: anno || (esisteGia ? esisteGia.anno : ''),
-                  scadCertificato: esisteGia ? esisteGia.scadCertificato : ''
+                  scadCertificato: esisteGia ? esisteGia.scadCertificato : '',
+                  card: esisteGia ? (esisteGia.card || '') : ''
               };
 
               if (esisteGia) aggiornati++; else nuovi++;
@@ -1426,7 +1428,7 @@
         
         // Archivio soci permanente: memorizziamo/aggiorniamo questo socio così non andrà
         // ridigitato da capo la prossima volta (anche in un'altra stagione).
-        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato);
+        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card);
         
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
@@ -1452,6 +1454,8 @@
                         nome: addUtenteRapido.nome,
                         anno: addUtenteRapido.anno,
                         scadCertificato: addUtenteRapido.scadCertificato,
+                        documentiFirmati: addUtenteRapido.documentiFirmati || '',
+                        card: addUtenteRapido.card || '',
                         iscrizioni: iscrizioniPulite
                     });
                     partecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
@@ -1464,7 +1468,7 @@
 
         const nomeAggiunto = addUtenteRapido.nome.trim();
         setIsAddUserModalOpen(false);
-        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
 
         if (corsiNonPiuDisponibili > 0) {
             mostraToast("Alcuni corsi selezionati non erano più disponibili e sono stati saltati.", 'error');
@@ -1510,7 +1514,8 @@
                 return {
                     ...p,
                     anno: inArchivio.anno || p.anno,
-                    scadCertificato: inArchivio.scadCertificato || p.scadCertificato
+                    scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
+                  card: inArchivio.card || p.card || ''
                 };
             })
             .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -1532,7 +1537,7 @@
               partecipanti: partecipantiOrdinati,
               tab: 'iscritti'
           });
-          setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
+          setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
           setEditingPartecipanteIndex(null);
           setShowAddForm(false);
       };
@@ -1617,7 +1622,8 @@
               return {
                   ...p,
                   anno: inArchivio.anno || p.anno,
-                  scadCertificato: inArchivio.scadCertificato || p.scadCertificato
+                  scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
+                  card: inArchivio.card || p.card || ''
               };
           })
           .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -1639,7 +1645,7 @@
           partecipanti: partecipantiOrdinati,
           tab: 'iscritti' // Apre di default la scheda degli iscritti
         });
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1666,7 +1672,7 @@
           return { ...prev, partecipanti: nuoviPartecipanti };
         });
         
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1680,7 +1686,7 @@
       };
 
       const annullaModificaPartecipante = () => {
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1751,7 +1757,7 @@
         // così i loro dati (anno, certificato) restano disponibili per l'autocompletamento
         // anche in altre stagioni o altri corsi, senza doverli ridigitare.
         finalPartecipanti.forEach(p => {
-            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato);
+            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card);
         });
         
         setTuttiPiani(prevTutti => {
@@ -1764,7 +1770,7 @@
           // --- Sincronizzazione globale dei certificati medici, anagrafica e documenti firmati ---
           const mapAggiornamenti = new Map();
           finalPartecipanti.forEach(p => {
-              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato, anno: p.anno, documentiFirmati: p.documentiFirmati });
+              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato, anno: p.anno, documentiFirmati: p.documentiFirmati, card: p.card });
           });
 
           Object.keys(nuovoPiano).forEach(k => {
@@ -1774,9 +1780,9 @@
                       if (!esistente || !esistente.nome) return esistente;
                       const updateInfo = mapAggiornamenti.get(esistente.nome.toLowerCase().trim());
                       if (updateInfo) {
-                          if (updateInfo.scadCertificato !== esistente.scadCertificato || updateInfo.anno !== esistente.anno || updateInfo.documentiFirmati !== esistente.documentiFirmati) {
+                          if (updateInfo.scadCertificato !== esistente.scadCertificato || updateInfo.anno !== esistente.anno || updateInfo.documentiFirmati !== esistente.documentiFirmati || updateInfo.card !== esistente.card) {
                               changed = true;
-                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, documentiFirmati: updateInfo.documentiFirmati };
+                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card };
                           }
                       }
                       return esistente;
@@ -1803,7 +1809,7 @@
         });
         
         setEditModal(null);
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
         mostraToast("Modifiche salvate con successo!");
@@ -2910,6 +2916,7 @@
                                             nome: val,
                                             anno: existing.anno || '',
                                             scadCertificato: existing.scadCertificato || '',
+                                            card: existing.card || '',
                                             iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
                                         });
                                     } else {
@@ -2931,6 +2938,14 @@
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Documenti Firmati</label>
                               <select value={addUtenteRapido.documentiFirmati} onChange={e => setAddUtenteRapido({...addUtenteRapido, documentiFirmati: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer">
+                                <option value="">-- Seleziona --</option>
+                                <option value="si">Sì</option>
+                                <option value="no">No</option>
+                              </select>
+                           </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Card</label>
+                              <select value={addUtenteRapido.card} onChange={e => setAddUtenteRapido({...addUtenteRapido, card: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer">
                                 <option value="">-- Seleziona --</option>
                                 <option value="si">Sì</option>
                                 <option value="no">No</option>
@@ -3244,7 +3259,7 @@
           {/* --- MODALE EDIT CORSO (CON TAB PARTECIPANTI) --- */}
           {editModal && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh] max-h-[800px]">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh] max-h-[800px]">
                 
                 {/* Header Tabulato */}
                 <div className={`px-2 pt-2 flex flex-col border-b border-white/20 text-white ${attivita.find(a => a.id === editModal.attivitaId)?.color.split(' ')[0] || 'bg-blue-600'}`}>
@@ -3425,6 +3440,7 @@
                                                 nome: val,
                                                 anno: existing.anno || '',
                                                 scadCertificato: existing.scadCertificato || '',
+                                                card: existing.card || '',
                                                 iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
                                             });
                                         } else {
@@ -3445,6 +3461,14 @@
                               <div>
                                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Documenti Firmati</label>
                                  <select value={nuovoPartecipante.documentiFirmati} onChange={e => setNuovoPartecipante({...nuovoPartecipante, documentiFirmati: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer">
+                                   <option value="">-- Seleziona --</option>
+                                   <option value="si">Sì</option>
+                                   <option value="no">No</option>
+                                 </select>
+                              </div>
+                              <div>
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Card</label>
+                                 <select value={nuovoPartecipante.card} onChange={e => setNuovoPartecipante({...nuovoPartecipante, card: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer">
                                    <option value="">-- Seleziona --</option>
                                    <option value="si">Sì</option>
                                    <option value="no">No</option>
@@ -3557,6 +3581,9 @@
                               <td className={`p-3 text-center font-bold ${p.documentiFirmati !== 'si' ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
                                 {p.documentiFirmati === 'si' ? 'Sì' : p.documentiFirmati === 'no' ? 'No' : <span className="text-[10px] uppercase font-semibold">Da verificare</span>}
                               </td>
+                              <td className="p-3 text-center font-bold text-slate-600">
+                                {p.card === 'si' ? 'Sì' : p.card === 'no' ? 'No' : <span className="text-slate-400 font-normal">-</span>}
+                              </td>
                               <td className="p-3 flex items-center justify-center gap-2">
                                 <button type="button" onClick={() => avviaModificaPartecipante(i)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
                                 <button type="button" onClick={() => rimuoviPartecipante(i)} title="Rimuovi" className="text-red-400 hover:text-red-600 transition-colors p-1.5 bg-red-50 hover:bg-red-100 rounded-md"><Trash2Icon size={16}/></button>
@@ -3573,21 +3600,22 @@
                                 <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">{attivi.length}</span>
                               </div>
                               <div className="overflow-x-auto w-full">
-                                <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+                                <table className="w-full text-left text-sm whitespace-nowrap min-w-[820px]">
                                   <thead className="bg-slate-100 border-b border-slate-200">
                                     <tr>
-                                      <th className="p-3 font-semibold text-slate-700 w-1/5">Cognome e Nome</th>
-                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/6">Anno</th>
-                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/5">Scad. Certificato</th>
-                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/5">Scad. Iscrizione</th>
-                                      <th className="p-3 font-semibold text-center text-slate-700 w-1/6">Documenti</th>
-                                      <th className="p-3 text-center w-20"></th>
+                                      <th className="p-3 font-semibold text-slate-700 w-[26%]">Cognome e Nome</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-[8%]">Anno</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-[16%]">Scad. Certificato</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-[20%]">Scad. Iscrizione</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-[12%]">Documenti</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-[8%]">Card</th>
+                                      <th className="p-3 text-center w-24"></th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {editModal.partecipanti.map((p, i) => isAttivoInSettimana(p, inizioSettimana) ? renderRigaPartecipante(p, i) : null)}
                                     {attivi.length === 0 && (
-                                      <tr><td colSpan="6" className="p-6 text-center text-slate-400 italic">Nessun iscritto attivo in questa settimana.</td></tr>
+                                      <tr><td colSpan="7" className="p-6 text-center text-slate-400 italic">Nessun iscritto attivo in questa settimana.</td></tr>
                                     )}
                                   </tbody>
                                 </table>
@@ -3601,16 +3629,17 @@
                                     <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded-full">{inattivi.length}</span>
                                   </div>
                                   <div className="overflow-x-auto w-full opacity-75 grayscale-[30%]">
-                                    <table className="w-full text-left text-sm whitespace-nowrap min-w-[600px]">
+                                    <table className="w-full text-left text-sm whitespace-nowrap min-w-[820px]">
                                       {/* Intestazione nascosta per mantenere allineate le colonne con la prima tabella */}
                                       <thead className="invisible h-0">
                                         <tr>
-                                          <th className="w-1/5"></th>
-                                          <th className="w-1/6"></th>
-                                          <th className="w-1/5"></th>
-                                          <th className="w-1/5"></th>
-                                          <th className="w-1/6"></th>
-                                          <th className="w-20"></th>
+                                          <th className="w-[26%]"></th>
+                                          <th className="w-[8%]"></th>
+                                          <th className="w-[16%]"></th>
+                                          <th className="w-[20%]"></th>
+                                          <th className="w-[12%]"></th>
+                                          <th className="w-[8%]"></th>
+                                          <th className="w-24"></th>
                                         </tr>
                                       </thead>
                                       <tbody>
