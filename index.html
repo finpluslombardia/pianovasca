@@ -1157,8 +1157,22 @@
           return list;
       }, [piano]);
 
+      // Formatta il/i periodo/i di iscrizione di un partecipante (es. "dal 01/09/2026 al 30/06/2027")
+      const formattaPeriodoIscrizione = (iscrizioni) => {
+          const validi = (iscrizioni || []).filter(isc => isc && (isc.inizio || isc.fine));
+          if (validi.length === 0) return '';
+          return validi.map(isc => {
+              const inizioStr = isc.inizio ? formatDate(isc.inizio) : '...';
+              const fineStr = isc.fine ? formatDate(isc.fine) : '...';
+              return `dal ${inizioStr} al ${fineStr}`;
+          }).join(', ');
+      };
+
       // --- "INSERITI OGGI": chi è stato aggiunto a un corso nella data odierna, per generare
-      // un messaggio di conferma iscrizione pronto da copiare e inviare su WhatsApp ---
+      // un messaggio di conferma iscrizione pronto da copiare e inviare su WhatsApp. Attenzione:
+      // "dataAggiunta" viene impostata SOLO quando una persona viene inserita per la prima volta in
+      // un corso (vedi aggiungiPartecipante / salvaModificheModal / salvaUtenteRapido) — una modifica
+      // alla sua anagrafica (certificato, documenti, tessera) non la tocca e quindi non la fa comparire qui.
       const inseritiOggi = useMemo(() => {
           const oggiStr = toYMD(new Date());
           const mapPersone = new Map();
@@ -1176,7 +1190,7 @@
                   }
                   const giaPresente = voce.corsi.some(co => co.nomeCorso === nomeCorsoStr && co.oraInizio === c.oraInizio && co.giorno === c.giorno);
                   if (!giaPresente) {
-                      voce.corsi.push({ nomeCorso: nomeCorsoStr, giorno: c.giorno, oraInizio: c.oraInizio || '' });
+                      voce.corsi.push({ nomeCorso: nomeCorsoStr, giorno: c.giorno, oraInizio: c.oraInizio || '', periodo: formattaPeriodoIscrizione(p.iscrizioni) });
                   }
               });
           });
@@ -1187,25 +1201,28 @@
       }, [tuttiCorsiSelect, attivita]);
 
       // Compila il testo del messaggio di conferma iscrizione, raggruppando per corso+orario
-      // e unendo i giorni (utile se la persona è stata iscritta oggi a più giorni/corsi insieme).
+      // e unendo i giorni (utile se la persona è stata iscritta oggi a più giorni/corsi insieme),
+      // includendo il periodo di iscrizione e un saluto finale.
       const generaMessaggioOggi = (persona) => {
           const gruppi = [];
           persona.corsi.forEach(c => {
               let g = gruppi.find(x => x.nomeCorso === c.nomeCorso && x.oraInizio === c.oraInizio);
-              if (!g) { g = { nomeCorso: c.nomeCorso, oraInizio: c.oraInizio, giorni: [] }; gruppi.push(g); }
+              if (!g) { g = { nomeCorso: c.nomeCorso, oraInizio: c.oraInizio, giorni: [], periodo: c.periodo || '' }; gruppi.push(g); }
               const giornoNome = GIORNI[c.giorno];
               if (giornoNome && !g.giorni.includes(giornoNome)) g.giorni.push(giornoNome);
+              if (!g.periodo && c.periodo) g.periodo = c.periodo;
           });
           const frasiCorsi = gruppi.map(g => {
               const giorniStr = g.giorni.length > 1
                   ? g.giorni.slice(0, -1).join(', ') + ' e ' + g.giorni[g.giorni.length - 1]
                   : (g.giorni[0] || '');
-              return `${g.nomeCorso} il ${giorniStr} alle ore ${g.oraInizio}`;
+              const periodoStr = g.periodo ? `, ${g.periodo}` : '';
+              return `${g.nomeCorso} il ${giorniStr} alle ore ${g.oraInizio}${periodoStr}`;
           });
           const corsiTesto = frasiCorsi.length > 1
               ? frasiCorsi.slice(0, -1).join('; ') + '; e ' + frasiCorsi[frasiCorsi.length - 1]
               : (frasiCorsi[0] || '');
-          return `Ciao ${persona.nome}, grazie per esserti iscritto/a oggi presso il Centro Federale Lampugnano. Ti confermiamo la tua iscrizione al corso ${corsiTesto}.`;
+          return `Ciao ${persona.nome}, grazie per esserti iscritto/a oggi presso il Centro Federale Lampugnano. Ti confermiamo la tua iscrizione al corso ${corsiTesto}.\n\nA presto in vasca! 🏊\nCentro Federale Lampugnano`;
       };
 
       const copiaMessaggioOggi = (testo) => {
@@ -1737,24 +1754,24 @@
 
         const partecipantePulito = {
             ...nuovoPartecipante,
-            // Se è una nuova iscrizione impostiamo la data di oggi; se invece stiamo modificando
-            // una persona già presente, "dataAggiunta" arriva già compilata da avviaModificaPartecipante
-            // e viene mantenuta com'era (non va "ri-datata" ogni volta che si modifica qualcosa).
-            dataAggiunta: nuovoPartecipante.dataAggiunta || toYMD(new Date()),
             iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
         };
 
         setEditModal(prev => {
           let nuoviPartecipanti = [...prev.partecipanti];
           if (editingPartecipanteIndex !== null) {
-            nuoviPartecipanti[editingPartecipanteIndex] = partecipantePulito;
+            // Stiamo modificando una persona già presente nel corso (es. certificato, documenti,
+            // tessera): la data di primo inserimento NON va mai toccata, qualunque sia il suo valore
+            // attuale (anche se mancante, perché aggiunta prima dell'introduzione di questo campo).
+            nuoviPartecipanti[editingPartecipanteIndex] = { ...partecipantePulito, dataAggiunta: nuoviPartecipanti[editingPartecipanteIndex]?.dataAggiunta };
           } else {
-            nuoviPartecipanti.push(partecipantePulito);
+            // Nuovo inserimento vero e proprio: qui, e solo qui, registriamo la data odierna.
+            nuoviPartecipanti.push({ ...partecipantePulito, dataAggiunta: toYMD(new Date()) });
           }
-          
+
           // Mantiene l'ordine alfabetico
           nuoviPartecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
-          
+
           return { ...prev, partecipanti: nuoviPartecipanti };
         });
         
@@ -1822,19 +1839,21 @@
         if (nuovoPartecipante && nuovoPartecipante.nome && nuovoPartecipante.nome.trim() !== '') {
             const partecipantePulito = {
                 ...nuovoPartecipante,
-                dataAggiunta: nuovoPartecipante.dataAggiunta || toYMD(new Date()),
                 iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
             };
             const nomeNorm = partecipantePulito.nome.toLowerCase().trim();
-            
+
             if (editingPartecipanteIndex !== null) {
-              finalPartecipanti[editingPartecipanteIndex] = partecipantePulito;
+              // Modifica di una persona già in elenco: la data di primo inserimento non cambia mai.
+              finalPartecipanti[editingPartecipanteIndex] = { ...partecipantePulito, dataAggiunta: finalPartecipanti[editingPartecipanteIndex]?.dataAggiunta };
             } else {
               const existingIndex = finalPartecipanti.findIndex(p => p.nome.toLowerCase().trim() === nomeNorm);
               if(existingIndex !== -1) {
-                  finalPartecipanti[existingIndex] = partecipantePulito;
+                  // Nome già presente in lista: anche questa è una modifica, non un nuovo inserimento.
+                  finalPartecipanti[existingIndex] = { ...partecipantePulito, dataAggiunta: finalPartecipanti[existingIndex].dataAggiunta };
               } else {
-                  finalPartecipanti.push(partecipantePulito);
+                  // Nuovo inserimento vero e proprio: qui, e solo qui, registriamo la data odierna.
+                  finalPartecipanti.push({ ...partecipantePulito, dataAggiunta: toYMD(new Date()) });
               }
             }
             finalPartecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
@@ -2632,7 +2651,9 @@
                                 <div className="font-bold text-slate-800 text-lg">{persona.nome}</div>
                                 <div className="text-sm font-medium text-slate-500 flex items-center gap-2 flex-wrap mt-1">
                                   {persona.corsi.map((c, ci) => (
-                                    <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">{GIORNI[c.giorno].substring(0,3)} {c.oraInizio} · {c.nomeCorso}</span>
+                                    <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">
+                                      {GIORNI[c.giorno].substring(0,3)} {c.oraInizio} · {c.nomeCorso}{c.periodo ? ` · ${c.periodo}` : ''}
+                                    </span>
                                   ))}
                                 </div>
                               </div>
@@ -3937,11 +3958,22 @@
                   <div className="flex flex-wrap justify-center items-center gap-2">
                     
                     {/* TASTO AGGIUNGI UTENTE RAPIDO */}
-                    <button 
+                    <button
                       onClick={() => setIsAddUserModalOpen(true)}
                       className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
                     >
                       <UserPlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Utente</span>
+                    </button>
+
+                    {/* TASTO CERCA SOCIO (affiancato ad Aggiungi Utente) */}
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        setIsSearchModalOpen(true);
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors"
+                    >
+                      <SearchIcon size={16} /> <span className="hidden sm:inline">Cerca Socio</span>
                     </button>
 
                     {/* TASTO LISTA D'ATTESA */}
@@ -4045,18 +4077,6 @@
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
-                  {/* TASTO CERCA SOCIO (Spostato qui) */}
-                  <button 
-                    onClick={() => {
-                      setSearchQuery('');
-                      setIsSearchModalOpen(true);
-                    }}
-                    className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
-                  >
-                    <SearchIcon size={16} className="text-slate-500" />
-                    <span className="hidden sm:inline font-bold text-slate-700">Cerca Socio</span>
-                  </button>
-
                   {/* MENU FILTRI */}
                   <div className="relative">
                     <button 
