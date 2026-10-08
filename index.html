@@ -93,6 +93,8 @@
     const RotateCcwIcon = (p) => <Icon {...p}><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></Icon>;
     const PhoneIcon = (p) => <Icon {...p}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></Icon>;
     const MailIcon = (p) => <Icon {...p}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></Icon>;
+    const MessageCircleIcon = (p) => <Icon {...p}><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></Icon>;
+    const CopyIcon = (p) => <Icon {...p}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></Icon>;
 
     // --- UTILITY DATE PER PARTECIPANTI E CALENDARIO ---
     // BUGFIX: confrontiamo giorno contro giorno (entrambe le date normalizzate a mezzanotte),
@@ -411,6 +413,10 @@
       const [ordinamentoScadenze, setOrdinamentoScadenze] = useState('scadenza');
       const [tipoEsportazioneScadenze, setTipoEsportazioneScadenze] = useState('certificati'); // 'certificati' | 'documenti'
 
+      // --- STATI "INSERITI OGGI" (iscrizioni odierne, con generazione messaggio WhatsApp) ---
+      const [isInseritiOggiOpen, setIsInseritiOggiOpen] = useState(false);
+      const [personaOggiEspansa, setPersonaOggiEspansa] = useState(null);
+
       // --- STATI LISTA D'ATTESA (contatti da ricontattare, indipendente dal piano vasca) ---
       const [listaAttesa, setListaAttesa] = useState([]);
       const [isListaAttesaOpen, setIsListaAttesaOpen] = useState(false);
@@ -459,7 +465,7 @@
 
       // --- BLOCCO SCORRIMENTO SFONDO ---
       useEffect(() => {
-          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa;
+          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen;
           if (isAnyModalOpen) {
               document.body.style.overflow = 'hidden';
           } else {
@@ -468,7 +474,7 @@
           return () => {
               document.body.style.overflow = '';
           };
-      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen, isListaAttesaOpen, isFormAttesaOpen, dettaglioContattoAttesa]);
+      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen, isListaAttesaOpen, isFormAttesaOpen, dettaglioContattoAttesa, isInseritiOggiOpen]);
 
       const partecipantiAttiviModal = useMemo(() => {
           return editModal ? (editModal.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)) : [];
@@ -1151,6 +1157,65 @@
           return list;
       }, [piano]);
 
+      // --- "INSERITI OGGI": chi è stato aggiunto a un corso nella data odierna, per generare
+      // un messaggio di conferma iscrizione pronto da copiare e inviare su WhatsApp ---
+      const inseritiOggi = useMemo(() => {
+          const oggiStr = toYMD(new Date());
+          const mapPersone = new Map();
+          tuttiCorsiSelect.forEach(c => {
+              const infoAtt = attivita.find(a => a.id === c.data.id);
+              const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
+              const nomeCorsoStr = nomeLiv ? `${infoAtt?.name} - ${nomeLiv}` : (infoAtt?.name || 'Corso');
+              (c.data.partecipanti || []).forEach(p => {
+                  if (!p || !p.nome || p.dataAggiunta !== oggiStr) return;
+                  const pKey = p.nome.toLowerCase().trim();
+                  let voce = mapPersone.get(pKey);
+                  if (!voce) {
+                      voce = { nome: p.nome, corsi: [] };
+                      mapPersone.set(pKey, voce);
+                  }
+                  const giaPresente = voce.corsi.some(co => co.nomeCorso === nomeCorsoStr && co.oraInizio === c.oraInizio && co.giorno === c.giorno);
+                  if (!giaPresente) {
+                      voce.corsi.push({ nomeCorso: nomeCorsoStr, giorno: c.giorno, oraInizio: c.oraInizio || '' });
+                  }
+              });
+          });
+          const lista = Array.from(mapPersone.values());
+          lista.forEach(v => v.corsi.sort((a, b) => a.giorno - b.giorno || a.oraInizio.localeCompare(b.oraInizio)));
+          lista.sort((a, b) => a.nome.localeCompare(b.nome));
+          return lista;
+      }, [tuttiCorsiSelect, attivita]);
+
+      // Compila il testo del messaggio di conferma iscrizione, raggruppando per corso+orario
+      // e unendo i giorni (utile se la persona è stata iscritta oggi a più giorni/corsi insieme).
+      const generaMessaggioOggi = (persona) => {
+          const gruppi = [];
+          persona.corsi.forEach(c => {
+              let g = gruppi.find(x => x.nomeCorso === c.nomeCorso && x.oraInizio === c.oraInizio);
+              if (!g) { g = { nomeCorso: c.nomeCorso, oraInizio: c.oraInizio, giorni: [] }; gruppi.push(g); }
+              const giornoNome = GIORNI[c.giorno];
+              if (giornoNome && !g.giorni.includes(giornoNome)) g.giorni.push(giornoNome);
+          });
+          const frasiCorsi = gruppi.map(g => {
+              const giorniStr = g.giorni.length > 1
+                  ? g.giorni.slice(0, -1).join(', ') + ' e ' + g.giorni[g.giorni.length - 1]
+                  : (g.giorni[0] || '');
+              return `${g.nomeCorso} il ${giorniStr} alle ore ${g.oraInizio}`;
+          });
+          const corsiTesto = frasiCorsi.length > 1
+              ? frasiCorsi.slice(0, -1).join('; ') + '; e ' + frasiCorsi[frasiCorsi.length - 1]
+              : (frasiCorsi[0] || '');
+          return `Ciao ${persona.nome}, grazie per esserti iscritto/a oggi presso il Centro Federale Lampugnano. Ti confermiamo la tua iscrizione al corso ${corsiTesto}.`;
+      };
+
+      const copiaMessaggioOggi = (testo) => {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(testo).then(() => mostraToast("Messaggio copiato negli appunti!")).catch(() => mostraToast("Impossibile copiare il messaggio.", 'error'));
+          } else {
+              mostraToast("Copia non supportata su questo browser.", 'error');
+          }
+      };
+
       const utentiConScadenze = useMemo(() => {
           const oggi = new Date();
           oggi.setHours(0,0,0,0);
@@ -1456,6 +1521,9 @@
                         scadCertificato: addUtenteRapido.scadCertificato,
                         documentiFirmati: addUtenteRapido.documentiFirmati || '',
                         card: addUtenteRapido.card || '',
+                        // Data di inserimento odierna: usata dal pannello "Inseriti Oggi" per
+                        // proporre il messaggio di conferma iscrizione da inviare su WhatsApp.
+                        dataAggiunta: toYMD(new Date()),
                         iscrizioni: iscrizioniPulite
                     });
                     partecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
@@ -1666,9 +1734,13 @@
 
       const aggiungiPartecipante = () => {
         if (!nuovoPartecipante.nome.trim()) return;
-        
+
         const partecipantePulito = {
             ...nuovoPartecipante,
+            // Se è una nuova iscrizione impostiamo la data di oggi; se invece stiamo modificando
+            // una persona già presente, "dataAggiunta" arriva già compilata da avviaModificaPartecipante
+            // e viene mantenuta com'era (non va "ri-datata" ogni volta che si modifica qualcosa).
+            dataAggiunta: nuovoPartecipante.dataAggiunta || toYMD(new Date()),
             iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
         };
 
@@ -1750,6 +1822,7 @@
         if (nuovoPartecipante && nuovoPartecipante.nome && nuovoPartecipante.nome.trim() !== '') {
             const partecipantePulito = {
                 ...nuovoPartecipante,
+                dataAggiunta: nuovoPartecipante.dataAggiunta || toYMD(new Date()),
                 iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
             };
             const nomeNorm = partecipantePulito.nome.toLowerCase().trim();
@@ -2527,6 +2600,62 @@
                 </div>
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
                   <button onClick={() => setIsScadenzeModalOpen(false)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* --- MODALE INSERITI OGGI --- */}
+          {isInseritiOggiOpen && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
+                  <h3 className="font-bold text-xl flex items-center gap-2"><MessageCircleIcon size={24}/> Inseriti Oggi</h3>
+                  <button onClick={() => { setIsInseritiOggiOpen(false); setPersonaOggiEspansa(null); }} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                </div>
+                <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 text-sm text-slate-500">
+                  Persone aggiunte oggi, {formatItalianDate(new Date())}, a un corso. Seleziona una persona per generare il messaggio di conferma da copiare e inviare su WhatsApp.
+                </div>
+                <div className="overflow-y-auto flex-1 bg-white" style={{ minHeight: '240px' }}>
+                  {inseritiOggi.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400">Nessuna nuova iscrizione registrata oggi.</div>
+                  ) : (
+                    <ul className="divide-y divide-slate-100">
+                      {inseritiOggi.map((persona, i) => {
+                        const key = persona.nome.toLowerCase().trim();
+                        const espansa = personaOggiEspansa === key;
+                        const messaggio = espansa ? generaMessaggioOggi(persona) : '';
+                        return (
+                          <li key={i} className="p-4">
+                            <div className="flex items-center justify-between cursor-pointer group" onClick={() => setPersonaOggiEspansa(espansa ? null : key)}>
+                              <div>
+                                <div className="font-bold text-slate-800 text-lg">{persona.nome}</div>
+                                <div className="text-sm font-medium text-slate-500 flex items-center gap-2 flex-wrap mt-1">
+                                  {persona.corsi.map((c, ci) => (
+                                    <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">{GIORNI[c.giorno].substring(0,3)} {c.oraInizio} · {c.nomeCorso}</span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="text-slate-300 group-hover:text-blue-500 transition-colors shrink-0 ml-2">
+                                <ChevronRightIcon size={24} className={`transition-transform ${espansa ? 'rotate-90' : ''}`} />
+                              </div>
+                            </div>
+                            {espansa && (
+                              <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+                                <textarea readOnly value={messaggio} onClick={e => e.target.select()} className="w-full bg-white border border-slate-200 rounded-lg p-3 text-sm text-slate-700 resize-none focus:outline-none" rows={4} />
+                                <div className="flex justify-end mt-2">
+                                  <button onClick={() => copiaMessaggioOggi(messaggio)} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors"><CopyIcon size={16}/> Copia messaggio</button>
+                                </div>
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+                <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
+                  <button onClick={() => { setIsInseritiOggiOpen(false); setPersonaOggiEspansa(null); }} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
                 </div>
               </div>
             </div>
@@ -3815,17 +3944,6 @@
                       <UserPlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Utente</span>
                     </button>
 
-                    {/* TASTO AGGIUNGI CORSO */}
-                    <button 
-                      onClick={() => {
-                        setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [giornoSelezionato === 7 ? 0 : giornoSelezionato], oraInizio: '06:00'}));
-                        setIsAddModalOpen(true);
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
-                    >
-                      <PlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Corso</span>
-                    </button>
-
                     {/* TASTO LISTA D'ATTESA */}
                     <button
                       onClick={() => setIsListaAttesaOpen(true)}
@@ -3849,6 +3967,18 @@
                          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white">
                             {utentiConScadenze.scaduti.length + utentiConScadenze.inScadenza.length}
                          </span>
+                      )}
+                    </button>
+
+                    {/* TASTO INSERITI OGGI */}
+                    <button
+                      onClick={() => setIsInseritiOggiOpen(true)}
+                      className="relative flex items-center gap-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-sm font-medium transition-colors"
+                      title="Persone iscritte oggi: genera il messaggio di conferma da inviare su WhatsApp"
+                    >
+                      <MessageCircleIcon size={16} /> <span className="hidden sm:inline">Inseriti Oggi</span>
+                      {inseritiOggi.length > 0 && (
+                         <span className="bg-emerald-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center absolute -top-1.5 -right-1.5">{inseritiOggi.length}</span>
                       )}
                     </button>
 
@@ -4015,6 +4145,18 @@
                       <option value={15}>15 min</option>
                     </select>
                   </div>
+
+                  {/* TASTO AGGIUNGI CORSO (spostato qui accanto alla Vista, stesso stile dei tasti vicini) */}
+                  <button
+                    onClick={() => {
+                      setNuovoCorso(prev => ({...prev, vasca: vascaSelezionata, giorni: [giornoSelezionato === 7 ? 0 : giornoSelezionato], oraInizio: '06:00'}));
+                      setIsAddModalOpen(true);
+                    }}
+                    className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
+                  >
+                    <PlusIcon size={16} className="text-slate-500" />
+                    <span className="hidden sm:inline font-bold text-slate-700">Aggiungi Corso</span>
+                  </button>
                 </div>
               </div>
             </div>
