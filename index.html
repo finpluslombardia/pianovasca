@@ -1220,13 +1220,13 @@
               const giorniStr = g.giorni.length > 1
                   ? g.giorni.slice(0, -1).join(', ') + ' e ' + g.giorni[g.giorni.length - 1]
                   : (g.giorni[0] || '');
-              const periodoStr = g.periodo ? `, ${g.periodo}` : '';
+              const periodoStr = g.periodo ? `, ${g.periodo.includes(', dal') ? 'nei periodi' : 'nel periodo'} ${g.periodo}` : '';
               return `${g.nomeCorso} il ${giorniStr} alle ore ${g.oraInizio}${periodoStr}`;
           });
           const corsiTesto = frasiCorsi.length > 1
               ? frasiCorsi.slice(0, -1).join('; ') + '; e ' + frasiCorsi[frasiCorsi.length - 1]
               : (frasiCorsi[0] || '');
-          return `Ciao ${persona.nome}, grazie per esserti iscritto/a oggi presso il Centro Federale Lampugnano. Ti confermiamo la tua iscrizione al corso ${corsiTesto}.\n\nA presto in vasca! 🏊\nCentro Federale Lampugnano`;
+          return `Ciao ${persona.nome}, grazie per esserti iscritto/a oggi presso il Centro Federale Lampugnano.\nTi confermiamo la tua iscrizione al corso ${corsiTesto}.\n\nA presto in vasca! 🏊\nCentro Federale Lampugnano`;
       };
 
       const copiaMessaggioOggi = (testo) => {
@@ -2797,7 +2797,8 @@
                             {espansa && (
                               <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                                 <textarea readOnly value={messaggio} onClick={e => e.target.select()} className="w-full bg-white border border-slate-200 rounded-lg p-3 text-sm text-slate-700 resize-none focus:outline-none" rows={4} />
-                                <div className="flex justify-end mt-2">
+                                <div className="flex justify-end gap-2 mt-2">
+                                  <a href={`https://wa.me/?text=${encodeURIComponent(messaggio)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg text-sm font-bold transition-colors"><MessageCircleIcon size={16}/> Apri in WhatsApp</a>
                                   <button onClick={() => copiaMessaggioOggi(messaggio)} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors"><CopyIcon size={16}/> Copia messaggio</button>
                                 </div>
                               </div>
