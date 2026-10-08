@@ -1607,7 +1607,7 @@
                     // data di primo inserimento resta quella originale, non viene "ritimbrata".
                     const existingIndex = partecipanti.findIndex(p => p && p.nome && p.nome.toLowerCase().trim() === nomeNormRapido);
                     if (existingIndex !== -1) {
-                        partecipanti[existingIndex] = { ...datiPartecipante, dataAggiunta: partecipanti[existingIndex].dataAggiunta };
+                        partecipanti[existingIndex] = { ...datiPartecipante, dataAggiunta: partecipanti[existingIndex].dataAggiunta || '' };
                     } else {
                         // Nuovo inserimento vero e proprio: qui, e solo qui, registriamo la data
                         // odierna (usata dal pannello "Inseriti Oggi" per il messaggio WhatsApp).
@@ -1833,7 +1833,7 @@
             // Stiamo modificando una persona già presente nel corso (es. certificato, documenti,
             // tessera): la data di primo inserimento NON va mai toccata, qualunque sia il suo valore
             // attuale (anche se mancante, perché aggiunta prima dell'introduzione di questo campo).
-            nuoviPartecipanti[editingPartecipanteIndex] = { ...partecipantePulito, dataAggiunta: nuoviPartecipanti[editingPartecipanteIndex]?.dataAggiunta };
+            nuoviPartecipanti[editingPartecipanteIndex] = { ...partecipantePulito, dataAggiunta: nuoviPartecipanti[editingPartecipanteIndex]?.dataAggiunta || '' };
           } else {
             // Nuovo inserimento vero e proprio: qui, e solo qui, registriamo la data odierna.
             nuoviPartecipanti.push({ ...partecipantePulito, dataAggiunta: toYMD(new Date()) });
@@ -1915,12 +1915,12 @@
 
             if (editingPartecipanteIndex !== null) {
               // Modifica di una persona già in elenco: la data di primo inserimento non cambia mai.
-              finalPartecipanti[editingPartecipanteIndex] = { ...partecipantePulito, dataAggiunta: finalPartecipanti[editingPartecipanteIndex]?.dataAggiunta };
+              finalPartecipanti[editingPartecipanteIndex] = { ...partecipantePulito, dataAggiunta: finalPartecipanti[editingPartecipanteIndex]?.dataAggiunta || '' };
             } else {
               const existingIndex = finalPartecipanti.findIndex(p => p.nome.toLowerCase().trim() === nomeNorm);
               if(existingIndex !== -1) {
                   // Nome già presente in lista: anche questa è una modifica, non un nuovo inserimento.
-                  finalPartecipanti[existingIndex] = { ...partecipantePulito, dataAggiunta: finalPartecipanti[existingIndex].dataAggiunta };
+                  finalPartecipanti[existingIndex] = { ...partecipantePulito, dataAggiunta: finalPartecipanti[existingIndex].dataAggiunta || '' };
               } else {
                   // Nuovo inserimento vero e proprio: qui, e solo qui, registriamo la data odierna.
                   finalPartecipanti.push({ ...partecipantePulito, dataAggiunta: toYMD(new Date()) });
