@@ -1185,9 +1185,13 @@
                   const pKey = p.nome.toLowerCase().trim();
                   let voce = mapPersone.get(pKey);
                   if (!voce) {
-                      voce = { nome: p.nome, corsi: [] };
+                      voce = { nome: p.nome, corsi: [], inviato: true };
                       mapPersone.set(pKey, voce);
                   }
+                  // "inviato" è vero solo se TUTTE le iscrizioni odierne di questa persona sono
+                  // state spuntate come messaggio inviato (così il pallino resta coerente anche
+                  // se è stata inserita oggi in più corsi contemporaneamente).
+                  if (!p.messaggioInviato) voce.inviato = false;
                   const giaPresente = voce.corsi.some(co => co.nomeCorso === nomeCorsoStr && co.oraInizio === c.oraInizio && co.giorno === c.giorno);
                   if (!giaPresente) {
                       voce.corsi.push({ nomeCorso: nomeCorsoStr, giorno: c.giorno, oraInizio: c.oraInizio || '', periodo: formattaPeriodoIscrizione(p.iscrizioni) });
@@ -1291,6 +1295,36 @@
           });
           setPersonaOggiEspansa(null);
           mostraToast("Elenco \"Inseriti Oggi\" svuotato.");
+      };
+
+      // Spunta/togli la spunta "messaggio inviato" su tutte le iscrizioni odierne di una persona
+      // (può essere stata inserita oggi in più corsi insieme): serve solo a non confondersi su chi
+      // è già stato contattato, non tocca nient'altro della sua scheda.
+      const segnaMessaggioInviato = (nomePersona, inviato) => {
+          const pKey = nomePersona.toLowerCase().trim();
+          const oggiStr = toYMD(new Date());
+          setTuttiPiani(prevTutti => {
+              const prevSeason = prevTutti[stagioneSelezionata] || {};
+              const nuovoPiano = { ...prevSeason };
+              let qualcosaCambiato = false;
+              Object.keys(nuovoPiano).forEach(k => {
+                  const cell = nuovoPiano[k];
+                  if (!cell.partecipanti || cell.partecipanti.length === 0) return;
+                  let cellCambiata = false;
+                  const nuoviPartecipanti = cell.partecipanti.map(p => {
+                      if (p && p.nome && p.nome.toLowerCase().trim() === pKey && p.dataAggiunta === oggiStr) {
+                          cellCambiata = true;
+                          return { ...p, messaggioInviato: !!inviato };
+                      }
+                      return p;
+                  });
+                  if (cellCambiata) {
+                      nuovoPiano[k] = { ...cell, partecipanti: nuoviPartecipanti };
+                      qualcosaCambiato = true;
+                  }
+              });
+              return qualcosaCambiato ? { ...prevTutti, [stagioneSelezionata]: nuovoPiano } : prevTutti;
+          });
       };
 
       const utentiConScadenze = useMemo(() => {
@@ -2726,16 +2760,25 @@
                         const espansa = personaOggiEspansa === key;
                         const messaggio = espansa ? generaMessaggioOggi(persona) : '';
                         return (
-                          <li key={i} className="p-4">
-                            <div className="flex items-center justify-between cursor-pointer group" onClick={() => setPersonaOggiEspansa(espansa ? null : key)}>
-                              <div>
-                                <div className="font-bold text-slate-800 text-lg">{persona.nome}</div>
-                                <div className="text-sm font-medium text-slate-500 flex items-center gap-2 flex-wrap mt-1">
-                                  {persona.corsi.map((c, ci) => (
-                                    <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">
-                                      {GIORNI[c.giorno].substring(0,3)} {c.oraInizio} · {c.nomeCorso}{c.periodo ? ` · ${c.periodo}` : ''}
-                                    </span>
-                                  ))}
+                          <li key={i} className={`p-4 transition-colors ${persona.inviato ? 'bg-slate-50' : ''}`}>
+                            <div className="flex items-center justify-between gap-2 group">
+                              <div className="flex items-start gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => setPersonaOggiEspansa(espansa ? null : key)}>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); segnaMessaggioInviato(persona.nome, !persona.inviato); }}
+                                  title={persona.inviato ? "Messaggio inviato: clicca per togliere la spunta" : "Spunta quando il messaggio è stato inviato"}
+                                  className={`mt-0.5 shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${persona.inviato ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white hover:border-emerald-400'}`}
+                                >
+                                  {persona.inviato && <CheckIcon size={14} className="text-white"/>}
+                                </button>
+                                <div className="min-w-0">
+                                  <div className={`font-bold text-lg ${persona.inviato ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{persona.nome}</div>
+                                  <div className="text-sm font-medium text-slate-500 flex items-center gap-2 flex-wrap mt-1">
+                                    {persona.corsi.map((c, ci) => (
+                                      <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">
+                                        {GIORNI[c.giorno].substring(0,3)} {c.oraInizio} · {c.nomeCorso}{c.periodo ? ` · ${c.periodo}` : ''}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-1 shrink-0 ml-2">
@@ -2746,7 +2789,7 @@
                                 >
                                   <XIcon size={16}/>
                                 </button>
-                                <div className="text-slate-300 group-hover:text-blue-500 transition-colors">
+                                <div className="text-slate-300 group-hover:text-blue-500 transition-colors cursor-pointer" onClick={() => setPersonaOggiEspansa(espansa ? null : key)}>
                                   <ChevronRightIcon size={24} className={`transition-transform ${espansa ? 'rotate-90' : ''}`} />
                                 </div>
                               </div>
@@ -4099,8 +4142,8 @@
                       title="Persone iscritte oggi: genera il messaggio di conferma da inviare su WhatsApp"
                     >
                       <MessageCircleIcon size={16} /> <span className="hidden sm:inline">Inseriti Oggi</span>
-                      {inseritiOggi.length > 0 && (
-                         <span className="bg-emerald-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center absolute -top-1.5 -right-1.5">{inseritiOggi.length}</span>
+                      {inseritiOggi.filter(p => !p.inviato).length > 0 && (
+                         <span className="bg-emerald-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center absolute -top-1.5 -right-1.5">{inseritiOggi.filter(p => !p.inviato).length}</span>
                       )}
                     </button>
 
