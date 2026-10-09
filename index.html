@@ -3608,7 +3608,16 @@
                 {/* Header Tabulato */}
                 <div className={`px-2 pt-2 flex flex-col border-b border-white/20 text-white ${attivita.find(a => a.id === editModal.attivitaId)?.color.split(' ')[0] || 'bg-blue-600'}`}>
                   <div className="flex justify-between items-center px-3 pb-2 pt-1">
-                    <h3 className="font-bold text-xl flex items-center gap-2">Gestione Corso</h3>
+                    <h3 className="font-bold text-xl flex items-center gap-2 flex-wrap min-w-0">
+                      Gestione Corso
+                      {(() => {
+                        const infoC = attivita.find(a => a.id === editModal.attivitaId);
+                        const nomeLivC = infoC?.isFreeTextLevel ? editModal.livello : infoC?.levels?.find(l => l.val === editModal.livello)?.name;
+                        const nomeC = nomeLivC ? `${infoC?.name} - ${nomeLivC}` : (infoC?.name || '');
+                        if (!nomeC) return null;
+                        return <span className="text-base font-semibold bg-white/25 px-3 py-1 rounded-lg">{nomeC} · {GIORNI[editModal.giorno]} {editModal.oraInizio}</span>;
+                      })()}
+                    </h3>
                     <button onClick={() => setEditModal(null)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                   </div>
                   <div className="flex">
