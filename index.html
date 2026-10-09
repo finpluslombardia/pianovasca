@@ -136,7 +136,7 @@
           (cell?.partecipanti || []).forEach(p => {
             if (p && p.nome && p.nome.trim()) {
               const key = p.nome.toLowerCase().trim();
-              map[key] = { nome: p.nome.trim(), anno: p.anno || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '' };
+              map[key] = { nome: p.nome.trim(), anno: p.anno || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '', telefono: p.telefono || (map[key] ? map[key].telefono : '') || '' };
             }
           });
         });
@@ -394,13 +394,13 @@
       });
 
       // --- STATO NUOVO PARTECIPANTE ---
-      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
       const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
       const [showAddForm, setShowAddForm] = useState(false);
 
       // --- STATI AGGIUNTA UTENTE RAPIDO ---
       const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
 
       // --- STATI RICERCA SOCIO ---
       const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -931,7 +931,7 @@
       // Crea o aggiorna la scheda di un socio nell'archivio permanente. Se l'anno di nascita o
       // il certificato vengono lasciati vuoti, mantiene il valore già presente in archivio
       // invece di cancellarlo: evita di perdere dati già noti per una semplice dimenticanza.
-      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card) => {
+      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card, telefono) => {
           if (!nome || !nome.trim()) return;
           const key = nome.toLowerCase().trim();
           setArchivioSoci(prev => {
@@ -942,7 +942,8 @@
                       nome: nome.trim(),
                       anno: anno || (esistente ? esistente.anno : '') || '',
                       scadCertificato: scadCertificato || (esistente ? esistente.scadCertificato : '') || '',
-                      card: card || (esistente ? esistente.card : '') || ''
+                      card: card || (esistente ? esistente.card : '') || '',
+                      telefono: telefono || (esistente ? esistente.telefono : '') || ''
                   }
               };
           });
@@ -984,7 +985,8 @@
                   nome: esisteGia ? esisteGia.nome : nomeCompleto,
                   anno: anno || (esisteGia ? esisteGia.anno : ''),
                   scadCertificato: esisteGia ? esisteGia.scadCertificato : '',
-                  card: esisteGia ? (esisteGia.card || '') : ''
+                  card: esisteGia ? (esisteGia.card || '') : '',
+                  telefono: esisteGia ? (esisteGia.telefono || '') : ''
               };
 
               if (esisteGia) aggiornati++; else nuovi++;
@@ -1185,8 +1187,11 @@
                   const pKey = p.nome.toLowerCase().trim();
                   let voce = mapPersone.get(pKey);
                   if (!voce) {
-                      voce = { nome: p.nome, corsi: [], inviato: true };
+                      const inArch = archivioSoci[pKey];
+                      voce = { nome: p.nome, corsi: [], inviato: true, telefono: (inArch && inArch.telefono) || p.telefono || '' };
                       mapPersone.set(pKey, voce);
+                  } else if (!voce.telefono && p.telefono) {
+                      voce.telefono = p.telefono;
                   }
                   // "inviato" è vero solo se TUTTE le iscrizioni odierne di questa persona sono
                   // state spuntate come messaggio inviato (così il pallino resta coerente anche
@@ -1202,7 +1207,20 @@
           lista.forEach(v => v.corsi.sort((a, b) => a.giorno - b.giorno || a.oraInizio.localeCompare(b.oraInizio)));
           lista.sort((a, b) => a.nome.localeCompare(b.nome));
           return lista;
-      }, [tuttiCorsiSelect, attivita]);
+      }, [tuttiCorsiSelect, attivita, archivioSoci]);
+
+      // Normalizza un numero per i link WhatsApp (solo cifre, con prefisso internazionale):
+      // per i numeri italiani scritti senza prefisso aggiunge 39.
+      const numeroPerWhatsapp = (tel) => {
+          let d = String(tel || '').trim();
+          if (!d) return '';
+          const conPiu = d.startsWith('+');
+          d = d.replace(/\D/g, '');
+          if (!d) return '';
+          if (d.startsWith('00')) d = d.slice(2);
+          else if (!conPiu && d.length <= 10) d = '39' + d;
+          return d;
+      };
 
       // Compila il testo del messaggio di conferma iscrizione, raggruppando per corso+orario
       // e unendo i giorni (utile se la persona è stata iscritta oggi a più giorni/corsi insieme),
@@ -1605,7 +1623,7 @@
 
         // Archivio soci permanente: memorizziamo/aggiorniamo questo socio così non andrà
         // ridigitato da capo la prossima volta (anche in un'altra stagione).
-        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card);
+        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card, addUtenteRapido.telefono);
 
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
@@ -1633,6 +1651,7 @@
                         scadCertificato: addUtenteRapido.scadCertificato,
                         documentiFirmati: addUtenteRapido.documentiFirmati || '',
                         card: addUtenteRapido.card || '',
+                        telefono: addUtenteRapido.telefono || '',
                         iscrizioni: iscrizioniPulite
                     };
                     // BUGFIX: se la persona è già iscritta a questo corso (es. lo si usa per
@@ -1657,7 +1676,7 @@
 
         const nomeAggiunto = addUtenteRapido.nome.trim();
         setIsAddUserModalOpen(false);
-        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
 
         if (corsiNonPiuDisponibili > 0) {
             mostraToast("Alcuni corsi selezionati non erano più disponibili e sono stati saltati.", 'error');
@@ -1717,7 +1736,8 @@
                     ...p,
                     anno: inArchivio.anno || p.anno,
                     scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
-                  card: inArchivio.card || p.card || ''
+                  card: inArchivio.card || p.card || '',
+                  telefono: inArchivio.telefono || p.telefono || ''
                 };
             })
             .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -1740,7 +1760,7 @@
               socioEvidenziato: nomeSocio ? nomeSocio.toLowerCase().trim() : null,
               tab: 'iscritti'
           });
-          setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
+          setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
           setEditingPartecipanteIndex(null);
           setShowAddForm(false);
       };
@@ -1826,7 +1846,8 @@
                   ...p,
                   anno: inArchivio.anno || p.anno,
                   scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
-                  card: inArchivio.card || p.card || ''
+                  card: inArchivio.card || p.card || '',
+                  telefono: inArchivio.telefono || p.telefono || ''
               };
           })
           .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -1848,7 +1869,7 @@
           partecipanti: partecipantiOrdinati,
           tab: 'iscritti' // Apre di default la scheda degli iscritti
         });
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1879,7 +1900,7 @@
           return { ...prev, partecipanti: nuoviPartecipanti };
         });
         
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1893,7 +1914,7 @@
       };
 
       const annullaModificaPartecipante = () => {
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1967,7 +1988,7 @@
         // così i loro dati (anno, certificato) restano disponibili per l'autocompletamento
         // anche in altre stagioni o altri corsi, senza doverli ridigitare.
         finalPartecipanti.forEach(p => {
-            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card);
+            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card, p.telefono);
         });
         
         setTuttiPiani(prevTutti => {
@@ -1980,7 +2001,7 @@
           // --- Sincronizzazione globale dei certificati medici, anagrafica e documenti firmati ---
           const mapAggiornamenti = new Map();
           finalPartecipanti.forEach(p => {
-              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato, anno: p.anno, documentiFirmati: p.documentiFirmati, card: p.card });
+              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato, anno: p.anno, documentiFirmati: p.documentiFirmati, card: p.card, telefono: p.telefono || '' });
           });
 
           Object.keys(nuovoPiano).forEach(k => {
@@ -1990,9 +2011,9 @@
                       if (!esistente || !esistente.nome) return esistente;
                       const updateInfo = mapAggiornamenti.get(esistente.nome.toLowerCase().trim());
                       if (updateInfo) {
-                          if (updateInfo.scadCertificato !== esistente.scadCertificato || updateInfo.anno !== esistente.anno || updateInfo.documentiFirmati !== esistente.documentiFirmati || updateInfo.card !== esistente.card) {
+                          if (updateInfo.scadCertificato !== esistente.scadCertificato || updateInfo.anno !== esistente.anno || updateInfo.documentiFirmati !== esistente.documentiFirmati || updateInfo.card !== esistente.card || updateInfo.telefono !== (esistente.telefono || '')) {
                               changed = true;
-                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card };
+                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card, telefono: updateInfo.telefono };
                           }
                       }
                       return esistente;
@@ -2019,7 +2040,7 @@
         });
         
         setEditModal(null);
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
         mostraToast("Modifiche salvate con successo!");
@@ -2798,7 +2819,7 @@
                               <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                                 <textarea readOnly value={messaggio} onClick={e => e.target.select()} className="w-full bg-white border border-slate-200 rounded-lg p-3 text-sm text-slate-700 resize-none focus:outline-none" rows={4} />
                                 <div className="flex justify-end gap-2 mt-2">
-                                  <a href={`https://wa.me/?text=${encodeURIComponent(messaggio)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg text-sm font-bold transition-colors"><MessageCircleIcon size={16}/> Apri in WhatsApp</a>
+                                  <a href={`https://wa.me/${numeroPerWhatsapp(persona.telefono)}?text=${encodeURIComponent(messaggio)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg text-sm font-bold transition-colors"><MessageCircleIcon size={16}/> Apri in WhatsApp{persona.telefono ? '' : ' (scegli contatto)'}</a>
                                   <button onClick={() => copiaMessaggioOggi(messaggio)} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors"><CopyIcon size={16}/> Copia messaggio</button>
                                 </div>
                               </div>
@@ -3235,6 +3256,7 @@
                                             anno: existing.anno || '',
                                             scadCertificato: existing.scadCertificato || '',
                                             card: existing.card || '',
+                                            telefono: existing.telefono || '',
                                             iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
                                         });
                                     } else {
@@ -3268,6 +3290,10 @@
                                 <option value="si">Sì</option>
                                 <option value="no">No</option>
                               </select>
+                           </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Telefono</label>
+                              <input type="tel" placeholder="Es. 333 1234567" value={addUtenteRapido.telefono || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, telefono: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
                            </div>
                         </div>
 
@@ -3759,6 +3785,7 @@
                                                 anno: existing.anno || '',
                                                 scadCertificato: existing.scadCertificato || '',
                                                 card: existing.card || '',
+                                            telefono: existing.telefono || '',
                                                 iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
                                             });
                                         } else {
@@ -3791,6 +3818,10 @@
                                    <option value="si">Sì</option>
                                    <option value="no">No</option>
                                  </select>
+                              </div>
+                              <div>
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Telefono</label>
+                                 <input type="tel" placeholder="Es. 333 1234567" value={nuovoPartecipante.telefono || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, telefono: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1" />
                               </div>
                             </div>
 
