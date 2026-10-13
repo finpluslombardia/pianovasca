@@ -4270,32 +4270,6 @@
                       )}
                     </button>
 
-                    <div className="w-px h-6 bg-slate-300 mx-1 hidden sm:block"></div>
-                    
-                    {/* MENU ESPORTAZIONE */}
-                    <div className="relative">
-                      <button onClick={() => setIsExportMenuOpen(!isExportMenuOpen)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors" title="Esporta / Importa">
-                        <DownloadIcon size={16} />
-                      </button>
-                      {isExportMenuOpen && (
-                        <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 min-w-[220px] flex flex-col">
-                          <button onClick={esportaExcel} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📊 Esporta in Excel / Fogli</button>
-                          <div className="h-px bg-slate-200 my-1"></div>
-                          <label className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium cursor-pointer">
-                            <UploadIcon size={16} /> Importa Soci (Excel/CSV)
-                            <input type="file" accept=".xlsx,.xls,.csv" onChange={gestisciFileSoci} className="hidden" />
-                          </label>
-                          <div className="h-px bg-slate-200 my-1"></div>
-                          <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
-                          <label className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium cursor-pointer">
-                            <UploadIcon size={16} /> Ripristina Backup (JSON)
-                            <input type="file" accept=".json" onChange={(e) => { importaDati(e); setIsExportMenuOpen(false); }} className="hidden" />
-                          </label>
-                        </div>
-                      )}
-                    </div>
-
-                    <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci"><LogOutIcon size={16} /></button>
                   </div>
                 </div>
               </div>
@@ -4471,6 +4445,38 @@
               ) : (
                 renderGriglia(fasceOrarie, null, corsiOggi, giornoSelezionato)
               )}
+            </div>
+
+            {/* BANNER INFERIORE: esportazione/importazione e uscita */}
+            <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                    {/* MENU ESPORTAZIONE */}
+                    <div className="relative">
+                      <button onClick={() => setIsExportMenuOpen(!isExportMenuOpen)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors" title="Esporta / Importa">
+                        <DownloadIcon size={16} /> Esporta / Importa
+                      </button>
+                      {isExportMenuOpen && (
+                        <div className="absolute bottom-full mb-2 left-0 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 min-w-[220px] flex flex-col">
+                          <button onClick={esportaExcel} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">📊 Esporta in Excel / Fogli</button>
+                          <div className="h-px bg-slate-200 my-1"></div>
+                          <label className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium cursor-pointer">
+                            <UploadIcon size={16} /> Importa Soci (Excel/CSV)
+                            <input type="file" accept=".xlsx,.xls,.csv" onChange={gestisciFileSoci} className="hidden" />
+                          </label>
+                          <div className="h-px bg-slate-200 my-1"></div>
+                          <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
+                          <label className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium cursor-pointer">
+                            <UploadIcon size={16} /> Ripristina Backup (JSON)
+                            <input type="file" accept=".json" onChange={(e) => { importaDati(e); setIsExportMenuOpen(false); }} className="hidden" />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+              </div>
+              <div className="flex items-center gap-2">
+                    <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci"><LogOutIcon size={16} /> Esci</button>
+              </div>
             </div>
 
           </main>
