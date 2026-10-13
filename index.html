@@ -4224,25 +4224,6 @@
                       <SearchIcon size={16} /> <span className="hidden sm:inline">Cerca Socio</span>
                     </button>
 
-                    {/* TASTO AGGIUNGI UTENTE RAPIDO */}
-                    <button
-                      onClick={() => setIsAddUserModalOpen(true)}
-                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
-                    >
-                      <UserPlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Utente</span>
-                    </button>
-
-                    {/* TASTO LISTA D'ATTESA */}
-                    <button
-                      onClick={() => setIsListaAttesaOpen(true)}
-                      className="relative flex items-center gap-2 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-md text-sm font-medium transition-colors"
-                    >
-                      <ClipboardListIcon size={16} /> <span className="hidden sm:inline">Lista d'Attesa</span>
-                      {contattiAttesaScaduti > 0 && (
-                        <span className="bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center absolute -top-1.5 -right-1.5">{contattiAttesaScaduti}</span>
-                      )}
-                    </button>
-
                     {/* TASTO SCADENZE */}
                     <button 
                       onClick={() => setIsScadenzeModalOpen(true)}
@@ -4258,6 +4239,17 @@
                       )}
                     </button>
 
+                    {/* TASTO LISTA D'ATTESA */}
+                    <button
+                      onClick={() => setIsListaAttesaOpen(true)}
+                      className="relative flex items-center gap-2 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-md text-sm font-medium transition-colors"
+                    >
+                      <ClipboardListIcon size={16} /> <span className="hidden sm:inline">Lista d'Attesa</span>
+                      {contattiAttesaScaduti > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center absolute -top-1.5 -right-1.5">{contattiAttesaScaduti}</span>
+                      )}
+                    </button>
+
                     {/* TASTO INSERITI OGGI */}
                     <button
                       onClick={() => setIsInseritiOggiOpen(true)}
@@ -4268,6 +4260,14 @@
                       {inseritiOggi.filter(p => !p.inviato).length > 0 && (
                          <span className="bg-emerald-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center absolute -top-1.5 -right-1.5">{inseritiOggi.filter(p => !p.inviato).length}</span>
                       )}
+                    </button>
+
+                    {/* TASTO AGGIUNGI UTENTE RAPIDO */}
+                    <button
+                      onClick={() => setIsAddUserModalOpen(true)}
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
+                    >
+                      <UserPlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Utente</span>
                     </button>
 
                   </div>
