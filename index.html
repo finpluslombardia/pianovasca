@@ -118,11 +118,25 @@
       const [y, m, d] = dateStr.split('-');
       return `${d}/${m}/${y}`;
     };
+    // Data di nascita completa (AAAA-MM-GG). Il campo "anno" resta come valore derivato (l'anno
+    // della data), così tutta la logica esistente basata sull'età continua a funzionare. Le
+    // persone inserite in passato con il solo anno mostrano l'anno finché non si completa la data.
+    const annoDaDataNascita = (d) => (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) ? d.slice(0, 4) : '';
+    const etichettaNascita = (p) => (p && p.dataNascita) ? formatDate(p.dataNascita) : ((p && p.anno) || '-');
     // Sotto i 6 anni il certificato medico non è obbligatorio: quindi anche se assente o con data
     // passata non va segnalato come scaduto/mancante. L'età viene calcolata rispetto all'anno di
     // inizio della stagione selezionata (così resta coerente per tutta la stagione), con fallback
     // sull'anno solare corrente se non disponibile.
-    const certificatoObbligatorio = (annoNascita, annoRiferimento) => {
+    // Se è nota la data di nascita completa, si usa l'età reale di OGGI (il certificato diventa
+    // obbligatorio dal giorno del sesto compleanno). Per chi ha solo l'anno resta il vecchio calcolo.
+    const certificatoObbligatorio = (annoNascita, annoRiferimento, dataNascita) => {
+      if (dataNascita && /^\d{4}-\d{2}-\d{2}$/.test(dataNascita)) {
+        const [by, bm, bd] = dataNascita.split('-').map(Number);
+        const oggi = new Date();
+        let eta = oggi.getFullYear() - by;
+        if (oggi.getMonth() + 1 < bm || (oggi.getMonth() + 1 === bm && oggi.getDate() < bd)) eta--;
+        return eta >= 6;
+      }
       if (!annoNascita) return true; // età sconosciuta: per prudenza continuiamo a segnalarlo
       const rif = annoRiferimento || new Date().getFullYear();
       return (rif - Number(annoNascita)) >= 6;
@@ -139,7 +153,7 @@
           (cell?.partecipanti || []).forEach(p => {
             if (p && p.nome && p.nome.trim()) {
               const key = p.nome.toLowerCase().trim();
-              map[key] = { nome: p.nome.trim(), anno: p.anno || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '', telefono: p.telefono || (map[key] ? map[key].telefono : '') || '' };
+              map[key] = { nome: p.nome.trim(), anno: p.anno || '', dataNascita: p.dataNascita || (map[key] ? map[key].dataNascita : '') || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '', telefono: p.telefono || (map[key] ? map[key].telefono : '') || '' };
             }
           });
         });
@@ -172,6 +186,25 @@
       if (!isNaN(num) && num > 1000 && num < 60000) {
         const d = new Date(Math.round((num - 25569) * 86400 * 1000));
         if (!isNaN(d)) return String(d.getUTCFullYear());
+      }
+      return '';
+    };
+
+    // Come sopra, ma restituisce la data completa in formato AAAA-MM-GG (stringa vuota se nel
+    // file c'è solo l'anno o il valore non è riconoscibile).
+    const estraiDataCompletaDaData = (valore) => {
+      if (!valore) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      if (valore instanceof Date && !isNaN(valore)) return `${valore.getFullYear()}-${pad(valore.getMonth() + 1)}-${pad(valore.getDate())}`;
+      const s = String(valore).trim();
+      let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+      if (m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+      m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+      if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+      const num = Number(s);
+      if (!isNaN(num) && num > 1000 && num < 60000) {
+        const d = new Date(Math.round((num - 25569) * 86400 * 1000));
+        if (!isNaN(d)) return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
       }
       return '';
     };
@@ -397,13 +430,13 @@
       });
 
       // --- STATO NUOVO PARTECIPANTE ---
-      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
       const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
       const [showAddForm, setShowAddForm] = useState(false);
 
       // --- STATI AGGIUNTA UTENTE RAPIDO ---
       const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
 
       // --- STATI RICERCA SOCIO ---
       const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -941,7 +974,7 @@
       // Crea o aggiorna la scheda di un socio nell'archivio permanente. Se l'anno di nascita o
       // il certificato vengono lasciati vuoti, mantiene il valore già presente in archivio
       // invece di cancellarlo: evita di perdere dati già noti per una semplice dimenticanza.
-      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card, telefono) => {
+      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card, telefono, dataNascita) => {
           if (!nome || !nome.trim()) return;
           const key = nome.toLowerCase().trim();
           setArchivioSoci(prev => {
@@ -951,6 +984,7 @@
                   [key]: {
                       nome: nome.trim(),
                       anno: anno || (esistente ? esistente.anno : '') || '',
+                      dataNascita: dataNascita || (esistente ? esistente.dataNascita : '') || '',
                       scadCertificato: scadCertificato || (esistente ? esistente.scadCertificato : '') || '',
                       card: card || (esistente ? esistente.card : '') || '',
                       telefono: telefono || (esistente ? esistente.telefono : '') || '',
@@ -983,6 +1017,7 @@
               const cognome = (riga[0] || '').toString().trim();
               const nomeProprio = (riga[1] || '').toString().trim();
               const anno = estraiAnnoDaData(riga[2]);
+              const dataNasc = estraiDataCompletaDaData(riga[2]);
 
               if (!cognome && !nomeProprio) continue; // riga vuota: ignorata silenziosamente
               if (!cognome || !nomeProprio) { scartati++; continue; }
@@ -995,6 +1030,7 @@
               map[key] = {
                   nome: esisteGia ? esisteGia.nome : nomeCompleto,
                   anno: anno || (esisteGia ? esisteGia.anno : ''),
+                  dataNascita: dataNasc || (esisteGia ? (esisteGia.dataNascita || '') : ''),
                   scadCertificato: esisteGia ? esisteGia.scadCertificato : '',
                   card: esisteGia ? (esisteGia.card || '') : '',
                   telefono: esisteGia ? (esisteGia.telefono || '') : '',
@@ -1002,7 +1038,7 @@
               };
 
               if (esisteGia) aggiornati++; else nuovi++;
-              if (esempi.length < 8) esempi.push({ nome: map[key].nome, anno: map[key].anno });
+              if (esempi.length < 8) esempi.push({ nome: map[key].nome, anno: map[key].anno, dataNascita: map[key].dataNascita });
           }
 
           if (Object.keys(map).length === 0) {
@@ -1262,7 +1298,7 @@
       // e si azzera da sola quando viene inserito un nuovo certificato (nuova data).
       const segnaCertMsgInviato = (u, inviato) => {
           setArchivioSoci(prev => {
-              const esistente = prev[u.key] || { nome: u.nome, anno: u.anno || '', scadCertificato: u.scadCertificato || '', card: u.card || '', telefono: u.telefono || '' };
+              const esistente = prev[u.key] || { nome: u.nome, anno: u.anno || '', dataNascita: u.dataNascita || '', scadCertificato: u.scadCertificato || '', card: u.card || '', telefono: u.telefono || '' };
               return { ...prev, [u.key]: { ...esistente, certMsgScad: inviato ? u.scadCertificato : '' } };
           });
       };
@@ -1424,7 +1460,7 @@
                   if (!utenteMap) {
                       // scadCertificatoCorso/annoCorso sono solo un ripiego, usati esclusivamente
                       // se la persona non si trovasse nell'archivio soci (caso raro/di sicurezza).
-                      utenteMap = { nome: p.nome, scadCertificatoCorso: p.scadCertificato || '', annoCorso: p.anno || '', corsi: [] };
+                      utenteMap = { nome: p.nome, scadCertificatoCorso: p.scadCertificato || '', annoCorso: p.anno || '', dataNascitaCorso: p.dataNascita || '', corsi: [] };
                       mapUtenti.set(pKey, utenteMap);
                   }
 
@@ -1449,7 +1485,8 @@
               const scadCertificatoEffettivo = (inArchivio && inArchivio.scadCertificato) || u.scadCertificatoCorso;
               const annoEffettivo = (inArchivio && inArchivio.anno) || u.annoCorso;
 
-              if (!scadCertificatoEffettivo || !certificatoObbligatorio(annoEffettivo, annoRif)) return;
+              const dataNascitaEffettiva = (inArchivio && inArchivio.dataNascita) || u.dataNascitaCorso || '';
+              if (!scadCertificatoEffettivo || !certificatoObbligatorio(annoEffettivo, annoRif, dataNascitaEffettiva)) return;
 
               const dataScad = new Date(scadCertificatoEffettivo);
               dataScad.setHours(0,0,0,0);
@@ -1682,7 +1719,7 @@
 
         // Archivio soci permanente: memorizziamo/aggiorniamo questo socio così non andrà
         // ridigitato da capo la prossima volta (anche in un'altra stagione).
-        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card, addUtenteRapido.telefono);
+        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card, addUtenteRapido.telefono, addUtenteRapido.dataNascita);
 
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
@@ -1707,6 +1744,7 @@
                     const datiPartecipante = {
                         nome: addUtenteRapido.nome,
                         anno: addUtenteRapido.anno,
+                        dataNascita: addUtenteRapido.dataNascita || '',
                         scadCertificato: addUtenteRapido.scadCertificato,
                         documentiFirmati: addUtenteRapido.documentiFirmati || '',
                         card: addUtenteRapido.card || '',
@@ -1735,7 +1773,7 @@
 
         const nomeAggiunto = addUtenteRapido.nome.trim();
         setIsAddUserModalOpen(false);
-        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
 
         if (corsiNonPiuDisponibili > 0) {
             mostraToast("Alcuni corsi selezionati non erano più disponibili e sono stati saltati.", 'error');
@@ -1794,6 +1832,7 @@
                 return {
                     ...p,
                     anno: inArchivio.anno || p.anno,
+                    dataNascita: inArchivio.dataNascita || p.dataNascita || '',
                     scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
                   card: inArchivio.card || p.card || '',
                   telefono: inArchivio.telefono || p.telefono || ''
@@ -1819,7 +1858,7 @@
               socioEvidenziato: nomeSocio ? nomeSocio.toLowerCase().trim() : null,
               tab: 'iscritti'
           });
-          setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+          setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
           setEditingPartecipanteIndex(null);
           setShowAddForm(false);
       };
@@ -1904,6 +1943,7 @@
               return {
                   ...p,
                   anno: inArchivio.anno || p.anno,
+                  dataNascita: inArchivio.dataNascita || p.dataNascita || '',
                   scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
                   card: inArchivio.card || p.card || '',
                   telefono: inArchivio.telefono || p.telefono || ''
@@ -1928,7 +1968,7 @@
           partecipanti: partecipantiOrdinati,
           tab: 'iscritti' // Apre di default la scheda degli iscritti
         });
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1959,7 +1999,7 @@
           return { ...prev, partecipanti: nuoviPartecipanti };
         });
         
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1973,7 +2013,7 @@
       };
 
       const annullaModificaPartecipante = () => {
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -2047,7 +2087,7 @@
         // così i loro dati (anno, certificato) restano disponibili per l'autocompletamento
         // anche in altre stagioni o altri corsi, senza doverli ridigitare.
         finalPartecipanti.forEach(p => {
-            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card, p.telefono);
+            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card, p.telefono, p.dataNascita);
         });
         
         setTuttiPiani(prevTutti => {
@@ -2060,7 +2100,7 @@
           // --- Sincronizzazione globale dei certificati medici, anagrafica e documenti firmati ---
           const mapAggiornamenti = new Map();
           finalPartecipanti.forEach(p => {
-              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato || '', anno: p.anno || '', documentiFirmati: p.documentiFirmati || '', card: p.card || '', telefono: p.telefono || '' });
+              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato || '', anno: p.anno || '', dataNascita: p.dataNascita || '', documentiFirmati: p.documentiFirmati || '', card: p.card || '', telefono: p.telefono || '' });
           });
 
           Object.keys(nuovoPiano).forEach(k => {
@@ -2070,9 +2110,9 @@
                       if (!esistente || !esistente.nome) return esistente;
                       const updateInfo = mapAggiornamenti.get(esistente.nome.toLowerCase().trim());
                       if (updateInfo) {
-                          if (updateInfo.scadCertificato !== (esistente.scadCertificato || '') || updateInfo.anno !== (esistente.anno || '') || updateInfo.documentiFirmati !== (esistente.documentiFirmati || '') || updateInfo.card !== (esistente.card || '') || updateInfo.telefono !== (esistente.telefono || '')) {
+                          if (updateInfo.scadCertificato !== (esistente.scadCertificato || '') || updateInfo.anno !== (esistente.anno || '') || updateInfo.dataNascita !== (esistente.dataNascita || '') || updateInfo.documentiFirmati !== (esistente.documentiFirmati || '') || updateInfo.card !== (esistente.card || '') || updateInfo.telefono !== (esistente.telefono || '')) {
                               changed = true;
-                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card, telefono: updateInfo.telefono };
+                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, dataNascita: updateInfo.dataNascita, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card, telefono: updateInfo.telefono };
                           }
                       }
                       return esistente;
@@ -2099,7 +2139,7 @@
         });
         
         setEditModal(null);
-        setNuovoPartecipante({ nome: '', anno: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
         mostraToast("Modifiche salvate con successo!");
@@ -2141,13 +2181,13 @@
 
         // Stampiamo solo i partecipanti attivi nella settimana in cui ci troviamo!
         let tableRows = partecipantiAttiviModal.map(p => {
-          const certObbligatorio = certificatoObbligatorio(p.anno, annoRifRegistro);
+          const certObbligatorio = certificatoObbligatorio(p.anno, annoRifRegistro, p.dataNascita);
           const certScaduto = certObbligatorio && isScaduto(p.scadCertificato);
           const testoCertificato = (!certObbligatorio && !p.scadCertificato) ? 'Non obbligatorio' : formatDate(p.scadCertificato);
           return `
           <tr>
             <td>${p.nome}</td>
-            <td style="text-align:center;">${p.anno || '-'}</td>
+            <td style="text-align:center;">${etichettaNascita(p)}</td>
             <td style="text-align:center; ${certScaduto ? 'color:#dc2626; font-weight:bold;' : ''}">${testoCertificato}</td>
             ${colonnePresenzeBody}
           </tr>
@@ -2186,7 +2226,7 @@
                 <thead>
                   <tr>
                     <th style="width: 15%;">Cognome e Nome</th>
-                    <th style="text-align:center; width: 4%;">Anno</th>
+                    <th style="text-align:center; width: 8%;">Nato il</th>
                     <th style="text-align:center; width: 15%;">Certificato</th>
                     ${colonnePresenzeHeader}
                   </tr>
@@ -2626,9 +2666,10 @@
                         // Dati anagrafici più aggiornati: archivio soci, con ripiego sul dato del corso.
                         const inArchivioRic = archivioSoci[(res.partecipante.nome || '').toLowerCase().trim()];
                         const annoNascitaRic = (inArchivioRic && inArchivioRic.anno) || res.partecipante.anno || '';
+                        const dataNascitaRic = (inArchivioRic && inArchivioRic.dataNascita) || res.partecipante.dataNascita || '';
                         const scadCertRic = (inArchivioRic && inArchivioRic.scadCertificato) || res.partecipante.scadCertificato || '';
                         const annoRifRic = parseInt(String(stagioneSelezionata).slice(0, 4), 10) || new Date().getFullYear();
-                        const certObblRic = certificatoObbligatorio(annoNascitaRic, annoRifRic);
+                        const certObblRic = certificatoObbligatorio(annoNascitaRic, annoRifRic, dataNascitaRic);
                         const certScadutoRic = certObblRic && !!scadCertRic && isScaduto(scadCertRic);
                         const docRic = res.partecipante.documentiFirmati;
                         const docOkRic = docRic === 'si';
@@ -2639,7 +2680,7 @@
                             <div>
                               <div className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2 flex-wrap">
                                 <span>{res.partecipante.nome}</span>
-                                {annoNascitaRic && <span className="font-medium text-slate-500 text-base">({annoNascitaRic})</span>}
+                                {annoNascitaRic && <span className="font-medium text-slate-500 text-base">({dataNascitaRic ? formatDate(dataNascitaRic) : annoNascitaRic})</span>}
                                 <span className={`${chipBase} ${certScadutoRic ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                                   Certificato: {!certObblRic && !scadCertRic ? 'non obbligatorio' : scadCertRic ? formatDate(scadCertRic) : '-'}{certScadutoRic ? ' (scaduto)' : ''}
                                 </span>
@@ -3336,6 +3377,7 @@
                                             ...addUtenteRapido, 
                                             nome: val,
                                             anno: existing.anno || '',
+                                            dataNascita: existing.dataNascita || '',
                                             scadCertificato: existing.scadCertificato || '',
                                             card: existing.card || '',
                                             telefono: existing.telefono || '',
@@ -3350,8 +3392,9 @@
                               />
                            </div>
                            <div className="lg:col-span-1">
-                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Anno di Nascita</label>
-                              <input type="number" placeholder="Es. 2015" value={addUtenteRapido.anno} onChange={e => setAddUtenteRapido({...addUtenteRapido, anno: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Data di Nascita</label>
+                              <input type="date" value={addUtenteRapido.dataNascita || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, dataNascita: e.target.value, anno: annoDaDataNascita(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
+                              {!addUtenteRapido.dataNascita && addUtenteRapido.anno && <p className="text-[11px] text-amber-600 font-medium mt-1">Al momento è registrato solo l'anno {addUtenteRapido.anno}: inserisci la data completa.</p>}
                            </div>
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Certificato</label>
@@ -3524,13 +3567,13 @@
                       {importaSociPreview.esempi.map((s, idx) => (
                         <div key={idx} className="px-3 py-2 text-sm flex justify-between items-center">
                           <span className="font-medium text-slate-700">{s.nome}</span>
-                          <span className="text-slate-400">{s.anno || '—'}</span>
+                          <span className="text-slate-400">{s.dataNascita ? formatDate(s.dataNascita) : (s.anno || '—')}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                   <p className="text-xs text-slate-500">
-                    Verranno salvati solo nome e anno di nascita. Il certificato medico va inserito a mano, come già fate ora; per i soci già presenti in archivio, un eventuale certificato già registrato non verrà toccato.
+                    Verranno salvati solo nome e data di nascita. Il certificato medico va inserito a mano, come già fate ora; per i soci già presenti in archivio, un eventuale certificato già registrato non verrà toccato.
                   </p>
                 </div>
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3 bg-white">
@@ -3874,6 +3917,7 @@
                                                 ...nuovoPartecipante, 
                                                 nome: val,
                                                 anno: existing.anno || '',
+                                                dataNascita: existing.dataNascita || '',
                                                 scadCertificato: existing.scadCertificato || '',
                                                 card: existing.card || '',
                                             telefono: existing.telefono || '',
@@ -3887,8 +3931,9 @@
                                  />
                               </div>
                               <div>
-                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Anno di Nascita</label>
-                                 <input type="number" placeholder="Es. 2015" value={nuovoPartecipante.anno} onChange={e => setNuovoPartecipante({...nuovoPartecipante, anno: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1" />
+                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Data di Nascita</label>
+                                 <input type="date" value={nuovoPartecipante.dataNascita || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, dataNascita: e.target.value, anno: annoDaDataNascita(e.target.value)})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer" />
+                                 {!nuovoPartecipante.dataNascita && nuovoPartecipante.anno && <p className="text-[11px] text-amber-600 font-medium mt-1">Registrato solo l'anno {nuovoPartecipante.anno}: inserisci la data completa.</p>}
                               </div>
                               <div>
                                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Scadenza Certificato</label>
@@ -3975,13 +4020,13 @@
                           const annoRifPartecipanti = parseInt(String(stagioneSelezionata).slice(0, 4), 10) || new Date().getFullYear();
 
                           const renderRigaPartecipante = (p, i) => {
-                            const certObbligatorio = certificatoObbligatorio(p.anno, annoRifPartecipanti);
+                            const certObbligatorio = certificatoObbligatorio(p.anno, annoRifPartecipanti, p.dataNascita);
                             const scaduto = certObbligatorio && isScaduto(p.scadCertificato);
                             const evidenziato = !!editModal.socioEvidenziato && (p.nome || '').toLowerCase().trim() === editModal.socioEvidenziato;
                             return (
                             <tr key={i} id={evidenziato ? 'riga-socio-evidenziato' : undefined} className={`border-b border-slate-100 transition-colors ${editingPartecipanteIndex === i ? 'bg-blue-50' : evidenziato ? 'bg-amber-50' : 'hover:bg-slate-50'}`}>
                               <td className={`p-3 font-medium text-slate-800 ${evidenziato ? 'border-l-4 border-amber-400' : ''}`}>{p.nome}</td>
-                              <td className="p-3 text-center text-slate-600">{p.anno || '-'}</td>
+                              <td className="p-3 text-center text-slate-600">{etichettaNascita(p)}</td>
                               <td className={`p-3 text-center font-bold ${scaduto ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
                                 {!certObbligatorio && !p.scadCertificato ? (
                                   <span className="text-[10px] uppercase font-semibold text-slate-400">Non obbligatorio</span>
@@ -4045,7 +4090,7 @@
                                   <thead className="bg-slate-100 border-b border-slate-200">
                                     <tr>
                                       <th className="p-3 font-semibold text-slate-700 w-[26%]">Cognome e Nome</th>
-                                      <th className="p-3 font-semibold text-center text-slate-700 w-[8%]">Anno</th>
+                                      <th className="p-3 font-semibold text-center text-slate-700 w-[11%]">Data di nascita</th>
                                       <th className="p-3 font-semibold text-center text-slate-700 w-[16%]">Scad. Certificato</th>
                                       <th className="p-3 font-semibold text-center text-slate-700 w-[20%]">Scad. Iscrizione</th>
                                       <th className="p-3 font-semibold text-center text-slate-700 w-[12%]">Documenti</th>
