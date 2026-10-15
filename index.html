@@ -452,6 +452,7 @@
 
       // --- STATI "INSERITI OGGI" (iscrizioni odierne, con generazione messaggio WhatsApp) ---
       const [isInseritiOggiOpen, setIsInseritiOggiOpen] = useState(false);
+      const [tabOggi, setTabOggi] = useState('inserimenti'); // 'inserimenti' | 'compleanni'
       const [personaOggiEspansa, setPersonaOggiEspansa] = useState(null);
 
       // --- STATI LISTA D'ATTESA (contatti da ricontattare, indipendente dal piano vasca) ---
@@ -2960,17 +2961,19 @@
           {isInseritiOggiOpen && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
-                  <h3 className="font-bold text-xl flex items-center gap-2"><MessageCircleIcon size={24}/> Oggi</h3>
-                  <button onClick={() => { setIsInseritiOggiOpen(false); setPersonaOggiEspansa(null); }} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                <div className="px-2 pt-2 flex flex-col bg-slate-800 text-white">
+                  <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1 border-b border-white/20">
+                    <h3 className="font-bold text-xl flex items-center gap-2"><MessageCircleIcon size={24}/> Oggi</h3>
+                    <button onClick={() => { setIsInseritiOggiOpen(false); setPersonaOggiEspansa(null); }} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                  </div>
+                  <div className="flex">
+                    <button onClick={() => setTabOggi('inserimenti')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'inserimenti' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Nuovi inserimenti ({inseritiOggi.length})</button>
+                    <button onClick={() => setTabOggi('compleanni')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'compleanni' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Compleanni ({compleanniOggi.length})</button>
+                  </div>
                 </div>
                 <div className="overflow-y-auto flex-1 bg-white" style={{ minHeight: '240px' }}>
-                <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
-                  <p className="text-sm text-slate-500">
-                    <span className="block text-xs font-bold uppercase tracking-wide text-slate-700 mb-0.5">Nuovi inserimenti</span>
-                    Persone aggiunte oggi, {formatItalianDate(new Date())}, a un corso. Seleziona una persona per generare il messaggio di conferma da copiare e inviare su WhatsApp. Se qualcuno non dovrebbe essere qui (es. hai solo modificato la sua scheda), usa la ✕ per toglierlo dall'elenco.
-                  </p>
-                  {inseritiOggi.length > 0 && (
+                {tabOggi === 'inserimenti' && inseritiOggi.length > 0 && (
+                  <div className="px-5 py-2 border-b border-slate-100 flex justify-end">
                     <button
                       onClick={() => { if (window.confirm('Svuotare tutto l\'elenco "Inseriti Oggi"? Le persone non verranno più segnalate come nuovi inserimenti odierni (non tocca le loro iscrizioni).')) svuotaInseritiOggi(); }}
                       className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors"
@@ -2978,8 +2981,9 @@
                     >
                       <Trash2Icon size={14}/> Svuota
                     </button>
+                  </div>
                   )}
-                </div>
+                {tabOggi === 'inserimenti' && (
                 <div>
                   {inseritiOggi.length === 0 ? (
                     <div className="p-8 text-center text-slate-400">Nessuna nuova iscrizione registrata oggi.</div>
@@ -3040,14 +3044,9 @@
                   )}
                 </div>
 
+                )}
                 {/* COMPLEANNI DI OGGI */}
-                <div className="px-5 py-3 bg-slate-50 border-y border-slate-200 flex items-center justify-between gap-3">
-                  <p className="text-sm text-slate-500">
-                    <span className="block text-xs font-bold uppercase tracking-wide text-slate-700 mb-0.5">Compleanni di oggi</span>
-                    Iscritti ai corsi della stagione che compiono gli anni oggi.
-                  </p>
-                  <span className="bg-pink-100 text-pink-700 text-xs font-bold px-2 py-0.5 rounded-full">{compleanniOggi.length}</span>
-                </div>
+                {tabOggi === 'compleanni' && (<>
                 {compleanniOggi.length === 0 ? (
                   <div className="p-6 text-center text-slate-400">Nessun compleanno oggi.</div>
                 ) : (
@@ -3073,6 +3072,7 @@
                     })}
                   </ul>
                 )}
+                </>)}
                 </div>
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
                   <button onClick={() => { setIsInseritiOggiOpen(false); setPersonaOggiEspansa(null); }} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
