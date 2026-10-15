@@ -448,6 +448,8 @@
       const [filtroScadenzeGiorno, setFiltroScadenzeGiorno] = useState('');
       const [filtroScadenzeAttivita, setFiltroScadenzeAttivita] = useState('');
       const [ordinamentoScadenze, setOrdinamentoScadenze] = useState('scadenza');
+      const [tabScadenze, setTabScadenze] = useState('scaduti'); // 'scaduti' | 'inscadenza' | 'documenti'
+      const [tabAttesa, setTabAttesa] = useState('attesa'); // 'scaduti' | 'oggi' | 'attesa'
       const [tipoEsportazioneScadenze, setTipoEsportazioneScadenze] = useState('certificati'); // 'certificati' | 'documenti'
 
       // --- STATI "INSERITI OGGI" (iscrizioni odierne, con generazione messaggio WhatsApp) ---
@@ -2682,7 +2684,7 @@
           {isSearchModalOpen && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
+                <div className="px-5 py-4 bg-[#1e3a5f] text-white flex justify-between items-center">
                   <h3 className="font-bold text-xl flex items-center gap-2"><SearchIcon size={24}/> Cerca Socio</h3>
                   <button onClick={() => setIsSearchModalOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                 </div>
@@ -2823,9 +2825,16 @@
           {isScadenzeModalOpen && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
-                  <h3 className="font-bold text-xl flex items-center gap-2"><AlertCircleIcon size={24}/> Scadenze Certificati Medici</h3>
-                  <button onClick={() => setIsScadenzeModalOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                <div className="px-2 pt-2 flex flex-col bg-[#1e3a5f] text-white">
+                  <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1 border-b border-white/20">
+                    <h3 className="font-bold text-xl flex items-center gap-2"><AlertCircleIcon size={24}/> Scadenze Certificati Medici</h3>
+                    <button onClick={() => setIsScadenzeModalOpen(false)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                  </div>
+                  <div className="flex">
+                    {[['scaduti', 'Certificati scaduti', scadenzeScadutiFiltrati.length], ['inscadenza', 'In scadenza (30 giorni)', scadenzeInScadenzaFiltrati.length], ['documenti', 'Documenti da firmare', documentiMancantiFiltrati.length]].map(([id, label, n]) => (
+                      <button key={id} onClick={() => setTabScadenze(id)} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabScadenze === id ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>{label} ({n})</button>
+                    ))}
+                  </div>
                 </div>
                 <div className="overflow-y-auto flex-1 bg-slate-50 p-6 flex flex-col gap-6" style={{ minHeight: '300px' }}>
 
@@ -2868,14 +2877,14 @@
                     <button onClick={esportaScadenzePDF} className="shrink-0 px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5"><DownloadIcon size={14}/> Esporta PDF</button>
                   </div>
 
-                  {/* SEZIONE SCADUTI */}
+                  {tabScadenze === 'scaduti' && (
                   <div className="shrink-0 bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
                       <div className="bg-red-50 px-4 py-3 border-b border-red-100 flex justify-between items-center sticky top-0">
                           <h4 className="font-bold text-red-700 uppercase tracking-wider text-sm flex items-center gap-2"><XIcon size={16}/> Certificati Scaduti</h4>
                           <span className="bg-red-200 text-red-800 text-xs font-bold px-2.5 py-1 rounded-full">{scadenzeScadutiFiltrati.length}</span>
                       </div>
                       {scadenzeScadutiFiltrati.length > 0 ? (
-                          <div className="max-h-[280px] overflow-y-auto">
+                          <div>
                               <table className="w-full text-left text-sm">
                                   <tbody>
                                       {scadenzeScadutiFiltrati.map((u, i) => (
@@ -2895,14 +2904,15 @@
                       )}
                   </div>
 
-                  {/* SEZIONE IN SCADENZA */}
+                  )}
+                  {tabScadenze === 'inscadenza' && (
                   <div className="shrink-0 bg-white rounded-xl shadow-sm border border-orange-200 overflow-hidden">
                       <div className="bg-orange-50 px-4 py-3 border-b border-orange-100 flex justify-between items-center sticky top-0">
                           <h4 className="font-bold text-orange-700 uppercase tracking-wider text-sm flex items-center gap-2"><ClockIcon size={16}/> In Scadenza (nei prossimi 30 giorni)</h4>
                           <span className="bg-orange-200 text-orange-800 text-xs font-bold px-2.5 py-1 rounded-full">{scadenzeInScadenzaFiltrati.length}</span>
                       </div>
                       {scadenzeInScadenzaFiltrati.length > 0 ? (
-                          <div className="max-h-[280px] overflow-y-auto">
+                          <div>
                               <table className="w-full text-left text-sm">
                                   <tbody>
                                       {scadenzeInScadenzaFiltrati.map((u, i) => (
@@ -2922,14 +2932,15 @@
                       )}
                   </div>
 
-                  {/* SEZIONE DOCUMENTI NON FIRMATI */}
+                  )}
+                  {tabScadenze === 'documenti' && (
                   <div className="shrink-0 bg-white rounded-xl shadow-sm border border-purple-200 overflow-hidden">
                       <div className="bg-purple-50 px-4 py-3 border-b border-purple-100 flex justify-between items-center sticky top-0">
                           <h4 className="font-bold text-purple-700 uppercase tracking-wider text-sm flex items-center gap-2"><EditIcon size={16}/> Documenti Non Firmati / Da Verificare</h4>
                           <span className="bg-purple-200 text-purple-800 text-xs font-bold px-2.5 py-1 rounded-full">{documentiMancantiFiltrati.length}</span>
                       </div>
                       {documentiMancantiFiltrati.length > 0 ? (
-                          <div className="max-h-[280px] overflow-y-auto">
+                          <div>
                               <table className="w-full text-left text-sm">
                                   <tbody>
                                       {documentiMancantiFiltrati.map((u, i) => (
@@ -2949,6 +2960,7 @@
                       )}
                   </div>
 
+                  )}
                 </div>
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
                   <button onClick={() => setIsScadenzeModalOpen(false)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
@@ -2961,7 +2973,7 @@
           {isInseritiOggiOpen && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                <div className="px-2 pt-2 flex flex-col bg-slate-800 text-white">
+                <div className="px-2 pt-2 flex flex-col bg-[#1e3a5f] text-white">
                   <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1 border-b border-white/20">
                     <h3 className="font-bold text-xl flex items-center gap-2"><MessageCircleIcon size={24}/> Oggi</h3>
                     <button onClick={() => { setIsInseritiOggiOpen(false); setPersonaOggiEspansa(null); }} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
@@ -3085,7 +3097,7 @@
           {isListaAttesaOpen && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl flex flex-col overflow-hidden" style={{ maxHeight: '90vh' }}>
-                <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center gap-3 flex-wrap rounded-t-2xl">
+                <div className="px-5 py-4 bg-[#1e3a5f] text-white flex justify-between items-center gap-3 flex-wrap rounded-t-2xl">
                   <h3 className="font-bold text-xl flex items-center gap-2"><ClipboardListIcon size={24}/> Lista d'Attesa</h3>
                   <div className="flex items-center gap-2">
                     <div className="relative">
@@ -3141,7 +3153,7 @@
                     <button onClick={() => setIsListaAttesaOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                   </div>
                 </div>
-                <div className="bg-slate-50 p-6 flex flex-col gap-4" style={{ overflowY: 'auto', maxHeight: 'calc(90vh - 152px)' }}>
+                <div className="bg-slate-50 flex flex-col flex-1 min-h-0">
                   {(() => {
                     const oggiRif = new Date(); oggiRif.setHours(0,0,0,0);
                     const classificaScadenza = (c) => {
@@ -3215,6 +3227,7 @@
                     if (isCompletatiOpen) {
                         const completatiFiltrati = contattiAttesaCompletati.filter(passaRicerca);
                         return (
+                          <div className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
                           <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                             <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center sticky top-0">
                               <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Contatti Completati</h4>
@@ -3223,6 +3236,7 @@
                             {completatiFiltrati.length > 0 ? renderTabellaAttesa(completatiFiltrati) : (
                               <div className="p-6 text-center text-slate-500 text-sm">{termine ? 'Nessun contatto completato corrisponde alla ricerca.' : 'Nessun contatto completato.'}</div>
                             )}
+                          </div>
                           </div>
                         );
                     }
@@ -3234,7 +3248,16 @@
 
                     return (
                       <>
-                        {/* SEZIONE SCADUTI */}
+                        <div className="bg-[#1e3a5f] text-white px-2 shrink-0">
+                          <div className="border-t border-white/20 mx-3 mb-1"></div>
+                          <div className="flex">
+                            {[['scaduti', 'Scaduti', scadutiList.length], ['oggi', 'Da fare oggi', oggiList.length], ['attesa', "Lista d'attesa", altriList.length]].map(([id, label, n]) => (
+                              <button key={id} onClick={() => setTabAttesa(id)} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabAttesa === id ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>{label} ({n})</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="p-6 flex flex-col gap-4 overflow-y-auto flex-1">
+                        {tabAttesa === 'scaduti' && (
                         <div className="shrink-0 bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
                           <div className="bg-red-50 px-4 py-3 border-b border-red-100 flex justify-between items-center sticky top-0">
                             <h4 className="font-bold text-red-700 uppercase tracking-wider text-sm flex items-center gap-2"><XIcon size={16}/> Scaduti</h4>
@@ -3245,7 +3268,9 @@
                           )}
                         </div>
 
-                        {/* SEZIONE DA FARE OGGI */}
+                        )}
+
+                        {tabAttesa === 'oggi' && (
                         <div className="shrink-0 bg-white rounded-xl shadow-sm border border-amber-200 overflow-hidden">
                           <div className="bg-amber-50 px-4 py-3 border-b border-amber-100 flex justify-between items-center sticky top-0">
                             <h4 className="font-bold text-amber-700 uppercase tracking-wider text-sm flex items-center gap-2"><ClockIcon size={16}/> Da Fare Oggi</h4>
@@ -3256,7 +3281,9 @@
                           )}
                         </div>
 
-                        {/* SEZIONE LISTA D'ATTESA (tutti gli altri) */}
+                        )}
+
+                        {tabAttesa === 'attesa' && (
                         <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                           <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center sticky top-0">
                             <h4 className="font-bold text-slate-700 uppercase tracking-wider text-sm">Lista d'Attesa</h4>
@@ -3265,6 +3292,8 @@
                           {altriList.length > 0 ? renderTabellaAttesa(altriList) : (
                             <div className="p-6 text-center text-slate-500 text-sm">{termine ? 'Nessun risultato per la ricerca.' : 'Nessun altro contatto in lista d\'attesa.'}</div>
                           )}
+                        </div>
+                        )}
                         </div>
                       </>
                     );
