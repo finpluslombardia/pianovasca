@@ -432,6 +432,7 @@
       // --- STATO NUOVO PARTECIPANTE ---
       const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
       const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
+      const [schedaSocio, setSchedaSocio] = useState(null); // partecipante di cui mostrare la scheda anagrafica
       const [showAddForm, setShowAddForm] = useState(false);
 
       // --- STATI AGGIUNTA UTENTE RAPIDO ---
@@ -2724,6 +2725,68 @@
             </div>
           )}
 
+          {/* --- SCHEDA ANAGRAFICA SOCIO --- */}
+          {schedaSocio && (() => {
+            const arch = archivioSoci[(schedaSocio.nome || '').toLowerCase().trim()] || {};
+            const tel = arch.telefono || schedaSocio.telefono || '';
+            const mail = arch.email || schedaSocio.email || '';
+            const dn = arch.dataNascita || schedaSocio.dataNascita || '';
+            const an = arch.anno || schedaSocio.anno || '';
+            const cert = arch.scadCertificato || schedaSocio.scadCertificato || '';
+            const card = arch.card || schedaSocio.card || '';
+            const num = numeroPerWhatsapp(tel);
+            const periodi = (schedaSocio.iscrizioni || []).filter(i => i.inizio || i.fine);
+            const lbl = "text-[11px] font-bold text-slate-400 uppercase tracking-wide";
+            const btn = "p-1.5 rounded-md transition-colors flex items-center justify-center";
+            return (
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setSchedaSocio(null)}>
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                  <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
+                    <h3 className="font-bold text-lg flex items-center gap-2"><UsersIcon size={20}/> Scheda anagrafica</h3>
+                    <button onClick={() => setSchedaSocio(null)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                  </div>
+                  <div className="p-6 overflow-y-auto flex flex-col gap-4">
+                    <div className="text-xl font-bold text-slate-800">{schedaSocio.nome}</div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><div className={lbl}>Data di nascita</div><div className="text-sm text-slate-700">{dn ? formatDate(dn) : (an || '-')}</div></div>
+                      <div><div className={lbl}>Scad. certificato</div><div className="text-sm text-slate-700">{cert ? formatDate(cert) : '-'}</div></div>
+                      <div><div className={lbl}>Documenti firmati</div><div className="text-sm text-slate-700">{schedaSocio.documentiFirmati === 'si' ? 'Sì' : schedaSocio.documentiFirmati === 'no' ? 'No' : 'Da verificare'}</div></div>
+                      <div><div className={lbl}>Card</div><div className="text-sm text-slate-700">{card === 'si' ? 'Sì' : card === 'no' ? 'No' : '-'}</div></div>
+                    </div>
+                    <div>
+                      <div className={lbl}>Telefono</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm text-slate-700">{tel || '-'}</span>
+                        {num
+                          ? <a href={`https://wa.me/${num}`} target="_blank" rel="noopener noreferrer" title="Apri chat WhatsApp" className={`${btn} text-[#25D366] hover:text-[#1ebe57] bg-green-50 hover:bg-green-100`}><WhatsAppIcon size={16}/></a>
+                          : <span title="Numero di telefono mancante" className={`${btn} text-slate-300 bg-slate-100 cursor-not-allowed`}><WhatsAppIcon size={16}/></span>}
+                      </div>
+                    </div>
+                    <div>
+                      <div className={lbl}>Email</div>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="text-sm text-slate-700 break-all">{mail || '-'}</span>
+                        {mail
+                          ? <a href={`mailto:${mail}`} title="Scrivi un'email (app di posta predefinita)" className={`${btn} text-blue-500 hover:text-blue-700 bg-blue-50 hover:bg-blue-100`}><MailIcon size={16}/></a>
+                          : <span title="Email mancante" className={`${btn} text-slate-300 bg-slate-100 cursor-not-allowed`}><MailIcon size={16}/></span>}
+                        <a href="https://mail.federnuoto.it/modern/" target="_blank" rel="noopener noreferrer" title="Apri la casella di posta federnuoto.it" className="text-xs font-bold px-2 py-1.5 rounded-md text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">Apri la mia posta</a>
+                      </div>
+                    </div>
+                    {periodi.length > 0 && (
+                      <div>
+                        <div className={lbl}>Periodi di iscrizione</div>
+                        <div className="text-sm text-slate-700 mt-1 flex flex-col gap-0.5">{periodi.map((i, k) => <span key={k}>{i.inizio ? formatDate(i.inizio) : '...'} - {i.fine ? formatDate(i.fine) : '...'}</span>)}</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="px-6 py-3 border-t border-slate-200 flex justify-end bg-slate-50">
+                    <button onClick={() => setSchedaSocio(null)} className="px-4 py-2 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition-colors">Chiudi</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* --- MODALE SCADENZE CERTIFICATI --- */}
           {isScadenzeModalOpen && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -4042,7 +4105,7 @@
                             const evidenziato = !!editModal.socioEvidenziato && (p.nome || '').toLowerCase().trim() === editModal.socioEvidenziato;
                             return (
                             <tr key={i} id={evidenziato ? 'riga-socio-evidenziato' : undefined} className={`border-b border-slate-100 transition-colors ${editingPartecipanteIndex === i ? 'bg-blue-50' : evidenziato ? 'bg-amber-50' : 'hover:bg-slate-50'}`}>
-                              <td className={`p-3 font-medium text-slate-800 ${evidenziato ? 'border-l-4 border-amber-400' : ''}`}>{p.nome}</td>
+                              <td className={`p-3 font-medium text-slate-800 ${evidenziato ? 'border-l-4 border-amber-400' : ''}`}><button type="button" onClick={() => setSchedaSocio(p)} title="Apri scheda anagrafica" className="text-left hover:text-blue-600 hover:underline underline-offset-2 transition-colors">{p.nome}</button></td>
                               <td className="p-3 text-center text-slate-600">{etichettaNascita(p)}</td>
                               <td className={`p-3 text-center font-bold ${scaduto ? 'text-red-600 bg-red-50' : 'text-slate-600'}`}>
                                 {!certObbligatorio && !p.scadCertificato ? (
