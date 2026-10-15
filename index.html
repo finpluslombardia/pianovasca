@@ -1275,6 +1275,37 @@
           return lista;
       }, [tuttiCorsiSelect, attivita, archivioSoci]);
 
+      // --- COMPLEANNI DI OGGI: persone iscritte ai corsi della stagione la cui data di nascita completa cade oggi.
+      const compleanniOggi = useMemo(() => {
+          const oggi = new Date();
+          const mmdd = toYMD(oggi).slice(5);
+          const mappa = new Map();
+          tuttiCorsiSelect.forEach(c => {
+              const infoAtt = attivita.find(a => a.id === c.data.id);
+              const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
+              const nomeCorsoStr = nomeLiv ? `${infoAtt?.name} - ${nomeLiv}` : (infoAtt?.name || 'Corso');
+              (c.data.partecipanti || []).forEach(p => {
+                  if (!p || !p.nome) return;
+                  const key = p.nome.toLowerCase().trim();
+                  const arch = archivioSoci[key] || {};
+                  const dn = arch.dataNascita || p.dataNascita || '';
+                  if (!dn || String(dn).slice(5) !== mmdd) return;
+                  let voce = mappa.get(key);
+                  if (!voce) {
+                      voce = { nome: p.nome, eta: oggi.getFullYear() - parseInt(String(dn).slice(0, 4), 10), telefono: arch.telefono || p.telefono || '', corsi: [] };
+                      mappa.set(key, voce);
+                  }
+                  if (!voce.corsi.some(co => co.nomeCorso === nomeCorsoStr && co.oraInizio === c.oraInizio && co.giorno === c.giorno)) {
+                      voce.corsi.push({ nomeCorso: nomeCorsoStr, giorno: c.giorno, oraInizio: c.oraInizio || '' });
+                  }
+              });
+          });
+          const lista = Array.from(mappa.values());
+          lista.forEach(v => v.corsi.sort((a, b) => a.giorno - b.giorno || a.oraInizio.localeCompare(b.oraInizio)));
+          lista.sort((a, b) => a.nome.localeCompare(b.nome));
+          return lista;
+      }, [tuttiCorsiSelect, attivita, archivioSoci]);
+
       // Normalizza un numero per i link WhatsApp (solo cifre, con prefisso internazionale):
       // per i numeri italiani scritti senza prefisso aggiunge 39.
       const numeroPerWhatsapp = (tel) => {
@@ -2930,11 +2961,13 @@
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
                 <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
-                  <h3 className="font-bold text-xl flex items-center gap-2"><MessageCircleIcon size={24}/> Inseriti Oggi</h3>
+                  <h3 className="font-bold text-xl flex items-center gap-2"><MessageCircleIcon size={24}/> Oggi</h3>
                   <button onClick={() => { setIsInseritiOggiOpen(false); setPersonaOggiEspansa(null); }} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                 </div>
+                <div className="overflow-y-auto flex-1 bg-white" style={{ minHeight: '240px' }}>
                 <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
                   <p className="text-sm text-slate-500">
+                    <span className="block text-xs font-bold uppercase tracking-wide text-slate-700 mb-0.5">Nuovi inserimenti</span>
                     Persone aggiunte oggi, {formatItalianDate(new Date())}, a un corso. Seleziona una persona per generare il messaggio di conferma da copiare e inviare su WhatsApp. Se qualcuno non dovrebbe essere qui (es. hai solo modificato la sua scheda), usa la ✕ per toglierlo dall'elenco.
                   </p>
                   {inseritiOggi.length > 0 && (
@@ -2947,7 +2980,7 @@
                     </button>
                   )}
                 </div>
-                <div className="overflow-y-auto flex-1 bg-white" style={{ minHeight: '240px' }}>
+                <div>
                   {inseritiOggi.length === 0 ? (
                     <div className="p-8 text-center text-slate-400">Nessuna nuova iscrizione registrata oggi.</div>
                   ) : (
@@ -3005,6 +3038,41 @@
                       })}
                     </ul>
                   )}
+                </div>
+
+                {/* COMPLEANNI DI OGGI */}
+                <div className="px-5 py-3 bg-slate-50 border-y border-slate-200 flex items-center justify-between gap-3">
+                  <p className="text-sm text-slate-500">
+                    <span className="block text-xs font-bold uppercase tracking-wide text-slate-700 mb-0.5">Compleanni di oggi</span>
+                    Iscritti ai corsi della stagione che compiono gli anni oggi.
+                  </p>
+                  <span className="bg-pink-100 text-pink-700 text-xs font-bold px-2 py-0.5 rounded-full">{compleanniOggi.length}</span>
+                </div>
+                {compleanniOggi.length === 0 ? (
+                  <div className="p-6 text-center text-slate-400">Nessun compleanno oggi.</div>
+                ) : (
+                  <ul className="divide-y divide-slate-100">
+                    {compleanniOggi.map((persona, i) => {
+                      const num = numeroPerWhatsapp(persona.telefono);
+                      const testo = `Ciao ${persona.nome}! Tantissimi auguri di buon compleanno da tutto il Centro Federale Lampugnano! 🎂🎉`;
+                      return (
+                        <li key={i} className="p-4 flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-bold text-lg text-slate-800">{persona.nome} <span className="font-medium text-slate-500 text-base">· {persona.eta} anni</span></div>
+                            <div className="text-sm font-medium text-slate-500 flex items-center gap-2 flex-wrap mt-1">
+                              {persona.corsi.map((c, ci) => (
+                                <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">{GIORNI[c.giorno].substring(0,3)} {c.oraInizio} · {c.nomeCorso}</span>
+                              ))}
+                            </div>
+                          </div>
+                          {num
+                            ? <a href={`https://wa.me/${num}?text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" title="Invia gli auguri su WhatsApp" className="shrink-0 p-2 rounded-md text-[#25D366] hover:text-[#1ebe57] bg-green-50 hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
+                            : <span title="Numero di telefono mancante" className="shrink-0 p-2 rounded-md text-slate-300 bg-slate-100 cursor-not-allowed"><WhatsAppIcon size={18}/></span>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
                 </div>
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
                   <button onClick={() => { setIsInseritiOggiOpen(false); setPersonaOggiEspansa(null); }} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
@@ -4384,7 +4452,7 @@
                       className="relative flex items-center gap-2 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-sm font-medium transition-colors"
                       title="Persone iscritte oggi: genera il messaggio di conferma da inviare su WhatsApp"
                     >
-                      <MessageCircleIcon size={16} /> <span className="hidden sm:inline">Inseriti Oggi</span>
+                      <MessageCircleIcon size={16} /> <span className="hidden sm:inline">Oggi</span>
                       {inseritiOggi.filter(p => !p.inviato).length > 0 && (
                          <span className="bg-emerald-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center absolute -top-1.5 -right-1.5">{inseritiOggi.filter(p => !p.inviato).length}</span>
                       )}
