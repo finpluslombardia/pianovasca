@@ -1164,7 +1164,12 @@
         { id: 'prova', label: 'Prova' },
         { id: 'altro', label: 'Informazioni/Altro' }
       ];
-      const motivazioniNascoste = OPZIONI_MOTIVAZIONE_ATTESA.filter(o => filtroMotivazioniAttesa[o.id] === false).length;
+      // Voci contate nel pulsante: tipi diversi da "Corso" + ogni singolo corso (sottocategorie)
+      const voceFiltroNascosta = (k) => filtroMotivazioniAttesa[k] === false;
+      const vociFiltroAttesa = [...OPZIONI_MOTIVAZIONE_ATTESA.filter(o => o.id !== 'corso').map(o => o.id), ...attivita.map(a => `corso:${a.id}`)];
+      const motivazioniNascoste = vociFiltroAttesa.filter(voceFiltroNascosta).length;
+      const toggleCorsoAttesa = (checked) => setFiltroMotivazioniAttesa(prev => { const n = { ...prev, corso: checked }; attivita.forEach(a => { n[`corso:${a.id}`] = checked; }); return n; });
+      const toggleSottoCorsoAttesa = (id, checked) => setFiltroMotivazioniAttesa(prev => { const n = { ...prev, [`corso:${id}`]: checked }; n.corso = attivita.some(a => n[`corso:${a.id}`] !== false); return n; });
       const etichettaMotivazioneAttesa = useCallback((c) => {
           if (c.motivazione === 'private') return 'Private';
           if (c.motivazione === 'corso') return `Corso: ${attivita.find(a => a.id === c.corsoRichiesto)?.name || '-'}`;
@@ -2968,21 +2973,29 @@
                     </select>
                     <div className="relative">
                       <button onClick={() => setIsFiltroMotivazioniOpen(o => !o)} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold transition-colors ${motivazioniNascoste > 0 ? 'bg-blue-500 hover:bg-blue-600' : 'bg-white/15 hover:bg-white/25'}`}>
-                        <FilterIcon size={14}/> Motivazione{motivazioniNascoste > 0 ? ` (${OPZIONI_MOTIVAZIONE_ATTESA.length - motivazioniNascoste}/${OPZIONI_MOTIVAZIONE_ATTESA.length})` : ''}
+                        <FilterIcon size={14}/> Motivazione{motivazioniNascoste > 0 ? ` (${vociFiltroAttesa.length - motivazioniNascoste}/${vociFiltroAttesa.length})` : ''}
                       </button>
                       {isFiltroMotivazioniOpen && (
                         <>
                           <div className="fixed inset-0 z-10" onClick={() => setIsFiltroMotivazioniOpen(false)}></div>
-                          <div className="absolute right-0 top-full mt-2 z-20 bg-white text-slate-800 rounded-xl shadow-xl border border-slate-200 p-3 w-56 flex flex-col gap-1">
+                          <div className="absolute right-0 top-full mt-2 z-20 bg-white text-slate-800 rounded-xl shadow-xl border border-slate-200 p-3 w-72 max-h-[60vh] overflow-y-auto flex flex-col gap-1">
                             <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide px-1 pb-1">Mostra solo le motivazioni spuntate</div>
                             {OPZIONI_MOTIVAZIONE_ATTESA.map(o => (
-                              <label key={o.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 cursor-pointer text-sm font-medium">
-                                <input type="checkbox" className="w-4 h-4 accent-blue-600" checked={filtroMotivazioniAttesa[o.id] !== false} onChange={e => setFiltroMotivazioniAttesa(prev => ({ ...prev, [o.id]: e.target.checked }))} />
-                                {o.label}
-                              </label>
+                              <React.Fragment key={o.id}>
+                                <label className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 cursor-pointer text-sm font-medium">
+                                  <input type="checkbox" className="w-4 h-4 accent-blue-600" checked={filtroMotivazioniAttesa[o.id] !== false} onChange={e => o.id === 'corso' ? toggleCorsoAttesa(e.target.checked) : setFiltroMotivazioniAttesa(prev => ({ ...prev, [o.id]: e.target.checked }))} />
+                                  {o.id === 'corso' ? 'Corso (Apertura/Inserimento)' : o.label}
+                                </label>
+                                {o.id === 'corso' && attivita.map(a => (
+                                  <label key={a.id} className="flex items-center gap-2 pl-8 pr-2 py-1 rounded-lg hover:bg-slate-100 cursor-pointer text-[13px] text-slate-600">
+                                    <input type="checkbox" className="w-3.5 h-3.5 accent-blue-600" checked={filtroMotivazioniAttesa[`corso:${a.id}`] !== false} onChange={e => toggleSottoCorsoAttesa(a.id, e.target.checked)} />
+                                    {a.name}
+                                  </label>
+                                ))}
+                              </React.Fragment>
                             ))}
                             {motivazioniNascoste > 0 && (
-                              <button onClick={() => setFiltroMotivazioniAttesa({ private: true, corso: true, prova: true, altro: true })} className="mt-1 text-xs font-bold text-blue-600 hover:text-blue-800 text-left px-2 py-1">Seleziona tutte</button>
+                              <button onClick={() => setFiltroMotivazioniAttesa({})} className="mt-1 text-xs font-bold text-blue-600 hover:text-blue-800 text-left px-2 py-1">Seleziona tutte</button>
                             )}
                           </div>
                         </>
@@ -3065,7 +3078,7 @@
                     );
 
                     const termine = ricercaAttesa.trim().toLowerCase();
-                    const passaRicerca = (c) => (!termine || (c.nome || '').toLowerCase().includes(termine)) && filtroMotivazioniAttesa[c.motivazione] !== false;
+                    const passaRicerca = (c) => (!termine || (c.nome || '').toLowerCase().includes(termine)) && filtroMotivazioniAttesa[c.motivazione] !== false && (c.motivazione !== 'corso' || filtroMotivazioniAttesa[`corso:${c.corsoRichiesto}`] !== false);
 
                     if (isCompletatiOpen) {
                         const completatiFiltrati = contattiAttesaCompletati.filter(passaRicerca);
