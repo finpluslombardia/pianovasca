@@ -2851,7 +2851,7 @@
                   </div>
                   <div className="flex">
                     {[['scaduti', 'Certificati scaduti', scadenzeScadutiFiltrati.length], ['inscadenza', 'In scadenza (30 giorni)', scadenzeInScadenzaFiltrati.length], ['documenti', 'Documenti da firmare', documentiMancantiFiltrati.length]].map(([id, label, n]) => (
-                      <button key={id} onClick={() => setTabScadenze(id)} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabScadenze === id ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>{label} ({n})</button>
+                      <button key={id} onClick={() => setTabScadenze(id)} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabScadenze === id ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>{label}<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{n}</span></button>
                     ))}
                   </div>
                 </div>
@@ -2967,8 +2967,8 @@
                     <button onClick={() => { setIsInseritiOggiOpen(false); setPersonaOggiEspansa(null); }} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                   </div>
                   <div className="flex">
-                    <button onClick={() => setTabOggi('inserimenti')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'inserimenti' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Nuovi inserimenti ({inseritiOggi.length})</button>
-                    <button onClick={() => setTabOggi('compleanni')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'compleanni' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Compleanni ({compleanniOggi.length})</button>
+                    <button onClick={() => setTabOggi('inserimenti')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'inserimenti' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Nuovi inserimenti<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{inseritiOggi.length}</span></button>
+                    <button onClick={() => setTabOggi('compleanni')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'compleanni' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Compleanni<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{compleanniOggi.length}</span></button>
                   </div>
                 </div>
                 <div className="overflow-y-auto flex-1 bg-white" style={{ minHeight: '240px' }}>
@@ -3240,7 +3240,7 @@
                           <div className="border-t border-white/20 mx-3 mb-1"></div>
                           <div className="flex">
                             {[['scaduti', 'Scaduti', scadutiList.length], ['oggi', 'Da fare oggi', oggiList.length], ['attesa', "Lista d'attesa", altriList.length]].map(([id, label, n]) => (
-                              <button key={id} onClick={() => setTabAttesa(id)} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabAttesa === id ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>{label} ({n})</button>
+                              <button key={id} onClick={() => setTabAttesa(id)} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabAttesa === id ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>{label}<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{n}</span></button>
                             ))}
                           </div>
                         </div>
