@@ -2863,18 +2863,9 @@
                         <option value="corso">Corso</option>
                       </select>
                     </div>
-                    <div className="min-w-[140px]">
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 whitespace-nowrap">Esporta</label>
-                      <select value={tipoEsportazioneScadenze} onChange={e => setTipoEsportazioneScadenze(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
-                        <option value="certificati">Certificati Scaduti</option>
-                        <option value="documenti">Documenti Non Firmati</option>
-                        <option value="entrambi">Entrambi</option>
-                      </select>
-                    </div>
                     {(filtroScadenzeGiorno || filtroScadenzeAttivita || ordinamentoScadenze !== 'scadenza') && (
                       <button onClick={() => { setFiltroScadenzeGiorno(''); setFiltroScadenzeAttivita(''); setOrdinamentoScadenze('scadenza'); }} className="shrink-0 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5"><XIcon size={14}/> Azzera</button>
                     )}
-                    <button onClick={esportaScadenzePDF} className="shrink-0 px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5"><DownloadIcon size={14}/> Esporta PDF</button>
                   </div>
 
                   {tabScadenze === 'scaduti' && (
@@ -2962,7 +2953,16 @@
 
                   )}
                 </div>
-                <div className="px-6 py-4 border-t border-slate-200 flex justify-end bg-white">
+                <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center gap-3 bg-white">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Esporta</span>
+                    <select value={tipoEsportazioneScadenze} onChange={e => setTipoEsportazioneScadenze(e.target.value)} className="p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
+                      <option value="certificati">Certificati Scaduti</option>
+                      <option value="documenti">Documenti Non Firmati</option>
+                      <option value="entrambi">Entrambi</option>
+                    </select>
+                    <button onClick={esportaScadenzePDF} className="shrink-0 px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5"><DownloadIcon size={14}/> Esporta PDF</button>
+                  </div>
                   <button onClick={() => setIsScadenzeModalOpen(false)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
                 </div>
               </div>
