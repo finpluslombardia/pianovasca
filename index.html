@@ -2724,26 +2724,26 @@
                         const chipBase = 'px-2 py-0.5 rounded font-bold border text-sm';
 
                         return (
-                          <li key={i} className="hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between p-4 group" onClick={() => apriCorsoDaRicerca(res.corso, res.partecipante.nome)}>
-                            <div>
-                              <div className="font-bold text-slate-800 text-lg mb-1 flex items-center gap-2 flex-wrap">
-                                <span>{res.partecipante.nome}</span>
-                                {annoNascitaRic && <span className="font-medium text-slate-500 text-base">({dataNascitaRic ? formatDate(dataNascitaRic) : annoNascitaRic})</span>}
-                                <span className={`${chipBase} ${certScadutoRic ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-                                  Certificato: {!certObblRic && !scadCertRic ? 'non obbligatorio' : scadCertRic ? formatDate(scadCertRic) : '-'}{certScadutoRic ? ' (scaduto)' : ''}
-                                </span>
-                                <span className={`${chipBase} ${docOkRic ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-red-50 text-red-600 border-red-200'}`}>
-                                  Documenti: {docRic === 'si' ? 'Sì' : docRic === 'no' ? 'No' : 'Da verificare'}
-                                </span>
+                          <li key={i} className="hover:bg-slate-50 transition-colors cursor-pointer flex items-center justify-between gap-4 px-5 py-3 group" onClick={() => apriCorsoDaRicerca(res.corso, res.partecipante.nome)}>
+                            <div className="min-w-0">
+                              <div className="font-semibold text-sm text-slate-800">
+                                {res.partecipante.nome}
+                                {annoNascitaRic && <span className="ml-2 text-xs font-normal text-slate-400">{dataNascitaRic ? formatDate(dataNascitaRic) : annoNascitaRic}</span>}
                               </div>
-                              <div className="text-sm font-medium text-slate-500 flex items-center gap-2">
-                                <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200">{GIORNI[res.corso.giorno]} {res.corso.oraInizio}</span>
-                                <span>{res.corso.vasca === 'interna' ? 'V. Interna' : 'V. Esterna'}</span>
-                                <span className="text-blue-600 font-semibold truncate max-w-[200px] sm:max-w-none">{nomeCompleto}</span>
+                              <div className="text-xs text-slate-500 mt-0.5 truncate">
+                                {GIORNI[res.corso.giorno]} {res.corso.oraInizio} · {res.corso.vasca === 'interna' ? 'V. Interna' : 'V. Esterna'} · <span className="text-blue-600">{nomeCompleto}</span>
+                              </div>
+                            </div>
+                            <div className="shrink-0 text-right text-xs leading-snug">
+                              <div className={certScadutoRic ? 'text-red-600 font-semibold' : 'text-slate-500'}>
+                                Certificato {!certObblRic && !scadCertRic ? 'non obbligatorio' : scadCertRic ? formatDate(scadCertRic) : '-'}{certScadutoRic ? ' (scaduto)' : ''}
+                              </div>
+                              <div className={docOkRic ? 'text-slate-400' : 'text-red-600 font-semibold'}>
+                                Documenti {docRic === 'si' ? 'firmati' : docRic === 'no' ? 'non firmati' : 'da verificare'}
                               </div>
                             </div>
                             <div className="text-slate-300 group-hover:text-blue-500 transition-colors">
-                              <ChevronRightIcon size={24} />
+                              <ChevronRightIcon size={20} />
                             </div>
                           </li>
                         );
