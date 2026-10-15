@@ -2828,7 +2828,26 @@
                 <div className="px-2 pt-2 flex flex-col bg-[#1e3a5f] text-white">
                   <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1 border-b border-white/20">
                     <h3 className="font-bold text-xl flex items-center gap-2"><AlertCircleIcon size={24}/> Scadenze Certificati Medici</h3>
-                    <button onClick={() => setIsScadenzeModalOpen(false)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                    <div className="flex items-center gap-2">
+                      <select value={filtroScadenzeGiorno} onChange={e => setFiltroScadenzeGiorno(e.target.value)} className="px-3 py-2 bg-white/15 hover:bg-white/25 rounded-lg text-sm font-bold text-white outline-none cursor-pointer [&>option]:text-slate-800">
+                        <option value="">Tutti i giorni</option>
+                        {GIORNI.map((g, idx) => <option key={idx} value={idx}>{g}</option>)}
+                      </select>
+                      <select value={filtroScadenzeAttivita} onChange={e => setFiltroScadenzeAttivita(e.target.value)} className="px-3 py-2 bg-white/15 hover:bg-white/25 rounded-lg text-sm font-bold text-white outline-none cursor-pointer [&>option]:text-slate-800">
+                        <option value="">Tutti i corsi</option>
+                        {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                      <select value={ordinamentoScadenze} onChange={e => setOrdinamentoScadenze(e.target.value)} className="px-3 py-2 bg-white/15 hover:bg-white/25 rounded-lg text-sm font-bold text-white outline-none cursor-pointer [&>option]:text-slate-800">
+                        <option value="scadenza">Ordina: Data di Scadenza</option>
+                        <option value="cognome">Ordina: Cognome</option>
+                        <option value="orario">Ordina: Orario</option>
+                        <option value="corso">Ordina: Corso</option>
+                      </select>
+                      {(filtroScadenzeGiorno || filtroScadenzeAttivita || ordinamentoScadenze !== 'scadenza') && (
+                        <button onClick={() => { setFiltroScadenzeGiorno(''); setFiltroScadenzeAttivita(''); setOrdinamentoScadenze('scadenza'); }} className="px-3 py-2 bg-white/15 hover:bg-white/25 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-colors"><XIcon size={14}/> Azzera</button>
+                      )}
+                      <button onClick={() => setIsScadenzeModalOpen(false)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                    </div>
                   </div>
                   <div className="flex">
                     {[['scaduti', 'Certificati scaduti', scadenzeScadutiFiltrati.length], ['inscadenza', 'In scadenza (30 giorni)', scadenzeInScadenzaFiltrati.length], ['documenti', 'Documenti da firmare', documentiMancantiFiltrati.length]].map(([id, label, n]) => (
@@ -2837,36 +2856,6 @@
                   </div>
                 </div>
                 <div className="overflow-y-auto flex-1 bg-slate-50 p-6 flex flex-col gap-6" style={{ minHeight: '300px' }}>
-
-                  {/* FILTRI */}
-                  <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-nowrap gap-2 items-end">
-                    <div className="min-w-[130px]">
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 whitespace-nowrap">Giorno della Settimana</label>
-                      <select value={filtroScadenzeGiorno} onChange={e => setFiltroScadenzeGiorno(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
-                        <option value="">Tutti i giorni</option>
-                        {GIORNI.map((g, idx) => <option key={idx} value={idx}>{g}</option>)}
-                      </select>
-                    </div>
-                    <div className="min-w-[120px]">
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 whitespace-nowrap">Tipo di Corso</label>
-                      <select value={filtroScadenzeAttivita} onChange={e => setFiltroScadenzeAttivita(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
-                        <option value="">Tutti i corsi</option>
-                        {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                      </select>
-                    </div>
-                    <div className="min-w-[120px]">
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 whitespace-nowrap">Ordina Per</label>
-                      <select value={ordinamentoScadenze} onChange={e => setOrdinamentoScadenze(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
-                        <option value="scadenza">Data di Scadenza</option>
-                        <option value="cognome">Cognome</option>
-                        <option value="orario">Orario</option>
-                        <option value="corso">Corso</option>
-                      </select>
-                    </div>
-                    {(filtroScadenzeGiorno || filtroScadenzeAttivita || ordinamentoScadenze !== 'scadenza') && (
-                      <button onClick={() => { setFiltroScadenzeGiorno(''); setFiltroScadenzeAttivita(''); setOrdinamentoScadenze('scadenza'); }} className="shrink-0 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5"><XIcon size={14}/> Azzera</button>
-                    )}
-                  </div>
 
                   {tabScadenze === 'scaduti' && (
                   <div className="shrink-0 bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
@@ -2954,16 +2943,18 @@
                   )}
                 </div>
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-between items-center gap-3 bg-white">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Esporta</span>
-                    <select value={tipoEsportazioneScadenze} onChange={e => setTipoEsportazioneScadenze(e.target.value)} className="p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
-                      <option value="certificati">Certificati Scaduti</option>
-                      <option value="documenti">Documenti Non Firmati</option>
-                      <option value="entrambi">Entrambi</option>
-                    </select>
-                    <button onClick={esportaScadenzePDF} className="shrink-0 px-4 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5"><DownloadIcon size={14}/> Esporta PDF</button>
+                  <div className="flex flex-nowrap items-end gap-2 min-w-0">
+                    <div className="min-w-[130px]">
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1 whitespace-nowrap">Esporta</label>
+                      <select value={tipoEsportazioneScadenze} onChange={e => setTipoEsportazioneScadenze(e.target.value)} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
+                        <option value="certificati">Certificati Scaduti</option>
+                        <option value="documenti">Documenti Non Firmati</option>
+                        <option value="entrambi">Entrambi</option>
+                      </select>
+                    </div>
+                    <button onClick={esportaScadenzePDF} className="shrink-0 px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-sm font-bold transition-colors flex items-center gap-1.5"><DownloadIcon size={14}/> Esporta PDF</button>
                   </div>
-                  <button onClick={() => setIsScadenzeModalOpen(false)} className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
+                  <button onClick={() => setIsScadenzeModalOpen(false)} className="shrink-0 px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold shadow-sm transition-all">Chiudi Pannello</button>
                 </div>
               </div>
             </div>
