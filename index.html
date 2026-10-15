@@ -3310,7 +3310,7 @@
           {/* --- MODALE AGGIUNGI UTENTE RAPIDO --- */}
           {isAddUserModalOpen && (
             <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
                 <div className="px-5 py-4 bg-blue-600 text-white flex justify-between items-center">
                   <h3 className="font-bold text-xl flex items-center gap-2"><UserPlusIcon size={24}/> Aggiungi Utente</h3>
                   <button onClick={() => setIsAddUserModalOpen(false)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
@@ -3403,6 +3403,14 @@
                               {!addUtenteRapido.dataNascita && addUtenteRapido.anno && <p className="text-[11px] text-amber-600 font-medium mt-1">Al momento è registrato solo l'anno {addUtenteRapido.anno}: inserisci la data completa.</p>}
                            </div>
                            <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Telefono</label>
+                              <input type="tel" placeholder="Es. 333 1234567" value={addUtenteRapido.telefono || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, telefono: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
+                           </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
+                              <input type="email" placeholder="nome@esempio.it" value={addUtenteRapido.email || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, email: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
+                           </div>
+                           <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Certificato</label>
                               <input type="date" value={addUtenteRapido.scadCertificato} onChange={e => setAddUtenteRapido({...addUtenteRapido, scadCertificato: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
                            </div>
@@ -3421,14 +3429,6 @@
                                 <option value="si">Sì</option>
                                 <option value="no">No</option>
                               </select>
-                           </div>
-                           <div className="lg:col-span-1">
-                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Telefono</label>
-                              <input type="tel" placeholder="Es. 333 1234567" value={addUtenteRapido.telefono || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, telefono: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
-                           </div>
-                           <div className="lg:col-span-1">
-                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
-                              <input type="email" placeholder="nome@esempio.it" value={addUtenteRapido.email || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, email: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
                            </div>
                         </div>
 
