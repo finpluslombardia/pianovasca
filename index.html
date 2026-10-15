@@ -2001,7 +2001,7 @@
           // Mantiene l'ordine alfabetico
           nuoviPartecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
 
-          return { ...prev, partecipanti: nuoviPartecipanti };
+          return { ...prev, partecipanti: nuoviPartecipanti, tab: 'iscritti' };
         });
         
         setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
@@ -2015,12 +2015,14 @@
         setNuovoPartecipante({ ...p, iscrizioni });
         setEditingPartecipanteIndex(idx);
         setShowAddForm(true);
+        setEditModal(prev => prev ? { ...prev, tab: 'partecipante' } : prev);
       };
 
       const annullaModificaPartecipante = () => {
         setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
+        setEditModal(prev => prev ? { ...prev, tab: 'iscritti' } : prev);
       };
 
       const rimuoviPartecipante = (idx) => {
@@ -3757,6 +3759,7 @@
                   </div>
                   <div className="flex">
                     <button onClick={() => setEditModal({...editModal, tab: 'iscritti'})} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 ${editModal.tab === 'iscritti' ? 'border-white bg-white/10' : 'border-transparent hover:bg-white/5 opacity-80'}`}>Lista Iscritti ({partecipantiAttiviModal.length}{editModal.maxUtenti ? `/${editModal.maxUtenti}` : ''})</button>
+                    <button onClick={() => { if (editingPartecipanteIndex === null) setShowAddForm(true); setEditModal({...editModal, tab: 'partecipante'}); }} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 ${editModal.tab === 'partecipante' ? 'border-white bg-white/10' : 'border-transparent hover:bg-white/5 opacity-80'}`}>{editingPartecipanteIndex !== null ? 'Modifica Partecipante' : 'Aggiungi Partecipante'}</button>
                     <button onClick={() => setEditModal({...editModal, tab: 'dettagli'})} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 ${editModal.tab === 'dettagli' ? 'border-white bg-white/10' : 'border-transparent hover:bg-white/5 opacity-80'}`}>Impostazioni Corso</button>
                   </div>
                 </div>
@@ -3885,32 +3888,16 @@
                     </form>
                   )}
 
-                  {/* TAB 2: GESTIONE ISCRITTI */}
-                  {editModal.tab === 'iscritti' && (
-                    <div className="flex flex-col min-h-full gap-4">
-                      {/* ADD FORM COMPLETO A SCOMPARSA */}
-                      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all shrink-0">
-                        <div 
-                          className={`px-5 py-3.5 flex justify-between items-center cursor-pointer select-none transition-colors ${showAddForm || editingPartecipanteIndex !== null ? 'bg-slate-50 border-b border-slate-200' : 'hover:bg-slate-50'}`}
-                          onClick={() => {
-                             if (editingPartecipanteIndex !== null) {
-                                 annullaModificaPartecipante();
-                             } else {
-                                 setShowAddForm(!showAddForm);
-                             }
-                          }}
-                        >
-                          <h4 className={`text-sm font-bold flex items-center gap-2 ${showAddForm || editingPartecipanteIndex !== null ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {editingPartecipanteIndex !== null ? <EditIcon size={18}/> : <PlusIcon size={18} className={`transition-transform duration-200 ${showAddForm ? 'rotate-45' : ''}`}/>} 
-                            {editingPartecipanteIndex !== null ? 'Modifica Partecipante' : 'Inserisci Nuovo Partecipante'}
-                          </h4>
-                          <span className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${showAddForm || editingPartecipanteIndex !== null ? 'bg-slate-200 text-slate-600' : 'bg-blue-100 hover:bg-blue-200 text-blue-700'}`}>
-                              {editingPartecipanteIndex !== null ? 'Annulla Modifica' : (showAddForm ? 'Chiudi' : 'Apri')}
-                          </span>
-                        </div>
-                        
-                        {(showAddForm || editingPartecipanteIndex !== null) && (
-                          <div className="p-5 animate-in fade-in slide-in-from-top-2 duration-200">
+                  {/* TAB: AGGIUNGI / MODIFICA PARTECIPANTE */}
+                  {editModal.tab === 'partecipante' && (
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                      <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200">
+                        <h4 className="text-sm font-bold flex items-center gap-2 text-blue-700">
+                          {editingPartecipanteIndex !== null ? <EditIcon size={18}/> : <PlusIcon size={18}/>}
+                          {editingPartecipanteIndex !== null ? 'Modifica Partecipante' : 'Inserisci Nuovo Partecipante'}
+                        </h4>
+                      </div>
+                          <div className="p-6">
                             {(() => {
                               const CLS_CAMPO = "w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-colors";
                               const LBL = "block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5";
@@ -4021,11 +4008,15 @@
                               );
                             })()}
                           </div>
-                        )}
-                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: GESTIONE ISCRITTI */}
+                  {editModal.tab === 'iscritti' && (
+                    <div className="flex flex-col h-full gap-5">
 
                       {/* LISTE SEPARATE */}
-                      <div className={`flex-1 overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-sm flex flex-col relative ${(showAddForm || editingPartecipanteIndex !== null) ? "min-h-[130px]" : "min-h-[300px]"}`}>
+                      <div className={`flex-1 overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-sm flex flex-col relative min-h-[300px]`}>
                         {(() => {
                           const attivi = editModal.partecipanti.filter(p => isAttivoInSettimana(p, inizioSettimana));
                           const inattivi = editModal.partecipanti.filter(p => !isAttivoInSettimana(p, inizioSettimana));
