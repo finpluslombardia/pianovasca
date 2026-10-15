@@ -153,7 +153,7 @@
           (cell?.partecipanti || []).forEach(p => {
             if (p && p.nome && p.nome.trim()) {
               const key = p.nome.toLowerCase().trim();
-              map[key] = { nome: p.nome.trim(), anno: p.anno || '', dataNascita: p.dataNascita || (map[key] ? map[key].dataNascita : '') || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '', telefono: p.telefono || (map[key] ? map[key].telefono : '') || '' };
+              map[key] = { nome: p.nome.trim(), anno: p.anno || '', dataNascita: p.dataNascita || (map[key] ? map[key].dataNascita : '') || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '', telefono: p.telefono || (map[key] ? map[key].telefono : '') || '', email: p.email || (map[key] ? map[key].email : '') || '' };
             }
           });
         });
@@ -430,13 +430,13 @@
       });
 
       // --- STATO NUOVO PARTECIPANTE ---
-      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
       const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
       const [showAddForm, setShowAddForm] = useState(false);
 
       // --- STATI AGGIUNTA UTENTE RAPIDO ---
       const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
-      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+      const [addUtenteRapido, setAddUtenteRapido] = useState({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
 
       // --- STATI RICERCA SOCIO ---
       const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -974,7 +974,7 @@
       // Crea o aggiorna la scheda di un socio nell'archivio permanente. Se l'anno di nascita o
       // il certificato vengono lasciati vuoti, mantiene il valore già presente in archivio
       // invece di cancellarlo: evita di perdere dati già noti per una semplice dimenticanza.
-      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card, telefono, dataNascita) => {
+      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card, telefono, dataNascita, email) => {
           if (!nome || !nome.trim()) return;
           const key = nome.toLowerCase().trim();
           setArchivioSoci(prev => {
@@ -988,6 +988,7 @@
                       scadCertificato: scadCertificato || (esistente ? esistente.scadCertificato : '') || '',
                       card: card || (esistente ? esistente.card : '') || '',
                       telefono: telefono || (esistente ? esistente.telefono : '') || '',
+                      email: email || (esistente ? esistente.email : '') || '',
                       certMsgScad: (esistente && esistente.certMsgScad) || ''
                   }
               };
@@ -1034,6 +1035,7 @@
                   scadCertificato: esisteGia ? esisteGia.scadCertificato : '',
                   card: esisteGia ? (esisteGia.card || '') : '',
                   telefono: esisteGia ? (esisteGia.telefono || '') : '',
+                  email: esisteGia ? (esisteGia.email || '') : '',
                   certMsgScad: esisteGia ? (esisteGia.certMsgScad || '') : ''
               };
 
@@ -1298,7 +1300,7 @@
       // e si azzera da sola quando viene inserito un nuovo certificato (nuova data).
       const segnaCertMsgInviato = (u, inviato) => {
           setArchivioSoci(prev => {
-              const esistente = prev[u.key] || { nome: u.nome, anno: u.anno || '', dataNascita: u.dataNascita || '', scadCertificato: u.scadCertificato || '', card: u.card || '', telefono: u.telefono || '' };
+              const esistente = prev[u.key] || { nome: u.nome, anno: u.anno || '', dataNascita: u.dataNascita || '', scadCertificato: u.scadCertificato || '', card: u.card || '', telefono: u.telefono || '', email: u.email || '' };
               return { ...prev, [u.key]: { ...esistente, certMsgScad: inviato ? u.scadCertificato : '' } };
           });
       };
@@ -1719,7 +1721,7 @@
 
         // Archivio soci permanente: memorizziamo/aggiorniamo questo socio così non andrà
         // ridigitato da capo la prossima volta (anche in un'altra stagione).
-        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card, addUtenteRapido.telefono, addUtenteRapido.dataNascita);
+        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card, addUtenteRapido.telefono, addUtenteRapido.dataNascita, addUtenteRapido.email);
 
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
@@ -1749,6 +1751,7 @@
                         documentiFirmati: addUtenteRapido.documentiFirmati || '',
                         card: addUtenteRapido.card || '',
                         telefono: addUtenteRapido.telefono || '',
+                        email: addUtenteRapido.email || '',
                         iscrizioni: iscrizioniPulite
                     };
                     // BUGFIX: se la persona è già iscritta a questo corso (es. lo si usa per
@@ -1773,7 +1776,7 @@
 
         const nomeAggiunto = addUtenteRapido.nome.trim();
         setIsAddUserModalOpen(false);
-        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
 
         if (corsiNonPiuDisponibili > 0) {
             mostraToast("Alcuni corsi selezionati non erano più disponibili e sono stati saltati.", 'error');
@@ -1835,7 +1838,8 @@
                     dataNascita: inArchivio.dataNascita || p.dataNascita || '',
                     scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
                   card: inArchivio.card || p.card || '',
-                  telefono: inArchivio.telefono || p.telefono || ''
+                  telefono: inArchivio.telefono || p.telefono || '',
+                  email: inArchivio.email || p.email || ''
                 };
             })
             .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -1858,7 +1862,7 @@
               socioEvidenziato: nomeSocio ? nomeSocio.toLowerCase().trim() : null,
               tab: 'iscritti'
           });
-          setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+          setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
           setEditingPartecipanteIndex(null);
           setShowAddForm(false);
       };
@@ -1946,7 +1950,8 @@
                   dataNascita: inArchivio.dataNascita || p.dataNascita || '',
                   scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
                   card: inArchivio.card || p.card || '',
-                  telefono: inArchivio.telefono || p.telefono || ''
+                  telefono: inArchivio.telefono || p.telefono || '',
+                  email: inArchivio.email || p.email || ''
               };
           })
           .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -1968,7 +1973,7 @@
           partecipanti: partecipantiOrdinati,
           tab: 'iscritti' // Apre di default la scheda degli iscritti
         });
-        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -1999,7 +2004,7 @@
           return { ...prev, partecipanti: nuoviPartecipanti };
         });
         
-        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -2013,7 +2018,7 @@
       };
 
       const annullaModificaPartecipante = () => {
-        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
       };
@@ -2087,7 +2092,7 @@
         // così i loro dati (anno, certificato) restano disponibili per l'autocompletamento
         // anche in altre stagioni o altri corsi, senza doverli ridigitare.
         finalPartecipanti.forEach(p => {
-            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card, p.telefono, p.dataNascita);
+            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card, p.telefono, p.dataNascita, p.email);
         });
         
         setTuttiPiani(prevTutti => {
@@ -2100,7 +2105,7 @@
           // --- Sincronizzazione globale dei certificati medici, anagrafica e documenti firmati ---
           const mapAggiornamenti = new Map();
           finalPartecipanti.forEach(p => {
-              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato || '', anno: p.anno || '', dataNascita: p.dataNascita || '', documentiFirmati: p.documentiFirmati || '', card: p.card || '', telefono: p.telefono || '' });
+              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato || '', anno: p.anno || '', dataNascita: p.dataNascita || '', documentiFirmati: p.documentiFirmati || '', card: p.card || '', telefono: p.telefono || '', email: p.email || '' });
           });
 
           Object.keys(nuovoPiano).forEach(k => {
@@ -2110,9 +2115,9 @@
                       if (!esistente || !esistente.nome) return esistente;
                       const updateInfo = mapAggiornamenti.get(esistente.nome.toLowerCase().trim());
                       if (updateInfo) {
-                          if (updateInfo.scadCertificato !== (esistente.scadCertificato || '') || updateInfo.anno !== (esistente.anno || '') || updateInfo.dataNascita !== (esistente.dataNascita || '') || updateInfo.documentiFirmati !== (esistente.documentiFirmati || '') || updateInfo.card !== (esistente.card || '') || updateInfo.telefono !== (esistente.telefono || '')) {
+                          if (updateInfo.scadCertificato !== (esistente.scadCertificato || '') || updateInfo.anno !== (esistente.anno || '') || updateInfo.dataNascita !== (esistente.dataNascita || '') || updateInfo.documentiFirmati !== (esistente.documentiFirmati || '') || updateInfo.card !== (esistente.card || '') || updateInfo.telefono !== (esistente.telefono || '') || updateInfo.email !== (esistente.email || '')) {
                               changed = true;
-                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, dataNascita: updateInfo.dataNascita, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card, telefono: updateInfo.telefono };
+                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, dataNascita: updateInfo.dataNascita, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card, telefono: updateInfo.telefono, email: updateInfo.email };
                           }
                       }
                       return esistente;
@@ -2139,7 +2144,7 @@
         });
         
         setEditModal(null);
-        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', iscrizioni: [{inizio: '', fine: ''}] });
+        setNuovoPartecipante({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
         setEditingPartecipanteIndex(null);
         setShowAddForm(false);
         mostraToast("Modifiche salvate con successo!");
@@ -3361,7 +3366,7 @@
                     )}
 
                     <div className="grid grid-cols-1 gap-4 mb-5">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cognome e Nome</label>
                               <input 
@@ -3381,6 +3386,7 @@
                                             scadCertificato: existing.scadCertificato || '',
                                             card: existing.card || '',
                                             telefono: existing.telefono || '',
+                                            email: existing.email || '',
                                             iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
                                         });
                                     } else {
@@ -3419,6 +3425,10 @@
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Telefono</label>
                               <input type="tel" placeholder="Es. 333 1234567" value={addUtenteRapido.telefono || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, telefono: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
+                           </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
+                              <input type="email" placeholder="nome@esempio.it" value={addUtenteRapido.email || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, email: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
                            </div>
                         </div>
 
@@ -3900,11 +3910,19 @@
                         </div>
                         
                         {(showAddForm || editingPartecipanteIndex !== null) && (
-                          <div className="p-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <div>
-                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Cognome e Nome</label>
-                                 <input 
+                          <div className="p-5 animate-in fade-in slide-in-from-top-2 duration-200">
+                            {(() => {
+                              const CLS_CAMPO = "w-full px-3 py-2 text-sm rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none transition-colors";
+                              const LBL = "block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1";
+                              const SEZ = "flex items-center gap-3 text-[11px] font-extrabold text-slate-400 uppercase tracking-widest mb-3";
+                              return (
+                              <div className="flex flex-col gap-6">
+                                <div>
+                                  <div className={SEZ}>Anagrafica<span className="flex-1 h-px bg-slate-200"></span></div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                      <label className={LBL}>Cognome e Nome</label>
+                                      <input 
                                     type="text" 
                                     list={nuovoPartecipante.nome.length >= 2 ? "utenti-list" : undefined}
                                     value={nuovoPartecipante.nome} 
@@ -3921,49 +3939,64 @@
                                                 scadCertificato: existing.scadCertificato || '',
                                                 card: existing.card || '',
                                             telefono: existing.telefono || '',
+                                            email: existing.email || '',
                                                 iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
                                             });
                                         } else {
                                             setNuovoPartecipante({...nuovoPartecipante, nome: val});
                                         }
                                     }} 
-                                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1" 
+                                    className={CLS_CAMPO} 
                                  />
-                              </div>
-                              <div>
-                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Data di Nascita</label>
-                                 <input type="date" value={nuovoPartecipante.dataNascita || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, dataNascita: e.target.value, anno: annoDaDataNascita(e.target.value)})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer" />
-                                 {!nuovoPartecipante.dataNascita && nuovoPartecipante.anno && <p className="text-[11px] text-amber-600 font-medium mt-1">Registrato solo l'anno {nuovoPartecipante.anno}: inserisci la data completa.</p>}
-                              </div>
-                              <div>
-                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Scadenza Certificato</label>
-                                 <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer" />
-                              </div>
-                              <div>
-                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Documenti Firmati</label>
-                                 <select value={nuovoPartecipante.documentiFirmati} onChange={e => setNuovoPartecipante({...nuovoPartecipante, documentiFirmati: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer">
-                                   <option value="">-- Seleziona --</option>
-                                   <option value="si">Sì</option>
-                                   <option value="no">No</option>
-                                 </select>
-                              </div>
-                              <div>
-                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Card</label>
-                                 <select value={nuovoPartecipante.card} onChange={e => setNuovoPartecipante({...nuovoPartecipante, card: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1 cursor-pointer">
-                                   <option value="">-- Seleziona --</option>
-                                   <option value="si">Sì</option>
-                                   <option value="no">No</option>
-                                 </select>
-                              </div>
-                              <div>
-                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Telefono</label>
-                                 <input type="tel" placeholder="Es. 333 1234567" value={nuovoPartecipante.telefono || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, telefono: e.target.value})} className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white mt-1" />
-                              </div>
-                            </div>
+                                    </div>
+                                    <div>
+                                      <label className={LBL}>Data di Nascita{!nuovoPartecipante.dataNascita && nuovoPartecipante.anno && <span className="normal-case tracking-normal font-semibold text-amber-600"> · solo anno {nuovoPartecipante.anno}</span>}</label>
+                                      <input type="date" value={nuovoPartecipante.dataNascita || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, dataNascita: e.target.value, anno: annoDaDataNascita(e.target.value)})} className={CLS_CAMPO + " cursor-pointer"} />
+                                    </div>
+                                    <div>
+                                      <label className={LBL}>Telefono</label>
+                                      <input type="tel" placeholder="Es. 333 1234567" value={nuovoPartecipante.telefono || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, telefono: e.target.value})} className={CLS_CAMPO} />
+                                    </div>
+                                    <div>
+                                      <label className={LBL}>Email</label>
+                                      <input type="email" placeholder="nome@esempio.it" value={nuovoPartecipante.email || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, email: e.target.value})} className={CLS_CAMPO} />
+                                    </div>
+                                  </div>
+                                </div>
 
-                            <div className="mt-3 border-t border-slate-200 pt-3">
-                               <div className="flex justify-between items-center mb-2">
-                                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">Periodi Iscrizione</label>
+                                <div>
+                                  <div className={SEZ}>Certificato, documenti e card<span className="flex-1 h-px bg-slate-200"></span></div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                      <label className={LBL}>Scadenza Certificato</label>
+                                      <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className={CLS_CAMPO + " cursor-pointer"} />
+                                    </div>
+                                    <div>
+                                      <label className={LBL}>Documenti Firmati</label>
+                                      <select value={nuovoPartecipante.documentiFirmati} onChange={e => setNuovoPartecipante({...nuovoPartecipante, documentiFirmati: e.target.value})} className={CLS_CAMPO + " cursor-pointer"}>
+                                        <option value="">—</option>
+                                        <option value="si">Sì</option>
+                                        <option value="no">No</option>
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className={LBL}>Card</label>
+                                      <select value={nuovoPartecipante.card} onChange={e => setNuovoPartecipante({...nuovoPartecipante, card: e.target.value})} className={CLS_CAMPO + " cursor-pointer"}>
+                                        <option value="">—</option>
+                                        <option value="si">Sì</option>
+                                        <option value="no">No</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              );
+                            })()}
+
+                            <div className="mt-6">
+                               <div className="flex items-center gap-3 mb-3">
+                                 <label className="text-[11px] font-extrabold text-slate-400 uppercase tracking-widest flex items-center gap-1">Periodi di iscrizione</label>
+                                 <span className="flex-1 h-px bg-slate-200"></span>
                                  <button type="button" onClick={() => setNuovoPartecipante({...nuovoPartecipante, iscrizioni: [...(nuovoPartecipante.iscrizioni || []), {inizio:'', fine:''}]})} className="text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-1 rounded font-bold transition-colors flex items-center gap-1"><PlusIcon size={12}/> Aggiungi Periodo</button>
                                </div>
                                <div className="flex flex-wrap gap-1.5 mb-2">
@@ -3972,7 +4005,7 @@
                                      key={pIdx}
                                      type="button"
                                      onClick={() => setNuovoPartecipante({...nuovoPartecipante, iscrizioni: applicaPresetIscrizione(nuovoPartecipante.iscrizioni, preset)})}
-                                     className="text-[11px] bg-slate-100 hover:bg-blue-100 hover:text-blue-700 text-slate-600 px-2 py-1 rounded-full font-semibold transition-colors border border-slate-200"
+                                     className="text-[11px] bg-white hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 text-slate-500 px-2.5 py-1 rounded-full font-semibold transition-colors border border-slate-200"
                                    >
                                      {preset.label}
                                    </button>
@@ -3981,7 +4014,7 @@
                                <div className="flex flex-col gap-2">
                                  {(nuovoPartecipante.iscrizioni || [{inizio:'', fine:''}]).map((isc, idx) => (
                                     <div key={idx} className="flex gap-2 items-center">
-                                       <div className="flex-1 flex flex-col sm:flex-row gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
+                                       <div className="flex-1 flex flex-col sm:flex-row gap-3 bg-white p-2 rounded-lg border border-slate-200">
                                           <div className="flex-1 flex items-center gap-2">
                                             <span className="text-xs font-bold text-slate-400 w-6 text-right">Dal</span>
                                             <input type="date" value={isc.inizio || ''} onChange={(e) => { const newIsc = [...(nuovoPartecipante.iscrizioni || [])]; newIsc[idx].inizio = e.target.value; setNuovoPartecipante({...nuovoPartecipante, iscrizioni: newIsc}); }} className="w-full px-2 py-1.5 text-sm rounded bg-white border border-slate-300 focus:ring-1 focus:ring-blue-500 outline-none cursor-pointer" />
@@ -3998,15 +4031,14 @@
                                  ))}
                                </div>
                             </div>
-                            <div className="mt-4 flex gap-2 justify-end float-right">
+                            <div className="mt-6 pt-4 border-t border-slate-200 flex gap-2 justify-end">
                               {editingPartecipanteIndex !== null && (
-                                <button type="button" onClick={annullaModificaPartecipante} className="px-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2 rounded-lg text-sm shadow-sm transition-colors">Annulla</button>
+                                <button type="button" onClick={annullaModificaPartecipante} className="px-4 bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 font-bold py-2 rounded-lg text-sm transition-colors">Annulla</button>
                               )}
-                              <button type="button" onClick={aggiungiPartecipante} className="px-6 bg-slate-800 hover:bg-slate-900 transition-colors text-white font-bold py-2 rounded-lg text-sm shadow-sm">
+                              <button type="button" onClick={aggiungiPartecipante} className="px-6 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 transition-colors font-bold py-2 rounded-lg text-sm">
                                 {editingPartecipanteIndex !== null ? 'Salva Modifica' : 'Aggiungi alla lista'}
                               </button>
                             </div>
-                            <div className="clear-both"></div>
                           </div>
                         )}
                       </div>
