@@ -1278,6 +1278,24 @@
           return lista;
       }, [tuttiCorsiSelect, attivita, archivioSoci]);
 
+      // Messaggio di auguri per i compleanni (Oggi → Compleanni). I nomi sono salvati come "Cognome Nome":
+      // per il saluto si usa solo il nome (si salta il cognome, anche se composto da particelle come "Dal Lago").
+      const soloNomeProprio = (nomeCompleto) => {
+          const parti = String(nomeCompleto || '').trim().split(/\s+/).filter(Boolean);
+          if (parti.length <= 1) return parti[0] || '';
+          const particelle = ['da', 'dal', 'dalla', 'dallo', 'dai', 'dei', 'del', 'della', 'delle', 'dello', 'di', 'de', 'des', 'la', 'le', 'lo', 'li', 'van', 'von', 'mc', 'san', 'santa', 'ben', 'el', 'al'];
+          let idx = 1;
+          while (idx < parti.length - 1 && particelle.includes(parti[idx - 1].toLowerCase())) idx++;
+          return parti.slice(idx).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+      };
+      const messaggioCompleanno = (nomeCompleto, eta) => {
+          const nome = soloNomeProprio(nomeCompleto);
+          const promo = eta > 16
+              ? "🏊‍♂️ 1 ingresso omaggio per il nuoto libero!\n🎉 Un secondo ingresso a soli 4,50 € per portare con te chi vuoi, perché festeggiare in compagnia è ancora più bello!"
+              : "🎟️ Con l'acquisto di 20 crediti, ne regaliamo 10 in omaggio!";
+          return `🎉🎂 Tanti auguri ${nome} dal Centro Federale Lampugnano! 🥳\nÈ il tuo compleanno e abbiamo una sorpresa speciale per te!\nPer festeggiare, ti regaliamo:\n${promo}\nHai 14 giorni dalla data del tuo compleanno per approfittare della promozione. Che aspetti? Prepara il costume e vieni a festeggiare con noi!\nAncora tantissimi auguri e buon compleanno da tutto lo staff del Centro Federale Lampugnano!`;
+      };
+
       // --- COMPLEANNI DI OGGI: persone iscritte ai corsi della stagione la cui data di nascita completa cade oggi.
       const compleanniOggi = useMemo(() => {
           const oggi = new Date();
@@ -3050,7 +3068,7 @@
                   <ul className="divide-y divide-slate-100">
                     {compleanniOggi.map((persona, i) => {
                       const num = numeroPerWhatsapp(persona.telefono);
-                      const testo = `Ciao ${persona.nome}! Tantissimi auguri di buon compleanno da tutto il Centro Federale Lampugnano! 🎂🎉`;
+                      const testo = messaggioCompleanno(persona.nome, persona.eta);
                       return (
                         <li key={i} className="p-3 flex items-center justify-between gap-3">
                           <div className="min-w-0">
