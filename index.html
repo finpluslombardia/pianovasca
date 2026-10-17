@@ -1291,8 +1291,8 @@
       const messaggioCompleanno = (nomeCompleto, eta) => {
           const nome = soloNomeProprio(nomeCompleto);
           const promo = eta > 16
-              ? "🏊‍♂️ 1 ingresso omaggio per il nuoto libero!\n🎉 Un secondo ingresso a soli 4,50 € per portare con te chi vuoi, perché festeggiare in compagnia è ancora più bello!"
-              : "🎟️ Con l'acquisto di 20 crediti, ne regaliamo 10 in omaggio!";
+              ? "🏊 1 ingresso omaggio per il nuoto libero!\n🎉 Un secondo ingresso a soli 4,50 € per portare con te chi vuoi, perché festeggiare in compagnia è ancora più bello!"
+              : "🎟 Con l'acquisto di 20 crediti, ne regaliamo 10 in omaggio!";
           return `🎉🎂 Tanti auguri ${nome} dal Centro Federale Lampugnano! 🥳\nÈ il tuo compleanno e abbiamo una sorpresa speciale per te!\nPer festeggiare, ti regaliamo:\n${promo}\nHai 14 giorni dalla data del tuo compleanno per approfittare della promozione. Che aspetti? Prepara il costume e vieni a festeggiare con noi!\nAncora tantissimi auguri e buon compleanno da tutto lo staff del Centro Federale Lampugnano!`;
       };
 
@@ -3080,7 +3080,7 @@
                             </div>
                           </div>
                           {num
-                            ? <a href={`https://wa.me/${num}?text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" title="Invia gli auguri su WhatsApp" className="shrink-0 p-2 rounded-md text-[#25D366] hover:text-[#1ebe57] bg-green-50 hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
+                            ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" title="Invia gli auguri su WhatsApp"><WhatsAppIcon size={18}/></a>
                             : <span title="Numero di telefono mancante" className="shrink-0 p-2 rounded-md text-slate-300 bg-slate-100 cursor-not-allowed"><WhatsAppIcon size={18}/></span>}
                         </li>
                       );
