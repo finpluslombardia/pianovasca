@@ -1801,15 +1801,16 @@
                     }
                     const cell = { ...nuovoPiano[k] };
                     const partecipanti = [...(cell.partecipanti || [])];
+                    const arcRapido = archivioSoci[nomeNormRapido] || {};
                     const datiPartecipante = {
                         nome: addUtenteRapido.nome,
-                        anno: addUtenteRapido.anno,
-                        dataNascita: addUtenteRapido.dataNascita || '',
+                        anno: addUtenteRapido.anno || arcRapido.anno || '',
+                        dataNascita: addUtenteRapido.dataNascita || arcRapido.dataNascita || '',
                         scadCertificato: addUtenteRapido.scadCertificato,
                         documentiFirmati: addUtenteRapido.documentiFirmati || '',
-                        card: addUtenteRapido.card || '',
-                        telefono: addUtenteRapido.telefono || '',
-                        email: addUtenteRapido.email || '',
+                        card: addUtenteRapido.card || arcRapido.card || '',
+                        telefono: addUtenteRapido.telefono || arcRapido.telefono || '',
+                        email: addUtenteRapido.email || arcRapido.email || '',
                         iscrizioni: iscrizioniPulite
                     };
                     // BUGFIX: se la persona è già iscritta a questo corso (es. lo si usa per
@@ -2148,6 +2149,21 @@
             finalPartecipanti.sort((a, b) => a.nome.localeCompare(b.nome));
         }
         
+        // PROTEZIONE DATI: se per una persona data di nascita, email, telefono o tessera risultano
+        // vuoti in questa lista ma esistono già in archivio, li recuperiamo prima di salvare.
+        // Così un campo lasciato vuoto per errore non cancella più il dato già noto (né in questo
+        // corso né, tramite la sincronizzazione globale, negli altri).
+        finalPartecipanti = finalPartecipanti.map(p => {
+            if (!p || !p.nome) return p;
+            const arc = archivioSoci[p.nome.toLowerCase().trim()];
+            if (!arc) return p;
+            const out = { ...p };
+            ['dataNascita', 'email', 'telefono', 'card'].forEach(c => { if (!out[c] && arc[c]) out[c] = arc[c]; });
+            if (!out.anno && arc.anno) out.anno = arc.anno;
+            if (out.dataNascita && /^\d{4}-/.test(out.dataNascita)) out.anno = out.dataNascita.slice(0, 4);
+            return out;
+        });
+
         // Archivio soci permanente: aggiorniamo la scheda di ogni iscritto di questo corso,
         // così i loro dati (anno, certificato) restano disponibili per l'autocompletamento
         // anche in altre stagioni o altri corsi, senza doverli ridigitare.
@@ -2173,7 +2189,16 @@
                   let changed = false;
                   const newPartecipanti = nuovoPiano[k].partecipanti.map(esistente => {
                       if (!esistente || !esistente.nome) return esistente;
-                      const updateInfo = mapAggiornamenti.get(esistente.nome.toLowerCase().trim());
+                      const updateInfoRaw = mapAggiornamenti.get(esistente.nome.toLowerCase().trim());
+                      // Dati anagrafici di contatto: un valore vuoto non cancella mai uno già presente.
+                      const updateInfo = updateInfoRaw ? {
+                          ...updateInfoRaw,
+                          dataNascita: updateInfoRaw.dataNascita || esistente.dataNascita || '',
+                          email: updateInfoRaw.email || esistente.email || '',
+                          telefono: updateInfoRaw.telefono || esistente.telefono || '',
+                          card: updateInfoRaw.card || esistente.card || '',
+                          anno: updateInfoRaw.anno || esistente.anno || ''
+                      } : null;
                       if (updateInfo) {
                           if (updateInfo.scadCertificato !== (esistente.scadCertificato || '') || updateInfo.anno !== (esistente.anno || '') || updateInfo.dataNascita !== (esistente.dataNascita || '') || updateInfo.documentiFirmati !== (esistente.documentiFirmati || '') || updateInfo.card !== (esistente.card || '') || updateInfo.telefono !== (esistente.telefono || '') || updateInfo.email !== (esistente.email || '')) {
                               changed = true;
