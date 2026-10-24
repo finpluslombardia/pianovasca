@@ -490,6 +490,13 @@
       // prima ancora che i dati cloud siano arrivati.
       const lastSavedPiano = useRef(JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita }));
       const initialLoadDone = useRef(false);
+      const ultimiConteggi = useRef(null); // conteggi (corsi/iscritti/soci) dell'ultima versione cloud nota: serve al freno di sicurezza
+      const updatedAtNoto = useRef(null); // data dell'ultima versione cloud che questo dispositivo ha letto/scritto
+      const updatedAtServer = useRef(null); // data dell'ultima versione presente sul cloud (anche se non applicata)
+      const ultimoBackupMs = useRef(0);
+      const ultimoBackupGiorno = useRef('');
+      const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+      const [elencoBackup, setElencoBackup] = useState(null);
       const hasModificheLocaliInSospeso = useRef(false); // true = ci sono modifiche locali non ancora confermate su Firestore
       const ultimoStatoLocaleVisto = useRef(""); // ultima "istantanea" locale osservata dal debounce di salvataggio
 
@@ -527,7 +534,7 @@
                 const dynamicImport = new Function('url', 'return import(url)');
                 const { initializeApp } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
                 const { getAuth, signInWithCustomToken, onAuthStateChanged, signInWithEmailAndPassword, signOut } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-                const { getFirestore, doc, setDoc, onSnapshot } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                const { getFirestore, doc, setDoc, getDoc, onSnapshot } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
                 const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
                 let app, auth, db, appId;
@@ -556,7 +563,7 @@
                 
                 auth = getAuth(app);
                 db = getFirestore(app);
-                setFirebaseInstances({ auth, db, appId, doc, setDoc, onSnapshot, signInWithEmailAndPassword, signOut });
+                setFirebaseInstances({ auth, db, appId, doc, setDoc, getDoc, onSnapshot, signInWithEmailAndPassword, signOut });
 
                 onAuthStateChanged(auth, (u) => {
                     setUser(u);
@@ -598,6 +605,7 @@
           if (docSnap.metadata.hasPendingWrites) {
             return;
           }
+          if (docSnap.exists()) { updatedAtServer.current = docSnap.data().updatedAt || null; }
 
           // BUGFIX: se ci sono modifiche locali non ancora salvate (il timer di debounce è
           // ancora in attesa), non sovrascriviamo lo stato con i dati arrivati dal server:
@@ -608,6 +616,8 @@
 
           if (docSnap.exists()) {
             const data = docSnap.data();
+            updatedAtNoto.current = data.updatedAt || null;
+            ultimiConteggi.current = contaDati(data.tuttiPiani, data.archivioSoci);
             
             // Nuovo formato con gestione Stagioni multiple
             if (data.tuttiPiani) {
@@ -689,6 +699,12 @@
         return () => unsubscribe();
       }, [user, firebaseInstances]);
 
+      const contaDati = (piani, arch) => {
+        let corsi = 0, iscritti = 0;
+        Object.values(piani || {}).forEach(st => Object.values(st || {}).forEach(c => { corsi++; iscritti += (c && c.partecipanti) ? c.partecipanti.length : 0; }));
+        return { corsi, iscritti, soci: Object.keys(arch || {}).length };
+      };
+
       // --- FUNZIONE DI SALVATAGGIO CLOUD ---
       const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare, stagionePredef, archivioDaSalvare, listaAttesaDaSalvare) => {
         if (!user || !firebaseInstances) {
@@ -696,15 +712,50 @@
             setTimeout(() => setStatoSalvataggio('idle'), 4000);
             return;
         }
+        // FRENO 1: se i dati da salvare sono molto più "piccoli" dell'ultima versione cloud nota,
+        // non scriviamo in silenzio: chiediamo conferma (evita di sovrascrivere dati buoni con stato vuoto/parziale).
+        const nuoviC = contaDati(pianiDaSalvare, archivioDaSalvare);
+        const vecchiC = ultimiConteggi.current;
+        if (vecchiC && ((vecchiC.iscritti >= 10 && nuoviC.iscritti < vecchiC.iscritti * 0.7) || (vecchiC.soci >= 10 && nuoviC.soci < vecchiC.soci * 0.7) || (vecchiC.corsi >= 5 && nuoviC.corsi < vecchiC.corsi * 0.6))) {
+            const ok = window.confirm(`ATTENZIONE: stai per salvare molti meno dati di prima.\n\nPrima: ${vecchiC.corsi} caselle corso, ${vecchiC.iscritti} iscritti, ${vecchiC.soci} soci in archivio.\nOra: ${nuoviC.corsi} caselle corso, ${nuoviC.iscritti} iscritti, ${nuoviC.soci} soci in archivio.\n\nOK = salva comunque (la versione precedente resta nei backup automatici).\nAnnulla = NON salvare, e ricarica la pagina per riavere i dati del cloud.`);
+            if (!ok) { setStatoSalvataggio('error'); return; }
+        }
+        // FRENO 2: un altro dispositivo/scheda ha scritto dati più nuovi di quelli che questo ha letto.
+        if (updatedAtServer.current && updatedAtNoto.current && updatedAtServer.current !== updatedAtNoto.current) {
+            const ok2 = window.confirm("ATTENZIONE: su un altro dispositivo (o in un'altra scheda) i dati sono stati modificati dopo l'ultima volta che questa pagina li ha letti.\n\nSe continui, quelle modifiche verranno SOVRASCRITTE.\n\nOK = sovrascrivi comunque.\nAnnulla = non salvare, e ricarica la pagina per riavere i dati più recenti.");
+            if (!ok2) { setStatoSalvataggio('error'); return; }
+        }
         setStatoSalvataggio('saving');
         try {
             const { db, appId, doc, setDoc } = firebaseInstances;
             const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
+            // BACKUP AUTOMATICO: prima di sovrascrivere, conserviamo la versione cloud precedente
+            // (una ogni 30 min a rotazione sulle ultime 12 ore + una al giorno per 14 giorni).
+            try {
+                const prec = JSON.parse(lastSavedPiano.current || '{}');
+                const cPrec = contaDati(prec.t, prec.arch);
+                if (cPrec.corsi > 0 || cPrec.soci > 0) {
+                    const adesso = Date.now();
+                    const giornoStr = new Date(adesso).toISOString().slice(0, 10);
+                    const dati = JSON.parse(JSON.stringify({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], backupAt: new Date(adesso).toISOString(), conteggi: cPrec }));
+                    if (adesso - ultimoBackupMs.current > 30 * 60000) {
+                        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'backup_m' + (Math.floor(adesso / (30 * 60000)) % 24)), dati);
+                        ultimoBackupMs.current = adesso;
+                    }
+                    if (ultimoBackupGiorno.current !== giornoStr) {
+                        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'backup_d' + (Math.floor(adesso / 86400000) % 14)), dati);
+                        ultimoBackupGiorno.current = giornoStr;
+                    }
+                }
+            } catch (errBk) { console.error("Backup automatico non riuscito:", errBk); }
             // Firestore rifiuta qualunque campo con valore `undefined` (anche annidato) e fa fallire
             // l'INTERO salvataggio. Il giro JSON elimina in blocco tali campi: rete di sicurezza
             // contro dati incompleti (es. persone inserite prima che esistessero certi campi).
             const payload = JSON.parse(JSON.stringify({ tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef || '', archivioSoci: archivioDaSalvare, listaAttesa: listaAttesaDaSalvare }));
-            await setDoc(docRef, { ...payload, updatedAt: new Date().toISOString() });
+            const adessoISO = new Date().toISOString();
+            await setDoc(docRef, { ...payload, updatedAt: adessoISO });
+            updatedAtNoto.current = adessoISO; updatedAtServer.current = adessoISO;
+            ultimiConteggi.current = nuoviC;
             const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef, arch: archivioDaSalvare, la: listaAttesaDaSalvare });
             lastSavedPiano.current = statoAppenaSalvato;
             // Abbassiamo il flag "modifiche in sospeso" solo se, durante il salvataggio (che è
@@ -2335,8 +2386,36 @@
       };
 
       // --- FUNZIONI CARICAMENTO FILE ---
+      const apriBackupCloud = async () => {
+        setIsExportMenuOpen(false);
+        setIsBackupModalOpen(true);
+        setElencoBackup(null);
+        try {
+          const { db, appId, doc, getDoc } = firebaseInstances;
+          const ids = [];
+          for (let i = 0; i < 24; i++) ids.push('backup_m' + i);
+          for (let i = 0; i < 14; i++) ids.push('backup_d' + i);
+          const snaps = await Promise.all(ids.map(id => getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', id)).catch(() => null)));
+          const lista = snaps.filter(sn => sn && sn.exists()).map(sn => ({ id: sn.id, ...sn.data() })).sort((a, b) => (b.backupAt || '').localeCompare(a.backupAt || ''));
+          setElencoBackup(lista);
+        } catch (err) { console.error(err); setElencoBackup([]); }
+      };
+      const ripristinaBackupCloud = (b) => {
+        const c = b.conteggi || contaDati(b.tuttiPiani, b.archivioSoci);
+        if (!window.confirm(`Ripristinare la versione del ${new Date(b.backupAt).toLocaleString('it-IT')}?\n(${c.corsi} caselle corso, ${c.iscritti} iscritti, ${c.soci} soci)\n\nI dati attuali verranno sostituiti.`)) return;
+        setTuttiPiani(b.tuttiPiani || {});
+        if (b.stagioni && b.stagioni.length) { setStagioni(b.stagioni); setStagioneSelezionata(b.stagionePredefinita && b.stagioni.includes(b.stagionePredefinita) ? b.stagionePredefinita : b.stagioni[0]); }
+        if (b.stagionePredefinita) setStagionePredefinita(b.stagionePredefinita);
+        setArchivioSoci(b.archivioSoci || {});
+        setListaAttesa(b.listaAttesa || []);
+        // la versione ripristinata è "nuova" rispetto al cloud: azzeriamo i freni per questo salvataggio
+        ultimiConteggi.current = null; updatedAtNoto.current = updatedAtServer.current;
+        setIsBackupModalOpen(false);
+        mostraToast("Versione ripristinata!");
+      };
+
       const esportaDati = () => {
-        const dataStr = JSON.stringify({ tuttiPiani, stagioni, attivita: ATTIVITA_DI_BASE }, null, 2);
+        const dataStr = JSON.stringify({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, attivita: ATTIVITA_DI_BASE }, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -2505,6 +2584,9 @@
             if (dati.tuttiPiani) {
               setTuttiPiani(dati.tuttiPiani);
               setStagioni(dati.stagioni || Object.keys(dati.tuttiPiani));
+              if (dati.archivioSoci) setArchivioSoci(dati.archivioSoci);
+              if (dati.listaAttesa) setListaAttesa(dati.listaAttesa);
+              if (dati.stagionePredefinita) setStagionePredefinita(dati.stagionePredefinita);
               if (dati.stagioni && dati.stagioni.length > 0) setStagioneSelezionata(dati.stagioni[0]);
             } else if (dati.piano) {
               const pianoMigrato = {};
@@ -2526,11 +2608,9 @@
       const eliminaStagione = () => {
         if (stagioni.length === 1) return; // Non elimina se c'è una sola stagione
         
-        if (!confermaEliminaStagione) {
-          setConfermaEliminaStagione(true);
-          setTimeout(() => setConfermaEliminaStagione(false), 3000);
-          return;
-        }
+        const nCelle = Object.keys(tuttiPiani[stagioneSelezionata] || {}).length;
+        const nIscritti = Object.values(tuttiPiani[stagioneSelezionata] || {}).reduce((t, c) => t + ((c && c.partecipanti) ? c.partecipanti.length : 0), 0);
+        if (!window.confirm(`Vuoi eliminare l'INTERA stagione ${stagioneSelezionata}?\n\nVerranno rimossi tutti i corsi (${nCelle} caselle) e le iscrizioni (${nIscritti}) di questa stagione.\n\nL'operazione non si può annullare dal sito (resta solo nei backup automatici).`)) return;
         
         const nuoveStagioni = stagioni.filter(s => s !== stagioneSelezionata);
         setStagioni(nuoveStagioni);
@@ -2860,6 +2940,34 @@
               </div>
             );
           })()}
+
+          {/* --- MODALE BACKUP AUTOMATICI --- */}
+          {isBackupModalOpen && (
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4" onClick={() => setIsBackupModalOpen(false)}>
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="bg-[#1e3a5f] text-white px-5 py-4 flex items-center justify-between">
+                  <h3 className="text-lg font-bold">Backup automatici</h3>
+                  <button onClick={() => setIsBackupModalOpen(false)} className="text-white/80 hover:text-white text-xl leading-none">×</button>
+                </div>
+                <div className="p-4 overflow-y-auto flex-1">
+                  {elencoBackup === null && <p className="text-sm text-slate-500">Caricamento…</p>}
+                  {elencoBackup && elencoBackup.length === 0 && <p className="text-sm text-slate-500">Nessun backup automatico ancora disponibile. Se ne crea uno ogni volta che si salva (al massimo uno ogni 30 minuti).</p>}
+                  {elencoBackup && elencoBackup.map(b => {
+                    const c = b.conteggi || contaDati(b.tuttiPiani, b.archivioSoci);
+                    return (
+                      <div key={b.id} className="flex items-center justify-between gap-3 py-2.5 border-b border-slate-100 last:border-0">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-800">{new Date(b.backupAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                          <div className="text-xs text-slate-500">{c.iscritti} iscritti · {c.corsi} caselle corso · {c.soci} soci in archivio</div>
+                        </div>
+                        <button onClick={() => ripristinaBackupCloud(b)} className="shrink-0 px-3 py-1.5 text-sm font-semibold rounded-md bg-[#1e3a5f] text-white hover:bg-[#2a4d7c]">Ripristina</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* --- MODALE SCADENZE CERTIFICATI --- */}
           {isScadenzeModalOpen && (
@@ -4421,8 +4529,8 @@
                              {stagioni.length > 1 && (
                                <button 
                                  onClick={eliminaStagione} 
-                                 className={`p-1 rounded-md transition-colors ml-1 ${confermaEliminaStagione ? 'bg-red-500 text-white' : 'text-red-400 hover:bg-red-50'}`} 
-                                 title={confermaEliminaStagione ? "Clicca di nuovo per eliminare" : "Elimina Stagione"}
+                                 className={`p-1 rounded-md transition-colors ml-1 text-red-400 hover:bg-red-50`} 
+                                 title="Elimina Stagione"
                                >
                                  <Trash2Icon size={14} />
                                </button>
@@ -4719,6 +4827,7 @@
                           </label>
                           <div className="h-px bg-slate-200 my-1"></div>
                           <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
+                          <button onClick={apriBackupCloud} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">🕘 Backup automatici (cloud)</button>
                           <label className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium cursor-pointer">
                             <UploadIcon size={16} /> Ripristina Backup (JSON)
                             <input type="file" accept=".json" onChange={(e) => { importaDati(e); setIsExportMenuOpen(false); }} className="hidden" />
