@@ -756,7 +756,7 @@
                 if (cPrec.corsi > 0 || cPrec.soci > 0) {
                     const adesso = Date.now();
                     const giornoStr = new Date(adesso).toISOString().slice(0, 10);
-                    const dati = JSON.parse(JSON.stringify({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], backupAt: new Date(adesso).toISOString(), conteggi: cPrec }));
+                    const dati = JSON.parse(JSON.stringify({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], attivita: ATTIVITA_DI_BASE, formato: 'pianovasca-backup-v2', backupAt: new Date(adesso).toISOString(), conteggi: cPrec }));
                     if (adesso - ultimoBackupMs.current > 30 * 60000) {
                         await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'backup_m' + (Math.floor(adesso / (30 * 60000)) % 24)), dati);
                         ultimoBackupMs.current = adesso;
@@ -2434,13 +2434,16 @@
       };
 
       const esportaDati = () => {
-        const dataStr = JSON.stringify({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci: archivioCompleto(archivioSoci, tuttiPiani), listaAttesa, attivita: ATTIVITA_DI_BASE }, null, 2);
+        const arcCompleto = archivioCompleto(archivioSoci, tuttiPiani);
+        const dataStr = JSON.stringify({ formato: 'pianovasca-backup-v2', esportatoIl: new Date().toISOString(), conteggi: contaDati(tuttiPiani, arcCompleto), tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arcCompleto, listaAttesa, attivita: ATTIVITA_DI_BASE }, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = url; link.download = `piano_vasca_${stagioneSelezionata.replace(/\//g, '-')}_backup.json`; link.click();
+        link.href = url; link.download = `piano_vasca_COMPLETO_${toYMD(new Date())}.json`; link.click();
         URL.revokeObjectURL(url);
         setIsExportMenuOpen(false);
+        const cc = contaDati(tuttiPiani, arcCompleto);
+        mostraToast(`Backup scaricato: ${stagioni.length} stagioni, ${cc.iscritti} iscritti, ${cc.soci} soci, ${listaAttesa.length} in lista d'attesa.`);
       };
 
       const esportaExcel = () => {
