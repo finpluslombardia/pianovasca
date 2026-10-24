@@ -701,6 +701,21 @@
         return () => unsubscribe();
       }, [user, firebaseInstances]);
 
+      // Archivio completo = archivio soci salvato + anagrafiche ricavate dai corsi (l'archivio ha la
+      // precedenza; i campi vuoti si completano con quelli dei corsi, e chi sta solo nei corsi viene aggiunto).
+      const archivioCompleto = (arch, piani) => {
+        const base = costruisciArchivioDaPiani(piani || {});
+        const out = { ...base };
+        Object.keys(arch || {}).forEach(k => {
+          const a = arch[k] || {};
+          const b = base[k] || {};
+          const m = { ...b, ...a };
+          Object.keys(b).forEach(f => { if (!a[f] && b[f]) m[f] = b[f]; });
+          out[k] = m;
+        });
+        return out;
+      };
+
       const contaDati = (piani, arch) => {
         let corsi = 0, iscritti = 0;
         Object.values(piani || {}).forEach(st => Object.values(st || {}).forEach(c => { corsi++; iscritti += (c && c.partecipanti) ? c.partecipanti.length : 0; }));
@@ -735,6 +750,8 @@
             // (una ogni 30 min a rotazione sulle ultime 12 ore + una al giorno per 14 giorni).
             try {
                 const prec = JSON.parse(lastSavedPiano.current || '{}');
+                // Le anagrafiche devono esserci sempre: se l'archivio soci risulta vuoto, lo ricostruiamo dai corsi.
+                prec.arch = archivioCompleto(prec.arch, prec.t);
                 const cPrec = contaDati(prec.t, prec.arch);
                 if (cPrec.corsi > 0 || cPrec.soci > 0) {
                     const adesso = Date.now();
@@ -2408,7 +2425,7 @@
         setTuttiPiani(b.tuttiPiani || {});
         if (b.stagioni && b.stagioni.length) { setStagioni(b.stagioni); setStagioneSelezionata(b.stagionePredefinita && b.stagioni.includes(b.stagionePredefinita) ? b.stagionePredefinita : b.stagioni[0]); }
         if (b.stagionePredefinita) setStagionePredefinita(b.stagionePredefinita);
-        setArchivioSoci(b.archivioSoci || {});
+        setArchivioSoci(archivioCompleto(b.archivioSoci, b.tuttiPiani));
         setListaAttesa(b.listaAttesa || []);
         // la versione ripristinata è "nuova" rispetto al cloud: azzeriamo i freni per questo salvataggio
         ultimiConteggi.current = null; updatedAtNoto.current = updatedAtServer.current;
@@ -2417,7 +2434,7 @@
       };
 
       const esportaDati = () => {
-        const dataStr = JSON.stringify({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, attivita: ATTIVITA_DI_BASE }, null, 2);
+        const dataStr = JSON.stringify({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci: archivioCompleto(archivioSoci, tuttiPiani), listaAttesa, attivita: ATTIVITA_DI_BASE }, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -2586,7 +2603,7 @@
             if (dati.tuttiPiani) {
               setTuttiPiani(dati.tuttiPiani);
               setStagioni(dati.stagioni || Object.keys(dati.tuttiPiani));
-              if (dati.archivioSoci) setArchivioSoci(dati.archivioSoci);
+              setArchivioSoci(archivioCompleto(dati.archivioSoci, dati.tuttiPiani));
               if (dati.listaAttesa) setListaAttesa(dati.listaAttesa);
               if (dati.stagionePredefinita) setStagionePredefinita(dati.stagionePredefinita);
               if (dati.stagioni && dati.stagioni.length > 0) setStagioneSelezionata(dati.stagioni[0]);
