@@ -217,6 +217,12 @@
     const SESSO_LABEL = { M: 'Maschio', F: 'Femmina', N: 'Non specificato' };
     const NOMI_M = new Set(['andrea','luca','nicola','mattia','elia','gianluca','joshua','noah','jesus','tobia','zaccaria','isaia','geremia','mustafa','hamza','osama','moussa','talha','zakaria','yahya','giosue','mohamed','mohammed','muhammad','ahmed','ahmad','karim','omar','ali','hassan','hussein','hussin','mahmoud','ibrahim','youssef','yousef','aziz','ayman','anwar','tamer','hany','fouad','moustafa','mohsen','ismail','ramy','fahim','sadek','mekhail','nagy','thomas','gabriel','leon','liam','christian','cristian','oscar','nathan','maxime','aaron','alexander','daniel','kevin','michael','adrian','stefan','andrew','anthony','fabian','joel','mike','lucas','roman','mihai','ilie','juan','rey','davide','daniele','michele','emanuele','samuele','gabriele','simone','luigi','giuseppe','elsayed','elsayes','samy','abdullah','abdelrahman','amir','kamal','khaled','tarek','walid','yassin','yassine','sami','said','salvatore','enrico','achille','leone','dino','nino','gino','saverio','paolo','giovanni','gianni','mathias','erik','eric','arthur','adam','ranieri','achraf','dimitrii','manuel','marcel','luis','jose','carlos','antoine','tommaso','kenut','kejan','godpower','lovepreet','amrit','kushal','miro','siro','ubay','obed','ezequiel','eddryl','rito','ayaan','arif','naeim','osma','xian','ettore','david','brandon','raphael','louis','nicolas','sebastian','rayan','jibril','steven','gioele','aleksandr','raymond','dylan','ryan','bryan','jonathan','nathaniel','samuel','joseph','peter','paul']);
     const NOMI_F = new Set(['irene','agnese','adele','rachele','noemi','nicole','beatrice','ines','iris','eloise','amelie','chloe','noelle','odile','desiree','elodie','carmen','ester','miriam','ruth','hope','alison','lucy','penelope','isabel','katherin','aline','ailyn','farah','dareen','dunya','shenali','laila','maria','mia','eva','ida','ada','emma','nora','nina','lisa','elisabeth','margot','judith','esther','sarah','rosemary','mirjam','ilse','astrid','ingrid','dorotea','bonaria','siria','noa','matilde','alice','susanne','emilie','clarice','bice','carole','denise','elise','estelle','gaelle','mirielle','emily','adrienne','mariel','christel','ketty','edvige','sharon','jennifer','jessica','melissa','kimberly','vanessa','nathalie','lorraine']);
+    const SESSO_STILE = {
+      M: { campo: '!border-sky-300 !bg-sky-50 focus:!border-sky-400 focus:!ring-sky-100', simbolo: '♂', col: 'text-sky-600', nome: 'text-sky-700' },
+      F: { campo: '!border-pink-300 !bg-pink-50 focus:!border-pink-400 focus:!ring-pink-100', simbolo: '♀', col: 'text-pink-500', nome: 'text-pink-600' },
+      N: { campo: '', simbolo: '○', col: 'text-slate-300', nome: 'text-slate-800' }
+    };
+    const sessoSuccessivo = (x) => x === 'M' ? 'F' : x === 'F' ? 'N' : 'M';
     const rilevaSesso = (nomeCompleto) => {
       const parti = String(nomeCompleto || '').trim().split(/\s+/).filter(Boolean);
       if (parti.length <= 1) return 'N';
@@ -3144,10 +3150,9 @@
                     <button onClick={() => setSchedaSocio(null)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                   </div>
                   <div className="p-6 overflow-y-auto flex flex-col gap-4">
-                    <div className="text-xl font-bold text-slate-800">{schedaSocio.nome}</div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className={"text-xl font-bold " + SESSO_STILE[arch.sesso || schedaSocio.sesso || rilevaSesso(schedaSocio.nome)].nome} title={SESSO_LABEL[arch.sesso || schedaSocio.sesso || rilevaSesso(schedaSocio.nome)]}>{schedaSocio.nome}</div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div><div className={lbl}>Data di nascita</div><div className="text-sm text-slate-700">{dn ? formatDate(dn) : (an || '-')}</div></div>
-                      <div><div className={lbl}>Sesso</div><div className="text-sm text-slate-700">{SESSO_LABEL[arch.sesso || schedaSocio.sesso || rilevaSesso(schedaSocio.nome)] || 'Non specificato'}</div></div>
                       <div><div className={lbl}>Scad. certificato</div><div className="text-sm text-slate-700">{cert ? formatDate(cert) : '-'}</div></div>
                       <div><div className={lbl}>Documenti firmati</div><div className="text-sm text-slate-700">{schedaSocio.documentiFirmati === 'si' ? 'Sì' : schedaSocio.documentiFirmati === 'no' ? 'No' : 'Da verificare'}</div></div>
                       <div><div className={lbl}>Card</div><div className="text-sm text-slate-700">{card === 'si' ? 'Sì' : card === 'no' ? 'No' : '-'}</div></div>
@@ -3923,10 +3928,11 @@
                     )}
 
                     <div className="grid grid-cols-1 gap-4 mb-5">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
-                           <div className="lg:col-span-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                           <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Cognome e Nome</label>
-                              <input 
+                              <div className="relative">
+<input 
                                 type="text" 
                                 list={addUtenteRapido.nome.length >= 2 ? "utenti-list" : undefined}
                                 value={addUtenteRapido.nome} 
@@ -3951,36 +3957,34 @@
                                         setAddUtenteRapido({...addUtenteRapido, nome: val});
                                     }
                                 }} 
-                                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" 
+                                className={"w-full px-4 pr-10 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none " + SESSO_STILE[addUtenteRapido.sesso || rilevaSesso(normalizzaNome(addUtenteRapido.nome))].campo} 
                                 required 
                               />
+                              <button type="button" tabIndex={-1} onClick={() => setAddUtenteRapido({...addUtenteRapido, sesso: sessoSuccessivo(addUtenteRapido.sesso || rilevaSesso(normalizzaNome(addUtenteRapido.nome)))})}
+                                title={"Sesso: " + SESSO_LABEL[addUtenteRapido.sesso || rilevaSesso(normalizzaNome(addUtenteRapido.nome))] + " (clicca per cambiare)"}
+                                className={"absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-full text-lg leading-none hover:bg-white/80 transition-colors " + SESSO_STILE[addUtenteRapido.sesso || rilevaSesso(normalizzaNome(addUtenteRapido.nome))].col}>
+                                {SESSO_STILE[addUtenteRapido.sesso || rilevaSesso(normalizzaNome(addUtenteRapido.nome))].simbolo}
+                              </button>
+                              </div>
                            </div>
-                           <div className="lg:col-span-2">
+                           <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Data di Nascita</label>
                               <input type="date" value={addUtenteRapido.dataNascita || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, dataNascita: e.target.value, anno: annoDaDataNascita(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
                               {!addUtenteRapido.dataNascita && addUtenteRapido.anno && <p className="text-[11px] text-amber-600 font-medium mt-1">Al momento è registrato solo l'anno {addUtenteRapido.anno}: inserisci la data completa.</p>}
                            </div>
                            <div className="lg:col-span-1">
-                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Sesso</label>
-                              <select title="M = Maschio · F = Femmina · N = Non specificato" value={addUtenteRapido.sesso || rilevaSesso(normalizzaNome(addUtenteRapido.nome))} onChange={e => setAddUtenteRapido({...addUtenteRapido, sesso: e.target.value})} className="w-full px-1 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer text-center">
-                                <option value="M">M</option>
-                                <option value="F">F</option>
-                                <option value="N">N</option>
-                              </select>
-                           </div>
-                           <div className="lg:col-span-2">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Telefono</label>
                               <input type="tel" placeholder="Es. 333 1234567" value={addUtenteRapido.telefono || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, telefono: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
                            </div>
-                           <div className="lg:col-span-4">
+                           <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
                               <input type="email" placeholder="nome@esempio.it" value={addUtenteRapido.email || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, email: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
                            </div>
-                           <div className="lg:col-span-4">
+                           <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Certificato</label>
                               <input type="date" value={addUtenteRapido.scadCertificato} onChange={e => setAddUtenteRapido({...addUtenteRapido, scadCertificato: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
                            </div>
-                           <div className="lg:col-span-4">
+                           <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Documenti Firmati</label>
                               <select value={addUtenteRapido.documentiFirmati} onChange={e => setAddUtenteRapido({...addUtenteRapido, documentiFirmati: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer">
                                 <option value="">-- Seleziona --</option>
@@ -3988,7 +3992,7 @@
                                 <option value="no">No</option>
                               </select>
                            </div>
-                           <div className="lg:col-span-4">
+                           <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Card</label>
                               <select value={addUtenteRapido.card} onChange={e => setAddUtenteRapido({...addUtenteRapido, card: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer">
                                 <option value="">-- Seleziona --</option>
@@ -4481,10 +4485,11 @@
                               const LBL = "block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5";
                               return (
                               <>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-x-4 gap-y-4">
-                                  <div className="lg:col-span-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-4">
+                                  <div>
                                     <label className={LBL}>Cognome e Nome</label>
-                                    <input 
+                                    <div className="relative">
+<input 
                                     type="text" 
                                     list={nuovoPartecipante.nome.length >= 2 ? "utenti-list" : undefined}
                                     value={nuovoPartecipante.nome} 
@@ -4509,34 +4514,32 @@
                                             setNuovoPartecipante({...nuovoPartecipante, nome: val});
                                         }
                                     }} 
-                                    className={CLS_CAMPO} 
+                                    className={CLS_CAMPO + " pr-9 " + SESSO_STILE[nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome))].campo} 
                                  />
+                                    <button type="button" tabIndex={-1} onClick={() => setNuovoPartecipante({...nuovoPartecipante, sesso: sessoSuccessivo(nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome)))})}
+                                      title={"Sesso: " + SESSO_LABEL[nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome))] + " (clicca per cambiare)"}
+                                      className={"absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full text-base leading-none hover:bg-white/80 transition-colors " + SESSO_STILE[nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome))].col}>
+                                      {SESSO_STILE[nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome))].simbolo}
+                                    </button>
                                   </div>
-                                  <div className="lg:col-span-2">
+                                  </div>
+                                  <div>
                                     <label className={LBL}>Data di Nascita{!nuovoPartecipante.dataNascita && nuovoPartecipante.anno && <span className="normal-case tracking-normal font-semibold text-amber-600"> · solo anno {nuovoPartecipante.anno}</span>}</label>
                                     <input type="date" value={nuovoPartecipante.dataNascita || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, dataNascita: e.target.value, anno: annoDaDataNascita(e.target.value)})} className={CLS_CAMPO + " cursor-pointer"} />
                                   </div>
-                                  <div className="lg:col-span-1">
-                                    <label className={LBL}>Sesso</label>
-                                    <select title="M = Maschio · F = Femmina · N = Non specificato" value={nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome))} onChange={e => setNuovoPartecipante({...nuovoPartecipante, sesso: e.target.value})} className={CLS_CAMPO + " cursor-pointer text-center !px-1"}>
-                                      <option value="M">M</option>
-                                      <option value="F">F</option>
-                                      <option value="N">N</option>
-                                    </select>
-                                  </div>
-                                  <div className="lg:col-span-2">
+                                  <div>
                                     <label className={LBL}>Telefono</label>
                                     <input type="tel" placeholder="Es. 333 1234567" value={nuovoPartecipante.telefono || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, telefono: e.target.value})} className={CLS_CAMPO} />
                                   </div>
-                                  <div className="lg:col-span-4">
+                                  <div>
                                     <label className={LBL}>Email</label>
                                     <input type="email" placeholder="nome@esempio.it" value={nuovoPartecipante.email || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, email: e.target.value})} className={CLS_CAMPO} />
                                   </div>
-                                  <div className="lg:col-span-4">
+                                  <div>
                                     <label className={LBL}>Scadenza Certificato</label>
                                     <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className={CLS_CAMPO + " cursor-pointer"} />
                                   </div>
-                                  <div className="lg:col-span-4">
+                                  <div>
                                     <label className={LBL}>Documenti Firmati</label>
                                     <select value={nuovoPartecipante.documentiFirmati} onChange={e => setNuovoPartecipante({...nuovoPartecipante, documentiFirmati: e.target.value})} className={CLS_CAMPO + " cursor-pointer"}>
                                       <option value="">—</option>
@@ -4544,7 +4547,7 @@
                                       <option value="no">No</option>
                                     </select>
                                   </div>
-                                  <div className="lg:col-span-4">
+                                  <div>
                                     <label className={LBL}>Card</label>
                                     <select value={nuovoPartecipante.card} onChange={e => setNuovoPartecipante({...nuovoPartecipante, card: e.target.value})} className={CLS_CAMPO + " cursor-pointer"}>
                                       <option value="">—</option>
