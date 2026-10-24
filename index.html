@@ -474,6 +474,8 @@
 
       // --- STATI GESTIONE STAGIONI ---
       const [isGestioneStagioniOpen, setIsGestioneStagioniOpen] = useState(false);
+      const [stagioneInRinomina, setStagioneInRinomina] = useState(null);
+      const [nuovoNomeStagione, setNuovoNomeStagione] = useState('');
 
       // --- STATI FIREBASE E SALVATAGGIO ---
       const [user, setUser] = useState(null);
@@ -2605,25 +2607,44 @@
         event.target.value = null;
       };
 
-      const eliminaStagione = () => {
+      const eliminaStagione = (nomeStagione) => {
+        const daEliminare = nomeStagione || stagioneSelezionata;
         if (stagioni.length === 1) return; // Non elimina se c'è una sola stagione
         
-        const nCelle = Object.keys(tuttiPiani[stagioneSelezionata] || {}).length;
-        const nIscritti = Object.values(tuttiPiani[stagioneSelezionata] || {}).reduce((t, c) => t + ((c && c.partecipanti) ? c.partecipanti.length : 0), 0);
-        if (!window.confirm(`Vuoi eliminare l'INTERA stagione ${stagioneSelezionata}?\n\nVerranno rimossi tutti i corsi (${nCelle} caselle) e le iscrizioni (${nIscritti}) di questa stagione.\n\nL'operazione non si può annullare dal sito (resta solo nei backup automatici).`)) return;
+        const nCelle = Object.keys(tuttiPiani[daEliminare] || {}).length;
+        const nIscritti = Object.values(tuttiPiani[daEliminare] || {}).reduce((t, c) => t + ((c && c.partecipanti) ? c.partecipanti.length : 0), 0);
+        if (!window.confirm(`Vuoi eliminare l'INTERA stagione ${daEliminare}?\n\nVerranno rimossi tutti i corsi (${nCelle} caselle) e le iscrizioni (${nIscritti}) di questa stagione.\n\nL'operazione non si può annullare dal sito (resta solo nei backup automatici).`)) return;
         
-        const nuoveStagioni = stagioni.filter(s => s !== stagioneSelezionata);
+        const nuoveStagioni = stagioni.filter(s => s !== daEliminare);
         setStagioni(nuoveStagioni);
         setTuttiPiani(prev => {
           const nuovoTutti = { ...prev };
-          delete nuovoTutti[stagioneSelezionata];
+          delete nuovoTutti[daEliminare];
           return nuovoTutti;
         });
-        setStagioneSelezionata(nuoveStagioni[0]);
-        if (stagionePredefinita === stagioneSelezionata) {
+        if (stagioneSelezionata === daEliminare) setStagioneSelezionata(nuoveStagioni[0]);
+        if (stagionePredefinita === daEliminare) {
             setStagionePredefinita(nuoveStagioni[0]);
         }
         setConfermaEliminaStagione(false);
+      };
+
+      const confermaRinominaStagione = () => {
+        const vecchio = stagioneInRinomina;
+        const nuovo = (nuovoNomeStagione || '').trim();
+        if (!vecchio) return;
+        if (!nuovo || nuovo === vecchio) { setStagioneInRinomina(null); return; }
+        if (stagioni.includes(nuovo)) { alert(`Esiste già una stagione chiamata "${nuovo}".`); return; }
+        setStagioni(prev => prev.map(x => x === vecchio ? nuovo : x));
+        setTuttiPiani(prev => {
+          const nuovoTutti = {};
+          Object.keys(prev).forEach(k => { nuovoTutti[k === vecchio ? nuovo : k] = prev[k]; });
+          return nuovoTutti;
+        });
+        if (stagioneSelezionata === vecchio) setStagioneSelezionata(nuovo);
+        if (stagionePredefinita === vecchio) setStagionePredefinita(nuovo);
+        setStagioneInRinomina(null);
+        mostraToast("Stagione rinominata!");
       };
 
       // --- GESTIONE ACCESSO ---
@@ -3799,10 +3820,10 @@
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
                 <div className="px-5 py-4 bg-slate-800 text-white flex justify-between items-center">
                   <h3 className="font-bold text-lg flex items-center gap-2">Gestione Stagioni</h3>
-                  <button onClick={() => setIsGestioneStagioniOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                  <button onClick={() => { setStagioneInRinomina(null); setIsGestioneStagioniOpen(false); }} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                 </div>
                 <div className="p-4 flex flex-col gap-2 bg-slate-50 overflow-y-auto">
-                  <p className="text-sm text-slate-500 mb-3">Usa le frecce per l'ordine nel menu, o clicca la stella per impostare la stagione di avvio.</p>
+                  <p className="text-sm text-slate-500 mb-3">Usa le frecce per l'ordine nel menu, la stella per la stagione di avvio, la matita per rinominare e il cestino per eliminare.</p>
                   {stagioni.map((s, idx) => (
                     <div key={s} className={`flex items-center justify-between bg-white border p-3 rounded-lg shadow-sm transition-colors ${stagionePredefinita === s ? 'border-yellow-400 ring-1 ring-yellow-400' : 'border-slate-200'}`}>
                       <div className="flex items-center gap-3">
@@ -3813,9 +3834,20 @@
                         >
                           <StarIcon size={20} className={stagionePredefinita === s ? "fill-yellow-500" : ""} />
                         </button>
-                        <span className={`font-bold ${stagionePredefinita === s ? 'text-slate-900' : 'text-slate-700'}`}>{s}</span>
+                        {stagioneInRinomina === s ? (
+                          <input autoFocus value={nuovoNomeStagione} onChange={e => setNuovoNomeStagione(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') confermaRinominaStagione(); if (e.key === 'Escape') setStagioneInRinomina(null); }}
+                            className="w-32 px-2 py-1 border border-blue-400 rounded-md font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-300" />
+                        ) : (
+                          <span className={`font-bold ${stagionePredefinita === s ? 'text-slate-900' : 'text-slate-700'}`}>{s}</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
+                        {stagioneInRinomina === s ? (
+                          <button onClick={confermaRinominaStagione} className="p-1.5 rounded-md text-emerald-600 hover:bg-emerald-50" title="Conferma nuovo nome"><CheckIcon size={18} /></button>
+                        ) : (
+                          <button onClick={() => { setStagioneInRinomina(s); setNuovoNomeStagione(s); }} className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100" title="Rinomina stagione"><EditIcon size={18} /></button>
+                        )}
                         <button 
                           onClick={() => {
                             if (idx === 0) return;
@@ -3843,6 +3875,10 @@
                           className="p-1.5 rounded-md transition-colors text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default"
                         >
                           <ArrowDownIcon size={18} />
+                        </button>
+                        <button onClick={() => eliminaStagione(s)} disabled={stagioni.length === 1}
+                          className="p-1.5 rounded-md transition-colors text-red-400 hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer disabled:cursor-default" title={stagioni.length === 1 ? "Non si può eliminare l'unica stagione" : "Elimina stagione"}>
+                          <Trash2Icon size={18} />
                         </button>
                       </div>
                     </div>
@@ -4520,21 +4556,12 @@
                                        setStagioneSelezionata(e.target.value);
                                    }
                                }}
-                               className="bg-transparent font-bold text-sm text-slate-800 outline-none cursor-pointer -ml-1"
+                               className="bg-transparent font-bold text-sm text-slate-800 outline-none cursor-pointer -ml-1 appearance-none pr-1" style={{ WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'none' }} title="Clicca per cambiare stagione"
                              >
                                {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
                                <option value="NUOVA" className="font-bold text-blue-600">+ Crea nuova...</option>
-                               {stagioni.length > 1 && <option value="ORDINA" className="font-bold text-slate-600">⚙️ Gestione stagioni...</option>}
+                               <option value="ORDINA" className="font-bold text-slate-600">⚙️ Gestione stagioni...</option>
                              </select>
-                             {stagioni.length > 1 && (
-                               <button 
-                                 onClick={eliminaStagione} 
-                                 className={`p-1 rounded-md transition-colors ml-1 text-red-400 hover:bg-red-50`} 
-                                 title="Elimina Stagione"
-                               >
-                                 <Trash2Icon size={14} />
-                               </button>
-                             )}
                            </div>
                         </div>
                       </div>
