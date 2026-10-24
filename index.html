@@ -3145,11 +3145,11 @@
                   </div>
                   <div className="p-6 overflow-y-auto flex flex-col gap-4">
                     <div className="text-xl font-bold text-slate-800">{schedaSocio.nome}</div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div><div className={lbl}>Data di nascita</div><div className="text-sm text-slate-700">{dn ? formatDate(dn) : (an || '-')}</div></div>
+                      <div><div className={lbl}>Sesso</div><div className="text-sm text-slate-700">{SESSO_LABEL[arch.sesso || schedaSocio.sesso || rilevaSesso(schedaSocio.nome)] || 'Non specificato'}</div></div>
                       <div><div className={lbl}>Scad. certificato</div><div className="text-sm text-slate-700">{cert ? formatDate(cert) : '-'}</div></div>
                       <div><div className={lbl}>Documenti firmati</div><div className="text-sm text-slate-700">{schedaSocio.documentiFirmati === 'si' ? 'Sì' : schedaSocio.documentiFirmati === 'no' ? 'No' : 'Da verificare'}</div></div>
-                      <div><div className={lbl}>Sesso</div><div className="text-sm text-slate-700">{SESSO_LABEL[arch.sesso || schedaSocio.sesso || rilevaSesso(schedaSocio.nome)] || 'Non specificato'}</div></div>
                       <div><div className={lbl}>Card</div><div className="text-sm text-slate-700">{card === 'si' ? 'Sì' : card === 'no' ? 'No' : '-'}</div></div>
                     </div>
                     <div>
@@ -3969,16 +3969,16 @@
                               </select>
                            </div>
                            <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Certificato</label>
+                              <input type="date" value={addUtenteRapido.scadCertificato} onChange={e => setAddUtenteRapido({...addUtenteRapido, scadCertificato: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
+                           </div>
+                           <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Telefono</label>
                               <input type="tel" placeholder="Es. 333 1234567" value={addUtenteRapido.telefono || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, telefono: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
                            </div>
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email</label>
                               <input type="email" placeholder="nome@esempio.it" value={addUtenteRapido.email || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, email: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
-                           </div>
-                           <div className="lg:col-span-1">
-                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Certificato</label>
-                              <input type="date" value={addUtenteRapido.scadCertificato} onChange={e => setAddUtenteRapido({...addUtenteRapido, scadCertificato: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
                            </div>
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Documenti Firmati</label>
@@ -4525,16 +4525,16 @@
                                     </select>
                                   </div>
                                   <div>
+                                    <label className={LBL}>Scadenza Certificato</label>
+                                    <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className={CLS_CAMPO + " cursor-pointer"} />
+                                  </div>
+                                  <div>
                                     <label className={LBL}>Telefono</label>
                                     <input type="tel" placeholder="Es. 333 1234567" value={nuovoPartecipante.telefono || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, telefono: e.target.value})} className={CLS_CAMPO} />
                                   </div>
                                   <div>
                                     <label className={LBL}>Email</label>
                                     <input type="email" placeholder="nome@esempio.it" value={nuovoPartecipante.email || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, email: e.target.value})} className={CLS_CAMPO} />
-                                  </div>
-                                  <div>
-                                    <label className={LBL}>Scadenza Certificato</label>
-                                    <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className={CLS_CAMPO + " cursor-pointer"} />
                                   </div>
                                   <div>
                                     <label className={LBL}>Documenti Firmati</label>
