@@ -773,32 +773,38 @@
             const percorso = ['artifacts', appId, 'users', user.uid, 'datiPianoVasca'];
 
             // BACKUP AUTOMATICO: prima di sovrascrivere, conserviamo la versione cloud precedente
-            // (una ogni 30 min a rotazione sulle ultime 12 ore + una al giorno per 14 giorni), a blocchi.
+            // (un solo backup al giorno, alle ore 13, conservati per 30 giorni), a blocchi.
             try {
                 const prec = JSON.parse(lastSavedPiano.current || '{}');
                 prec.arch = archivioCompleto(prec.arch, prec.t);
                 const cPrec = contaDati(prec.t, prec.arch);
                 if (cPrec.corsi > 0 || cPrec.soci > 0) {
                     const adesso = Date.now();
-                    const giornoStr = new Date(adesso).toISOString().slice(0, 10);
+                    // Un solo backup al giorno, riferito alle ore 13:00: la copia viene fatta al primo
+                    // salvataggio dopo le 13 (conserva lo stato com'era a quell'ora).
+                    const oraBk = new Date(adesso);
+                    const limiteOra = new Date(oraBk); limiteOra.setHours(13, 0, 0, 0);
+                    if (oraBk < limiteOra) limiteOra.setDate(limiteOra.getDate() - 1);
+                    const chiaveGiorno = toYMD(limiteOra);
                     const docsPrec = statoToDocs({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [] });
                     const scriviBackup = async (slot) => {
                         const ids = Object.keys(docsPrec);
                         const ops = ids.map(id => [`bk2_${slot}__${id}`, JSON.parse(JSON.stringify(docsPrec[id]))]);
-                        ops.push([`bk2_${slot}__meta`, { formato: 'v2', backupAt: new Date(adesso).toISOString(), conteggi: cPrec, docIds: ids, attivita: ATTIVITA_DI_BASE }]);
+                        ops.push([`bk2_${slot}__meta`, { formato: 'v2', chiave: chiaveGiorno, backupAt: new Date(adesso).toISOString(), conteggi: cPrec, docIds: ids, attivita: ATTIVITA_DI_BASE }]);
                         for (let i = 0; i < ops.length; i += 400) {
                             const bb = writeBatch(db);
                             ops.slice(i, i + 400).forEach(([id, dati]) => bb.set(doc(db, ...percorso, id), dati));
                             await bb.commit();
                         }
                     };
-                    if (adesso - ultimoBackupMs.current > 30 * 60000) {
-                        await scriviBackup('m' + (Math.floor(adesso / (30 * 60000)) % 24));
-                        ultimoBackupMs.current = adesso;
-                    }
-                    if (ultimoBackupGiorno.current !== giornoStr) {
-                        await scriviBackup('d' + (Math.floor(adesso / 86400000) % 14));
-                        ultimoBackupGiorno.current = giornoStr;
+                    if (ultimoBackupGiorno.current !== chiaveGiorno) {
+                        const slotG = 'd' + (Math.floor(new Date(chiaveGiorno + 'T00:00:00Z').getTime() / 86400000) % 30);
+                        const { getDoc: getDocBk } = firebaseInstances;
+                        const gia = await getDocBk(doc(db, ...percorso, `bk2_${slotG}__meta`)).catch(() => null);
+                        if (!(gia && gia.exists() && gia.data().chiave === chiaveGiorno)) {
+                            await scriviBackup(slotG);
+                        }
+                        ultimoBackupGiorno.current = chiaveGiorno;
                     }
                 }
             } catch (errBk) { console.error("Backup automatico non riuscito:", errBk); }
@@ -2470,18 +2476,45 @@
           const { db, appId, doc, getDoc } = firebaseInstances;
           const percorso = ['artifacts', appId, 'users', user.uid, 'datiPianoVasca'];
           const slots = [];
-          for (let i = 0; i < 24; i++) slots.push('m' + i);
-          for (let i = 0; i < 14; i++) slots.push('d' + i);
-          // backup a blocchi (nuovo formato) + eventuali backup a documento unico fatti in precedenza
+          for (let i = 0; i < 30; i++) slots.push('d' + i);
+          for (let i = 0; i < 10; i++) slots.push('x' + i);
           const nuovi = await Promise.all(slots.map(sl => getDoc(doc(db, ...percorso, `bk2_${sl}__meta`)).catch(() => null)));
-          const vecchi = await Promise.all(slots.map(sl => getDoc(doc(db, ...percorso, 'backup_' + sl)).catch(() => null)));
           const lista = [];
           nuovi.forEach((sn, i) => { if (sn && sn.exists()) lista.push({ id: 'bk2_' + slots[i], slot: slots[i], nuovoFormato: true, ...sn.data() }); });
-          vecchi.forEach(sn => { if (sn && sn.exists()) lista.push({ id: sn.id, ...sn.data() }); });
           lista.sort((a, b) => (b.backupAt || '').localeCompare(a.backupAt || ''));
           setElencoBackup(lista);
         } catch (err) { console.error(err); setElencoBackup([]); }
       };
+      // BACKUP MANUALE: copia dello stato ATTUALE sul cloud (fino a 10, poi sostituisce il più vecchio).
+      const creaBackupManuale = async () => {
+        setIsExportMenuOpen(false);
+        if (!user || !firebaseInstances) { alert("Non sono connesso al cloud: riprova tra poco."); return; }
+        try {
+          const { db, appId, doc, getDoc, writeBatch } = firebaseInstances;
+          const percorso = ['artifacts', appId, 'users', user.uid, 'datiPianoVasca'];
+          // scegliamo il posto: il primo libero, altrimenti il più vecchio
+          const metas = await Promise.all(Array.from({ length: 10 }, (_, i) => getDoc(doc(db, ...percorso, `bk2_x${i}__meta`)).catch(() => null)));
+          let slot = null, piuVecchio = null, dataVecchia = '';
+          metas.forEach((sn, i) => {
+            if (!sn || !sn.exists()) { if (slot === null) slot = 'x' + i; }
+            else if (piuVecchio === null || (sn.data().backupAt || '') < dataVecchia) { piuVecchio = 'x' + i; dataVecchia = sn.data().backupAt || ''; }
+          });
+          if (slot === null) slot = piuVecchio || 'x0';
+          const arc = archivioCompleto(archivioSoci, tuttiPiani);
+          const docsAtt = statoToDocs({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arc, listaAttesa });
+          const ids = Object.keys(docsAtt);
+          const cc = contaDati(tuttiPiani, arc);
+          const ops = ids.map(id => [`bk2_${slot}__${id}`, JSON.parse(JSON.stringify(docsAtt[id]))]);
+          ops.push([`bk2_${slot}__meta`, { formato: 'v2', manuale: true, backupAt: new Date().toISOString(), conteggi: cc, docIds: ids, attivita: ATTIVITA_DI_BASE }]);
+          for (let i = 0; i < ops.length; i += 400) {
+            const bb = writeBatch(db);
+            ops.slice(i, i + 400).forEach(([id, dati]) => bb.set(doc(db, ...percorso, id), dati));
+            await bb.commit();
+          }
+          mostraToast(`Backup creato: ${cc.iscritti} iscritti, ${cc.soci} soci, ${listaAttesa.length} in lista d'attesa.`);
+        } catch (err) { console.error(err); alert("Backup non riuscito: " + (err && err.message ? err.message : err)); }
+      };
+
       const ripristinaBackupCloud = async (b0) => {
         const c0 = b0.conteggi || contaDati(b0.tuttiPiani, b0.archivioSoci);
         if (!window.confirm(`Ripristinare la versione del ${new Date(b0.backupAt).toLocaleString('it-IT')}?\n(${c0.corsi} caselle corso, ${c0.iscritti} iscritti, ${c0.soci} soci)\n\nI dati attuali verranno sostituiti.`)) return;
@@ -3063,18 +3096,18 @@
             <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 p-4" onClick={() => setIsBackupModalOpen(false)}>
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="bg-[#1e3a5f] text-white px-5 py-4 flex items-center justify-between">
-                  <h3 className="text-lg font-bold">Backup automatici</h3>
+                  <h3 className="text-lg font-bold">Backup su cloud</h3>
                   <button onClick={() => setIsBackupModalOpen(false)} className="text-white/80 hover:text-white text-xl leading-none">×</button>
                 </div>
                 <div className="p-4 overflow-y-auto flex-1">
                   {elencoBackup === null && <p className="text-sm text-slate-500">Caricamento…</p>}
-                  {elencoBackup && elencoBackup.length === 0 && <p className="text-sm text-slate-500">Nessun backup automatico ancora disponibile. Se ne crea uno ogni volta che si salva (al massimo uno ogni 30 minuti).</p>}
+                  {elencoBackup && elencoBackup.length === 0 && <p className="text-sm text-slate-500">Nessun backup ancora disponibile. Se ne crea uno al giorno, al primo salvataggio dopo le 13, oppure a mano con "Crea backup ora".</p>}
                   {elencoBackup && elencoBackup.map(b => {
                     const c = b.conteggi || contaDati(b.tuttiPiani, b.archivioSoci);
                     return (
                       <div key={b.id} className="flex items-center justify-between gap-3 py-2.5 border-b border-slate-100 last:border-0">
                         <div>
-                          <div className="text-sm font-semibold text-slate-800">{new Date(b.backupAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                          <div className="text-sm font-semibold text-slate-800">{b.manuale ? `Manuale · ${new Date(b.backupAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}` : (b.chiave ? `Giornata del ${formatDate(b.chiave)} (ore 13)` : new Date(b.backupAt).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' }))}</div>
                           <div className="text-xs text-slate-500">{c.iscritti} iscritti · {c.corsi} caselle corso · {c.soci} soci in archivio</div>
                         </div>
                         <button onClick={() => ripristinaBackupCloud(b)} className="shrink-0 px-3 py-1.5 text-sm font-semibold rounded-md bg-[#1e3a5f] text-white hover:bg-[#2a4d7c]">Ripristina</button>
@@ -4950,7 +4983,8 @@
                           </label>
                           <div className="h-px bg-slate-200 my-1"></div>
                           <button onClick={esportaDati} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">💾 File di Backup (JSON)</button>
-                          <button onClick={apriBackupCloud} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">🕘 Backup automatici (cloud)</button>
+                          <button onClick={creaBackupManuale} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">☁️ Crea backup ora (cloud)</button>
+                          <button onClick={apriBackupCloud} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">🕘 Backup su cloud (elenco)</button>
                           <label className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium cursor-pointer">
                             <UploadIcon size={16} /> Ripristina Backup (JSON)
                             <input type="file" accept=".json" onChange={(e) => { importaDati(e); setIsExportMenuOpen(false); }} className="hidden" />
