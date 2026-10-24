@@ -194,7 +194,7 @@
           (cell?.partecipanti || []).forEach(p => {
             if (p && p.nome && p.nome.trim()) {
               const key = p.nome.toLowerCase().trim();
-              map[key] = { nome: p.nome.trim(), anno: p.anno || '', dataNascita: p.dataNascita || (map[key] ? map[key].dataNascita : '') || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '', telefono: p.telefono || (map[key] ? map[key].telefono : '') || '', email: p.email || (map[key] ? map[key].email : '') || '' };
+              map[key] = { nome: p.nome.trim(), anno: p.anno || '', dataNascita: p.dataNascita || (map[key] ? map[key].dataNascita : '') || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '', telefono: p.telefono || (map[key] ? map[key].telefono : '') || '', email: p.email || (map[key] ? map[key].email : '') || '', sesso: p.sesso || (map[key] ? map[key].sesso : '') || '' };
             }
           });
         });
@@ -208,6 +208,75 @@
     const formattaNomeProprio = (str) => {
       return String(str || '').trim().replace(/\s+/g, ' ').toLowerCase()
         .split(' ').map(w => w ? w.charAt(0).toUpperCase() + w.slice(1) : w).join(' ');
+    };
+
+    // Regole di salvataggio: nome sempre "Prima Lettera Maiuscola" dopo ogni spazio, email sempre minuscola.
+    const normalizzaNome = (n) => formattaNomeProprio(n);
+    const normalizzaEmail = (e) => String(e || '').trim().toLowerCase();
+    // --- SESSO: 'M' maschio, 'F' femmina, 'N' non specificato. Rilevato dal nome (formato "Cognome Nome"). ---
+    const SESSO_LABEL = { M: 'Maschio', F: 'Femmina', N: 'Non specificato' };
+    const NOMI_M = new Set(['andrea','luca','nicola','mattia','elia','gianluca','joshua','noah','jesus','tobia','zaccaria','isaia','geremia','mustafa','hamza','osama','moussa','talha','zakaria','yahya','giosue','mohamed','mohammed','muhammad','ahmed','ahmad','karim','omar','ali','hassan','hussein','hussin','mahmoud','ibrahim','youssef','yousef','aziz','ayman','anwar','tamer','hany','fouad','moustafa','mohsen','ismail','ramy','fahim','sadek','mekhail','nagy','thomas','gabriel','leon','liam','christian','cristian','oscar','nathan','maxime','aaron','alexander','daniel','kevin','michael','adrian','stefan','andrew','anthony','fabian','joel','mike','lucas','roman','mihai','ilie','juan','rey','davide','daniele','michele','emanuele','samuele','gabriele','simone','luigi','giuseppe','elsayed','elsayes','samy','abdullah','abdelrahman','amir','kamal','khaled','tarek','walid','yassin','yassine','sami','said','salvatore','enrico','achille','leone','dino','nino','gino','saverio','paolo','giovanni','gianni','mathias','erik','eric','arthur','adam','ranieri','achraf','dimitrii','manuel','marcel','luis','jose','carlos','antoine','tommaso','kenut','kejan','godpower','lovepreet','amrit','kushal','miro','siro','ubay','obed','ezequiel','eddryl','rito','ayaan','arif','naeim','osma','xian','ettore','david','brandon','raphael','louis','nicolas','sebastian','rayan','jibril','steven','gioele','aleksandr','raymond','dylan','ryan','bryan','jonathan','nathaniel','samuel','joseph','peter','paul']);
+    const NOMI_F = new Set(['irene','agnese','adele','rachele','noemi','nicole','beatrice','ines','iris','eloise','amelie','chloe','noelle','odile','desiree','elodie','carmen','ester','miriam','ruth','hope','alison','lucy','penelope','isabel','katherin','aline','ailyn','farah','dareen','dunya','shenali','laila','maria','mia','eva','ida','ada','emma','nora','nina','lisa','elisabeth','margot','judith','esther','sarah','rosemary','mirjam','ilse','astrid','ingrid','dorotea','bonaria','siria','noa','matilde','alice','susanne','emilie','clarice','bice','carole','denise','elise','estelle','gaelle','mirielle','emily','adrienne','mariel','christel','ketty','edvige','sharon','jennifer','jessica','melissa','kimberly','vanessa','nathalie','lorraine']);
+    const rilevaSesso = (nomeCompleto) => {
+      const parti = String(nomeCompleto || '').trim().split(/\s+/).filter(Boolean);
+      if (parti.length <= 1) return 'N';
+      const particelle = ['da','dal','dalla','dallo','dai','dei','del','della','delle','dello','di','de','des','la','le','lo','van','von','mc','san','santa','ben','el','dos','das','do'];
+      let idx = 1;
+      while (idx < parti.length - 1 && particelle.includes(parti[idx - 1].toLowerCase())) idx++;
+      const parole = parti.slice(idx).map(w => w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, ''));
+      for (const w of parole) {
+        if (!w) continue;
+        if (NOMI_M.has(w)) return 'M';
+        if (NOMI_F.has(w)) return 'F';
+        if (w.length > 5 && w.startsWith('maria') && !w.startsWith('mario')) return 'F';
+        if (w.endsWith('a')) return 'F';
+        if (w.endsWith('o') || w.endsWith('i')) return 'M';
+      }
+      return 'N';
+    };
+
+    // Applica le regole a tutto lo stato; restituisce gli STESSI oggetti se nulla cambia (evita giri a vuoto).
+    const normalizzaDatiAnagrafici = (piani, arch, attesa) => {
+      let cambiato = false;
+      const sessoArch = {};
+      Object.keys(arch || {}).forEach(k => { const a = arch[k]; if (a && a.sesso) sessoArch[k] = a.sesso; });
+      const normP = (p) => {
+        if (!p || typeof p !== 'object') return p;
+        const nome = p.nome ? normalizzaNome(p.nome) : p.nome;
+        const email = p.email ? normalizzaEmail(p.email) : p.email;
+        let sesso = p.sesso;
+        if (!sesso && p.nome) sesso = sessoArch[String(p.nome).toLowerCase().trim()] || rilevaSesso(nome);
+        if (nome === p.nome && email === p.email && sesso === p.sesso) return p;
+        cambiato = true;
+        return { ...p, nome, email, sesso };
+      };
+      const nuoviPiani = {};
+      Object.keys(piani || {}).forEach(st => {
+        const stag = piani[st] || {};
+        const nuovaStag = {};
+        let stagCamb = false;
+        Object.keys(stag).forEach(k => {
+          const cell = stag[k];
+          if (cell && cell.partecipanti && cell.partecipanti.length) {
+            const nuovi = cell.partecipanti.map(normP);
+            if (nuovi.some((x, i) => x !== cell.partecipanti[i])) { nuovaStag[k] = { ...cell, partecipanti: nuovi }; stagCamb = true; return; }
+          }
+          nuovaStag[k] = cell;
+        });
+        nuoviPiani[st] = stagCamb ? nuovaStag : stag;
+      });
+      const nuovoArch = {};
+      Object.keys(arch || {}).forEach(k => { nuovoArch[k] = normP(arch[k]); });
+      const nuovaAttesa = (attesa || []).map(c => {
+        if (!c) return c;
+        const nome = c.nome ? normalizzaNome(c.nome) : c.nome;
+        const nomeGenitore = c.nomeGenitore ? normalizzaNome(c.nomeGenitore) : c.nomeGenitore;
+        const email = c.email ? normalizzaEmail(c.email) : c.email;
+        if (nome === c.nome && email === c.email && nomeGenitore === c.nomeGenitore) return c;
+        cambiato = true;
+        return { ...c, nome, nomeGenitore, email };
+      });
+      return cambiato ? { piani: nuoviPiani, arch: nuovoArch, attesa: nuovaAttesa, cambiato: true } : { piani, arch, attesa, cambiato: false };
     };
 
     // Estrae l'anno di nascita da vari possibili formati: GG/MM/AAAA, GG-MM-AAAA, AAAA-MM-GG,
@@ -877,6 +946,17 @@
         return () => clearTimeout(timer);
       }, [tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, user, firebaseInstances, isDataLoaded]);
 
+      // --- NORMALIZZAZIONE DATI: nomi con iniziali maiuscole ed email in minuscolo (anche per i dati già presenti) ---
+      useEffect(() => {
+        if (!isDataLoaded) return;
+        const r = normalizzaDatiAnagrafici(tuttiPiani, archivioSoci, listaAttesa);
+        if (r.cambiato) {
+          setTuttiPiani(r.piani);
+          setArchivioSoci(r.arch);
+          setListaAttesa(r.attesa);
+        }
+      }, [tuttiPiani, archivioSoci, listaAttesa, isDataLoaded]);
+
       // --- AVVISO DI USCITA CON MODIFICHE NON SALVATE ---
       // Il salvataggio è "debounced" (aspetta ~1,5s di inattività prima di scrivere su
       // Firestore): se l'utente chiude o ricarica la pagina troppo in fretta dopo una modifica
@@ -1111,7 +1191,7 @@
       // Crea o aggiorna la scheda di un socio nell'archivio permanente. Se l'anno di nascita o
       // il certificato vengono lasciati vuoti, mantiene il valore già presente in archivio
       // invece di cancellarlo: evita di perdere dati già noti per una semplice dimenticanza.
-      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card, telefono, dataNascita, email) => {
+      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card, telefono, dataNascita, email, sesso) => {
           if (!nome || !nome.trim()) return;
           const key = nome.toLowerCase().trim();
           setArchivioSoci(prev => {
@@ -1119,13 +1199,14 @@
               return {
                   ...prev,
                   [key]: {
-                      nome: nome.trim(),
+                      nome: normalizzaNome(nome),
                       anno: anno || (esistente ? esistente.anno : '') || '',
                       dataNascita: dataNascita || (esistente ? esistente.dataNascita : '') || '',
                       scadCertificato: scadCertificato || (esistente ? esistente.scadCertificato : '') || '',
                       card: card || (esistente ? esistente.card : '') || '',
                       telefono: telefono || (esistente ? esistente.telefono : '') || '',
-                      email: email || (esistente ? esistente.email : '') || '',
+                      email: normalizzaEmail(email || (esistente ? esistente.email : '') || ''),
+                      sesso: sesso || (esistente ? esistente.sesso : '') || rilevaSesso(nome),
                       certMsgScad: (esistente && esistente.certMsgScad) || ''
                   }
               };
@@ -1232,11 +1313,13 @@
           alert("Seleziona il corso di interesse!");
           return;
         }
+        const nuovoContattoAttesa_ = nuovoContattoAttesa;
+        const nuovoContattoPulito = { ...nuovoContattoAttesa_, nome: normalizzaNome(nuovoContattoAttesa_.nome), nomeGenitore: nuovoContattoAttesa_.nomeGenitore ? normalizzaNome(nuovoContattoAttesa_.nomeGenitore) : nuovoContattoAttesa_.nomeGenitore, email: normalizzaEmail(nuovoContattoAttesa_.email) };
         if (editandoContattoAttesaId) {
-          setListaAttesa(prev => prev.map(c => c.id === editandoContattoAttesaId ? { ...nuovoContattoAttesa, id: editandoContattoAttesaId } : c));
+          setListaAttesa(prev => prev.map(c => c.id === editandoContattoAttesaId ? { ...nuovoContattoPulito, id: editandoContattoAttesaId } : c));
           mostraToast("Contatto aggiornato!");
         } else {
-          setListaAttesa(prev => [...prev, { ...nuovoContattoAttesa, id: Date.now() + Math.random() }]);
+          setListaAttesa(prev => [...prev, { ...nuovoContattoPulito, id: Date.now() + Math.random() }]);
           mostraToast("Contatto aggiunto alla lista d'attesa!");
         }
         setNuovoContattoAttesa(creaContattoAttesaVuoto());
@@ -1912,7 +1995,7 @@
 
         // Archivio soci permanente: memorizziamo/aggiorniamo questo socio così non andrà
         // ridigitato da capo la prossima volta (anche in un'altra stagione).
-        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card, addUtenteRapido.telefono, addUtenteRapido.dataNascita, addUtenteRapido.email);
+        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card, addUtenteRapido.telefono, addUtenteRapido.dataNascita, addUtenteRapido.email, addUtenteRapido.sesso);
 
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
@@ -1936,14 +2019,15 @@
                     const partecipanti = [...(cell.partecipanti || [])];
                     const arcRapido = archivioSoci[nomeNormRapido] || {};
                     const datiPartecipante = {
-                        nome: addUtenteRapido.nome,
+                        nome: normalizzaNome(addUtenteRapido.nome),
                         anno: addUtenteRapido.anno || arcRapido.anno || '',
                         dataNascita: addUtenteRapido.dataNascita || arcRapido.dataNascita || '',
                         scadCertificato: addUtenteRapido.scadCertificato,
                         documentiFirmati: addUtenteRapido.documentiFirmati || '',
                         card: addUtenteRapido.card || arcRapido.card || '',
                         telefono: addUtenteRapido.telefono || arcRapido.telefono || '',
-                        email: addUtenteRapido.email || arcRapido.email || '',
+                        email: normalizzaEmail(addUtenteRapido.email || arcRapido.email || ''),
+                        sesso: addUtenteRapido.sesso || arcRapido.sesso || rilevaSesso(normalizzaNome(addUtenteRapido.nome)),
                         iscrizioni: iscrizioniPulite
                     };
                     // BUGFIX: se la persona è già iscritta a questo corso (es. lo si usa per
@@ -2028,6 +2112,7 @@
                     ...p,
                     anno: inArchivio.anno || p.anno,
                     dataNascita: inArchivio.dataNascita || p.dataNascita || '',
+                    sesso: inArchivio.sesso || p.sesso || '',
                     scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
                   card: inArchivio.card || p.card || '',
                   telefono: inArchivio.telefono || p.telefono || '',
@@ -2140,6 +2225,7 @@
                   ...p,
                   anno: inArchivio.anno || p.anno,
                   dataNascita: inArchivio.dataNascita || p.dataNascita || '',
+                  sesso: inArchivio.sesso || p.sesso || '',
                   scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
                   card: inArchivio.card || p.card || '',
                   telefono: inArchivio.telefono || p.telefono || '',
@@ -2175,6 +2261,9 @@
 
         const partecipantePulito = {
             ...nuovoPartecipante,
+            nome: normalizzaNome(nuovoPartecipante.nome),
+            email: normalizzaEmail(nuovoPartecipante.email),
+            sesso: nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome)),
             iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
         };
 
@@ -2262,6 +2351,9 @@
         if (nuovoPartecipante && nuovoPartecipante.nome && nuovoPartecipante.nome.trim() !== '') {
             const partecipantePulito = {
                 ...nuovoPartecipante,
+                nome: normalizzaNome(nuovoPartecipante.nome),
+                email: normalizzaEmail(nuovoPartecipante.email),
+                sesso: nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome)),
                 iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
             };
             const nomeNorm = partecipantePulito.nome.toLowerCase().trim();
@@ -2286,12 +2378,13 @@
         // vuoti in questa lista ma esistono già in archivio, li recuperiamo prima di salvare.
         // Così un campo lasciato vuoto per errore non cancella più il dato già noto (né in questo
         // corso né, tramite la sincronizzazione globale, negli altri).
+        finalPartecipanti = finalPartecipanti.map(p => (p && p.nome) ? { ...p, nome: normalizzaNome(p.nome), email: normalizzaEmail(p.email) } : p);
         finalPartecipanti = finalPartecipanti.map(p => {
             if (!p || !p.nome) return p;
             const arc = archivioSoci[p.nome.toLowerCase().trim()];
             if (!arc) return p;
             const out = { ...p };
-            ['dataNascita', 'email', 'telefono', 'card'].forEach(c => { if (!out[c] && arc[c]) out[c] = arc[c]; });
+            ['dataNascita', 'email', 'telefono', 'card', 'sesso'].forEach(c => { if (!out[c] && arc[c]) out[c] = arc[c]; });
             if (!out.anno && arc.anno) out.anno = arc.anno;
             if (out.dataNascita && /^\d{4}-/.test(out.dataNascita)) out.anno = out.dataNascita.slice(0, 4);
             return out;
@@ -2301,7 +2394,7 @@
         // così i loro dati (anno, certificato) restano disponibili per l'autocompletamento
         // anche in altre stagioni o altri corsi, senza doverli ridigitare.
         finalPartecipanti.forEach(p => {
-            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card, p.telefono, p.dataNascita, p.email);
+            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card, p.telefono, p.dataNascita, p.email, p.sesso);
         });
         
         setTuttiPiani(prevTutti => {
@@ -2314,7 +2407,7 @@
           // --- Sincronizzazione globale dei certificati medici, anagrafica e documenti firmati ---
           const mapAggiornamenti = new Map();
           finalPartecipanti.forEach(p => {
-              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { scadCertificato: p.scadCertificato || '', anno: p.anno || '', dataNascita: p.dataNascita || '', documentiFirmati: p.documentiFirmati || '', card: p.card || '', telefono: p.telefono || '', email: p.email || '' });
+              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { sesso: p.sesso || '', scadCertificato: p.scadCertificato || '', anno: p.anno || '', dataNascita: p.dataNascita || '', documentiFirmati: p.documentiFirmati || '', card: p.card || '', telefono: p.telefono || '', email: p.email || '' });
           });
 
           Object.keys(nuovoPiano).forEach(k => {
@@ -2330,12 +2423,13 @@
                           email: updateInfoRaw.email || esistente.email || '',
                           telefono: updateInfoRaw.telefono || esistente.telefono || '',
                           card: updateInfoRaw.card || esistente.card || '',
+                          sesso: updateInfoRaw.sesso || esistente.sesso || '',
                           anno: updateInfoRaw.anno || esistente.anno || ''
                       } : null;
                       if (updateInfo) {
-                          if (updateInfo.scadCertificato !== (esistente.scadCertificato || '') || updateInfo.anno !== (esistente.anno || '') || updateInfo.dataNascita !== (esistente.dataNascita || '') || updateInfo.documentiFirmati !== (esistente.documentiFirmati || '') || updateInfo.card !== (esistente.card || '') || updateInfo.telefono !== (esistente.telefono || '') || updateInfo.email !== (esistente.email || '')) {
+                          if (updateInfo.scadCertificato !== (esistente.scadCertificato || '') || updateInfo.anno !== (esistente.anno || '') || updateInfo.dataNascita !== (esistente.dataNascita || '') || updateInfo.documentiFirmati !== (esistente.documentiFirmati || '') || updateInfo.card !== (esistente.card || '') || updateInfo.telefono !== (esistente.telefono || '') || updateInfo.email !== (esistente.email || '') || updateInfo.sesso !== (esistente.sesso || '')) {
                               changed = true;
-                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, dataNascita: updateInfo.dataNascita, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card, telefono: updateInfo.telefono, email: updateInfo.email };
+                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, dataNascita: updateInfo.dataNascita, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card, telefono: updateInfo.telefono, email: updateInfo.email, sesso: updateInfo.sesso };
                           }
                       }
                       return esistente;
@@ -3055,6 +3149,7 @@
                       <div><div className={lbl}>Data di nascita</div><div className="text-sm text-slate-700">{dn ? formatDate(dn) : (an || '-')}</div></div>
                       <div><div className={lbl}>Scad. certificato</div><div className="text-sm text-slate-700">{cert ? formatDate(cert) : '-'}</div></div>
                       <div><div className={lbl}>Documenti firmati</div><div className="text-sm text-slate-700">{schedaSocio.documentiFirmati === 'si' ? 'Sì' : schedaSocio.documentiFirmati === 'no' ? 'No' : 'Da verificare'}</div></div>
+                      <div><div className={lbl}>Sesso</div><div className="text-sm text-slate-700">{SESSO_LABEL[arch.sesso || schedaSocio.sesso || rilevaSesso(schedaSocio.nome)] || 'Non specificato'}</div></div>
                       <div><div className={lbl}>Card</div><div className="text-sm text-slate-700">{card === 'si' ? 'Sì' : card === 'no' ? 'No' : '-'}</div></div>
                     </div>
                     <div>
@@ -3849,6 +3944,7 @@
                                             card: existing.card || '',
                                             telefono: existing.telefono || '',
                                             email: existing.email || '',
+                                            sesso: existing.sesso || '',
                                             iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
                                         });
                                     } else {
@@ -3863,6 +3959,14 @@
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Data di Nascita</label>
                               <input type="date" value={addUtenteRapido.dataNascita || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, dataNascita: e.target.value, anno: annoDaDataNascita(e.target.value)})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
                               {!addUtenteRapido.dataNascita && addUtenteRapido.anno && <p className="text-[11px] text-amber-600 font-medium mt-1">Al momento è registrato solo l'anno {addUtenteRapido.anno}: inserisci la data completa.</p>}
+                           </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Sesso</label>
+                              <select value={addUtenteRapido.sesso || rilevaSesso(normalizzaNome(addUtenteRapido.nome))} onChange={e => setAddUtenteRapido({...addUtenteRapido, sesso: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer">
+                                <option value="M">Maschio</option>
+                                <option value="F">Femmina</option>
+                                <option value="N">Non specificato</option>
+                              </select>
                            </div>
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Telefono</label>
@@ -4398,6 +4502,7 @@
                                                 card: existing.card || '',
                                             telefono: existing.telefono || '',
                                             email: existing.email || '',
+                                            sesso: existing.sesso || '',
                                                 iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
                                             });
                                         } else {
@@ -4410,6 +4515,14 @@
                                   <div>
                                     <label className={LBL}>Data di Nascita{!nuovoPartecipante.dataNascita && nuovoPartecipante.anno && <span className="normal-case tracking-normal font-semibold text-amber-600"> · solo anno {nuovoPartecipante.anno}</span>}</label>
                                     <input type="date" value={nuovoPartecipante.dataNascita || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, dataNascita: e.target.value, anno: annoDaDataNascita(e.target.value)})} className={CLS_CAMPO + " cursor-pointer"} />
+                                  </div>
+                                  <div>
+                                    <label className={LBL}>Sesso</label>
+                                    <select value={nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome))} onChange={e => setNuovoPartecipante({...nuovoPartecipante, sesso: e.target.value})} className={CLS_CAMPO + " cursor-pointer"}>
+                                      <option value="M">Maschio</option>
+                                      <option value="F">Femmina</option>
+                                      <option value="N">Non specificato</option>
+                                    </select>
                                   </div>
                                   <div>
                                     <label className={LBL}>Telefono</label>
