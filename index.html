@@ -4545,19 +4545,12 @@
                   {/* TITOLO E SELETTORE STAGIONE */}
                   <div className="flex flex-col xl:flex-row items-start xl:items-center gap-4 shrink-0 w-full md:w-auto">
                     <div className="flex flex-col shrink-0">
-                      <h1 className="text-2xl font-bold text-slate-800 leading-tight">
-                        Gestione Piano Vasca
-                      </h1>
-                      <span className="text-sm font-medium text-slate-500">Centro Federale Lampugnano</span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                      {/* BOX STAGIONE */}
-                      <div className="flex items-center bg-white border border-slate-200 rounded-lg px-3 py-1 shadow-sm shrink-0 h-[48px]">
-                        <div className="flex flex-col justify-center">
-                           <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Stagione</span>
-                           <div className="flex items-center">
-                             <select
+                      <div className="flex items-center gap-2.5">
+                        <h1 className="text-2xl font-bold text-[#1e3a5f] leading-tight">
+                          Gestione Piano Vasca
+                        </h1>
+                        <div className="flex items-center bg-[#1e3a5f]/10 hover:bg-[#1e3a5f]/15 rounded-md px-2 py-0.5 transition-colors" title="Stagione: clicca per cambiare">
+                          <select
                                value={stagioneSelezionata}
                                onChange={(e) => {
                                    if (e.target.value === 'NUOVA') {
@@ -4576,16 +4569,18 @@
                                        setStagioneSelezionata(e.target.value);
                                    }
                                }}
-                               className="bg-transparent font-bold text-sm text-slate-800 outline-none cursor-pointer -ml-1 appearance-none pr-1" style={{ WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'none' }} title="Clicca per cambiare stagione"
+                               className="bg-transparent font-bold text-base text-[#1e3a5f] outline-none cursor-pointer appearance-none" style={{ WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'none' }} title="Clicca per cambiare stagione"
                              >
                                {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
                                <option value="NUOVA" className="font-bold text-blue-600">+ Crea nuova...</option>
                                <option value="ORDINA" className="font-bold text-slate-600">⚙️ Gestione stagioni...</option>
                              </select>
-                           </div>
                         </div>
                       </div>
+                      <span className="text-sm font-medium text-slate-500">Centro Federale Lampugnano</span>
+                    </div>
 
+                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                       {/* BOX SETTIMANA */}
                       <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm shrink-0 h-[48px] w-full sm:w-auto">
                         <button onClick={() => setInizioSettimana(prev => new Date(prev.getTime() - 7 * 24 * 60 * 60 * 1000))} className="p-1 hover:bg-slate-100 rounded-md text-slate-600 transition-colors"><ChevronLeftIcon size={18} /></button>
