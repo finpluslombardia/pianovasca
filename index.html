@@ -4549,7 +4549,8 @@
                         <h1 className="text-2xl font-bold text-[#1e3a5f] leading-tight">
                           Gestione Piano Vasca
                         </h1>
-                        <div className="flex items-center bg-[#1e3a5f]/10 hover:bg-[#1e3a5f]/15 rounded-md px-2 py-0.5 transition-colors" title="Stagione: clicca per cambiare">
+                        <div className="relative inline-flex items-center bg-[#1e3a5f]/10 hover:bg-[#1e3a5f]/15 rounded-lg px-3 py-0.5 transition-colors self-center" title="Stagione: clicca per cambiare">
+                          <span className="text-xl font-bold text-[#1e3a5f] leading-tight whitespace-nowrap">{stagioneSelezionata}</span>
                           <select
                                value={stagioneSelezionata}
                                onChange={(e) => {
@@ -4569,7 +4570,7 @@
                                        setStagioneSelezionata(e.target.value);
                                    }
                                }}
-                               className="bg-transparent font-bold text-base text-[#1e3a5f] outline-none cursor-pointer appearance-none" style={{ WebkitAppearance: 'none', MozAppearance: 'none', backgroundImage: 'none' }} title="Clicca per cambiare stagione"
+                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" title="Clicca per cambiare stagione"
                              >
                                {stagioni.map(s => <option key={s} value={s}>{s}</option>)}
                                <option value="NUOVA" className="font-bold text-blue-600">+ Crea nuova...</option>
