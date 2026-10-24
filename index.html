@@ -146,6 +146,47 @@
     // Costruisce l'archivio soci unendo tutti i partecipanti già presenti in TUTTE le stagioni
     // salvate. Usata come migrazione automatica la prima volta (quando l'archivio non esiste
     // ancora su Firestore), così i nomi già inseriti in passato non vanno ridigitati da capo.
+    // --- SALVATAGGIO A BLOCCHI (formato v2) ---
+    // Invece di un unico documento enorme, i dati sono divisi in blocchi piccoli: uno per ogni
+    // stagione/vasca/giorno, alcuni per l'archivio soci, uno per la lista d'attesa e uno di
+    // intestazione (elenco stagioni). Si riscrivono solo i blocchi che cambiano.
+    const stableStringify = (v) => JSON.stringify(v, (k, val) => (val && typeof val === 'object' && !Array.isArray(val)) ? Object.keys(val).sort().reduce((o, key) => { o[key] = val[key]; return o; }, {}) : val);
+    const idStagione = (n) => String(n).replace(/[\/\s.]/g, '_');
+    const N_BLOCCHI_ARCHIVIO = 12;
+    const hashBlocco = (str) => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h % N_BLOCCHI_ARCHIVIO; };
+    const statoToDocs = ({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa }) => {
+      const docs = {};
+      docs['v2_meta'] = { formato: 'v2', stagioni: stagioni || [], stagionePredefinita: stagionePredefinita || '' };
+      docs['v2_attesa'] = { listaAttesa: listaAttesa || [] };
+      const blocchiArc = {};
+      Object.keys(archivioSoci || {}).forEach(k => { const b = hashBlocco(k); (blocchiArc[b] = blocchiArc[b] || {})[k] = archivioSoci[k]; });
+      Object.keys(blocchiArc).forEach(b => { docs['v2_arc_' + String(b).padStart(2, '0')] = { archivioSoci: blocchiArc[b] }; });
+      Object.keys(tuttiPiani || {}).forEach(nome => {
+        const gruppi = {};
+        Object.keys(tuttiPiani[nome] || {}).forEach(k => {
+          const parti = k.split('-');
+          const g = (parti[0] || 'x') + '__' + (parti[1] || 'x');
+          (gruppi[g] = gruppi[g] || {})[k] = tuttiPiani[nome][k];
+        });
+        Object.keys(gruppi).forEach(g => { docs['v2_piano__' + idStagione(nome) + '__' + g] = { stagione: nome, celle: gruppi[g] }; });
+      });
+      return docs;
+    };
+    const stateFromDocs = (m) => {
+      const meta = m['v2_meta'] || {};
+      const tuttiPiani = {};
+      (meta.stagioni || []).forEach(st => { tuttiPiani[st] = {}; });
+      const archivioSoci = {};
+      let listaAttesa = [];
+      Object.keys(m).forEach(id => {
+        const d = m[id] || {};
+        if (id.startsWith('v2_piano__')) { const n = d.stagione; if (n !== undefined) { tuttiPiani[n] = tuttiPiani[n] || {}; Object.assign(tuttiPiani[n], d.celle || {}); } }
+        else if (id.startsWith('v2_arc_')) Object.assign(archivioSoci, d.archivioSoci || {});
+        else if (id === 'v2_attesa') listaAttesa = d.listaAttesa || [];
+      });
+      return { tuttiPiani, stagioni: (meta.stagioni && meta.stagioni.length) ? meta.stagioni : Object.keys(tuttiPiani), stagionePredefinita: meta.stagionePredefinita || '', archivioSoci, listaAttesa, updatedAt: meta.updatedAt || null };
+    };
+
     const costruisciArchivioDaPiani = (tuttiPianiObj) => {
       const map = {};
       Object.values(tuttiPianiObj || {}).forEach(piano => {
@@ -496,6 +537,9 @@
       const updatedAtNoto = useRef(null); // data dell'ultima versione cloud che questo dispositivo ha letto/scritto
       const updatedAtServer = useRef(null); // data dell'ultima versione presente sul cloud (anche se non applicata)
       const ultimoBackupMs = useRef(0);
+      const lastSavedDocs = useRef({}); // id blocco -> contenuto (testo) come presente sul cloud
+      const migrazioneAvviata = useRef(false);
+      const avvisoErroreCloud = useRef(false);
       const ultimoBackupGiorno = useRef('');
       const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
       const [elencoBackup, setElencoBackup] = useState(null);
@@ -536,7 +580,7 @@
                 const dynamicImport = new Function('url', 'return import(url)');
                 const { initializeApp } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
                 const { getAuth, signInWithCustomToken, onAuthStateChanged, signInWithEmailAndPassword, signOut } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-                const { getFirestore, doc, setDoc, getDoc, onSnapshot } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+                const { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, query, where, documentId, writeBatch } = await dynamicImport("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
 
                 const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
                 let app, auth, db, appId;
@@ -565,7 +609,7 @@
                 
                 auth = getAuth(app);
                 db = getFirestore(app);
-                setFirebaseInstances({ auth, db, appId, doc, setDoc, getDoc, onSnapshot, signInWithEmailAndPassword, signOut });
+                setFirebaseInstances({ auth, db, appId, doc, setDoc, getDoc, onSnapshot, collection, query, where, documentId, writeBatch, signInWithEmailAndPassword, signOut });
 
                 onAuthStateChanged(auth, (u) => {
                     setUser(u);
@@ -591,113 +635,94 @@
           return cell;
       };
 
-      // --- LETTURA E SYNC DATI CLOUD ---
+      // --- LETTURA E SYNC DATI CLOUD (formato a blocchi) ---
       useEffect(() => {
         if (!user || !firebaseInstances) return;
-        const { db, appId, doc, onSnapshot } = firebaseInstances;
-        const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
-        
-        const unsubscribe = onSnapshot(docRef, (docSnap) => {
-          setIsDataLoaded(true); // Sblocca il salvataggio automatico solo dopo la lettura
+        const { db, appId, doc, onSnapshot, getDoc, collection, query, where, documentId } = firebaseInstances;
+        const percorso = ['artifacts', appId, 'users', user.uid, 'datiPianoVasca'];
+        const colRef = collection(db, ...percorso);
+        const q = query(colRef, where(documentId(), '>=', 'v2_'), where(documentId(), '<=', 'v2_'));
+        const vecchioRef = doc(db, ...percorso, 'statoCorrente');
 
-          // BUGFIX: ignoriamo l'eco locale della nostra stessa scrittura (hasPendingWrites = true).
-          // Questo eco può contenere dati già superati da modifiche fatte nel frattempo dall'utente
-          // (es. un nuovo partecipante aggiunto dopo l'ultimo salvataggio ma prima che questo eco
-          // arrivasse): applicarlo cancellerebbe silenziosamente quella modifica.
-          if (docSnap.metadata.hasPendingWrites) {
-            return;
+        // Applica uno stato completo (letto dal cloud) all'interfaccia.
+        const applicaStato = (st, daMigrazione) => {
+          setTuttiPiani(st.tuttiPiani);
+          const archivioVuoto = !st.archivioSoci || Object.keys(st.archivioSoci).length === 0;
+          const archivioCaricato = archivioVuoto ? costruisciArchivioDaPiani(st.tuttiPiani) : st.archivioSoci;
+          setArchivioSoci(archivioCaricato);
+          setListaAttesa(st.listaAttesa || []);
+          let defaultSeason = st.stagionePredefinita;
+          if (st.stagioni && st.stagioni.length > 0) {
+            setStagioni(st.stagioni);
+            if (!defaultSeason || !st.stagioni.includes(defaultSeason)) defaultSeason = st.stagioni[0];
+            setStagionePredefinita(defaultSeason);
+            const eraPrimoCaricamento = !initialLoadDone.current;
+            initialLoadDone.current = true;
+            setStagioneSelezionata((prev) => {
+              if (eraPrimoCaricamento) return defaultSeason;
+              return st.stagioni.includes(prev) ? prev : defaultSeason;
+            });
           }
-          if (docSnap.exists()) { updatedAtServer.current = docSnap.data().updatedAt || null; }
+          // Se l'archivio era vuoto e lo abbiamo ricostruito dai corsi, lo lasciamo "da salvare".
+          lastSavedPiano.current = daMigrazione ? 'MIGRAZIONE' : JSON.stringify({ t: st.tuttiPiani, s: st.stagioni, def: defaultSeason, arch: archivioVuoto ? (st.archivioSoci || {}) : archivioCaricato, la: st.listaAttesa || [] });
+          ultimiConteggi.current = contaDati(st.tuttiPiani, archivioCaricato);
+        };
 
-          // BUGFIX: se ci sono modifiche locali non ancora salvate (il timer di debounce è
-          // ancora in attesa), non sovrascriviamo lo stato con i dati arrivati dal server:
-          // sarebbero dati più vecchi rispetto a quello che l'utente ha appena digitato.
-          if (hasModificheLocaliInSospeso.current) {
-            return;
-          }
+        const unsubscribe = onSnapshot(q, (snap) => {
+          // Eco locale della nostra stessa scrittura: ignorato (può contenere dati già superati).
+          if (snap.metadata.hasPendingWrites) return;
 
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            updatedAtNoto.current = data.updatedAt || null;
-            ultimiConteggi.current = contaDati(data.tuttiPiani, data.archivioSoci);
-            
-            // Nuovo formato con gestione Stagioni multiple
-            if (data.tuttiPiani) {
-              setTuttiPiani(data.tuttiPiani);
-              
-              // Archivio soci permanente: se non esiste ancora su Firestore (prima attivazione
-              // della funzione), lo costruiamo automaticamente unendo tutti i partecipanti già
-              // presenti in tutte le stagioni salvate, così non si riparte da zero.
-              const archivioCaricato = data.archivioSoci || costruisciArchivioDaPiani(data.tuttiPiani);
-              setArchivioSoci(archivioCaricato);
-              
-              // Lista d'attesa (contatti da ricontattare): indipendente dalle stagioni.
-              setListaAttesa(data.listaAttesa || []);
-              
-              let defaultSeason = data.stagionePredefinita;
-              
-              if (data.stagioni && data.stagioni.length > 0) {
-                 setStagioni(data.stagioni);
-                 
-                 if (!defaultSeason || !data.stagioni.includes(defaultSeason)) {
-                     defaultSeason = data.stagioni[0];
-                 }
-                 setStagionePredefinita(defaultSeason);
-                 
-                 // BUGFIX: catturiamo "è il primo caricamento?" PRIMA di chiamare setStagioneSelezionata
-                 // e di aggiornare il ref. La funzione passata a setStagioneSelezionata viene eseguita
-                 // da React in un momento successivo: se si controllasse initialLoadDone.current al suo
-                 // interno, lo si troverebbe già a "true" (perché la riga sottostante lo aggiorna subito,
-                 // in modo sincrono), e la stagione di avvio con la stella non verrebbe più applicata.
-                 const eraPrimoCaricamento = !initialLoadDone.current;
-                 initialLoadDone.current = true;
-                 
-                 // Seleziona SEMPRE la stagione predefinita all'apertura del sito
-                 setStagioneSelezionata((prev) => {
-                     if (eraPrimoCaricamento) {
-                         return defaultSeason; // Forza la predefinita
-                     }
-                     return data.stagioni.includes(prev) ? prev : defaultSeason;
-                 });
-              }
-              // Salviamo anche l'ordine delle stagioni e l'archivio soci nel riferimento per riconoscerne le modifiche
-              lastSavedPiano.current = JSON.stringify({ t: data.tuttiPiani, s: data.stagioni, def: defaultSeason, arch: archivioCaricato, la: data.listaAttesa || [] });
-            } 
-            // Migrazione automatica dal vecchio formato singolo a Stagioni
-            else if (data.piano) {
-              const pianoMigrato = {};
-              for (const key in data.piano) {
-                let newKey = key;
-                if (!key.startsWith('interna-') && !key.startsWith('esterna-')) {
-                  newKey = `interna-${key}`;
+          const mappa = {};
+          snap.docs.forEach(d => { mappa[d.id] = d.data(); });
+
+          // Nessun dato nel nuovo formato: MIGRAZIONE una tantum dal vecchio documento unico.
+          // Il vecchio documento resta intatto sul cloud (diventa una copia di sicurezza).
+          if (!mappa['v2_meta']) {
+            if (migrazioneAvviata.current) return;
+            migrazioneAvviata.current = true;
+            getDoc(vecchioRef).then((os) => {
+              if (os.exists()) {
+                const data = os.data();
+                let st = null;
+                if (data.tuttiPiani) {
+                  st = { tuttiPiani: data.tuttiPiani, stagioni: data.stagioni || Object.keys(data.tuttiPiani), stagionePredefinita: data.stagionePredefinita, archivioSoci: data.archivioSoci, listaAttesa: data.listaAttesa || [] };
+                } else if (data.piano) {
+                  const pianoMigrato = {};
+                  for (const key in data.piano) {
+                    let newKey = key;
+                    if (!key.startsWith('interna-') && !key.startsWith('esterna-')) newKey = `interna-${key}`;
+                    pianoMigrato[newKey] = formatCellData(data.piano[key]);
+                  }
+                  st = { tuttiPiani: { '2025/2026': pianoMigrato }, stagioni: ['2025/2026'], stagionePredefinita: '2025/2026', archivioSoci: data.archivioSoci, listaAttesa: data.listaAttesa || [] };
                 }
-                pianoMigrato[newKey] = formatCellData(data.piano[key]);
+                if (st) {
+                  updatedAtNoto.current = null; updatedAtServer.current = null;
+                  applicaStato(st, true);
+                  lastSavedDocs.current = {};
+                }
               }
-              const defaultSeason = '2025/2026';
-              const initialTuttiPiani = { [defaultSeason]: pianoMigrato };
-              setTuttiPiani(initialTuttiPiani);
-              setStagioni([defaultSeason]);
-              setStagionePredefinita(defaultSeason);
-              
-              const archivioCaricato = data.archivioSoci || costruisciArchivioDaPiani(initialTuttiPiani);
-              setArchivioSoci(archivioCaricato);
-              
-              setListaAttesa(data.listaAttesa || []);
-              
-              // BUGFIX: vedi nota sopra, stessa correzione (catturare il valore prima di
-              // aggiornare il ref, invece di leggerlo dentro la funzione di aggiornamento).
-              const eraPrimoCaricamento = !initialLoadDone.current;
-              initialLoadDone.current = true;
-              
-              setStagioneSelezionata((prev) => {
-                  if (eraPrimoCaricamento) return defaultSeason;
-                  return prev;
-              });
-              
-              lastSavedPiano.current = JSON.stringify({ t: initialTuttiPiani, s: [defaultSeason], def: defaultSeason, arch: archivioCaricato, la: data.listaAttesa || [] });
-            }
+              setIsDataLoaded(true); // sblocca il salvataggio solo DOPO aver caricato i dati
+            }).catch((err) => { console.error("Errore lettura dati precedenti:", err); migrazioneAvviata.current = false; });
+            return;
           }
-        }, (error) => console.error("Errore sync Cloud:", error));
+
+          updatedAtServer.current = mappa['v2_meta'].updatedAt || null;
+          setIsDataLoaded(true);
+          // Se ci sono modifiche locali non ancora salvate, non le sovrascriviamo con dati del server.
+          if (hasModificheLocaliInSospeso.current) return;
+
+          const st = stateFromDocs(mappa);
+          updatedAtNoto.current = st.updatedAt;
+          applicaStato(st, false);
+          const sd = {}; Object.keys(mappa).forEach(id => { sd[id] = stableStringify(mappa[id]); });
+          lastSavedDocs.current = sd;
+        }, (error) => {
+          console.error("Errore sync Cloud:", error);
+          if (!avvisoErroreCloud.current) {
+            avvisoErroreCloud.current = true;
+            alert("Non riesco a leggere i dati dal cloud (" + (error && error.code ? error.code : 'errore') + ").\n\nNon è stato perso nulla e il salvataggio è sospeso per sicurezza: i dati sul cloud sono intatti. Ricarica la pagina; se il problema resta, avvisami indicando questo codice.");
+          }
+        });
         return () => unsubscribe();
       }, [user, firebaseInstances]);
 
@@ -722,7 +747,7 @@
         return { corsi, iscritti, soci: Object.keys(arch || {}).length };
       };
 
-      // --- FUNZIONE DI SALVATAGGIO CLOUD ---
+      // --- FUNZIONE DI SALVATAGGIO CLOUD (a blocchi) ---
       const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare, stagionePredef, archivioDaSalvare, listaAttesaDaSalvare) => {
         if (!user || !firebaseInstances) {
             setStatoSalvataggio('error');
@@ -744,42 +769,74 @@
         }
         setStatoSalvataggio('saving');
         try {
-            const { db, appId, doc, setDoc } = firebaseInstances;
-            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'statoCorrente');
+            const { db, appId, doc, writeBatch } = firebaseInstances;
+            const percorso = ['artifacts', appId, 'users', user.uid, 'datiPianoVasca'];
+
             // BACKUP AUTOMATICO: prima di sovrascrivere, conserviamo la versione cloud precedente
-            // (una ogni 30 min a rotazione sulle ultime 12 ore + una al giorno per 14 giorni).
+            // (una ogni 30 min a rotazione sulle ultime 12 ore + una al giorno per 14 giorni), a blocchi.
             try {
                 const prec = JSON.parse(lastSavedPiano.current || '{}');
-                // Le anagrafiche devono esserci sempre: se l'archivio soci risulta vuoto, lo ricostruiamo dai corsi.
                 prec.arch = archivioCompleto(prec.arch, prec.t);
                 const cPrec = contaDati(prec.t, prec.arch);
                 if (cPrec.corsi > 0 || cPrec.soci > 0) {
                     const adesso = Date.now();
                     const giornoStr = new Date(adesso).toISOString().slice(0, 10);
-                    const dati = JSON.parse(JSON.stringify({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], attivita: ATTIVITA_DI_BASE, formato: 'pianovasca-backup-v2', backupAt: new Date(adesso).toISOString(), conteggi: cPrec }));
+                    const docsPrec = statoToDocs({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [] });
+                    const scriviBackup = async (slot) => {
+                        const ids = Object.keys(docsPrec);
+                        const ops = ids.map(id => [`bk2_${slot}__${id}`, JSON.parse(JSON.stringify(docsPrec[id]))]);
+                        ops.push([`bk2_${slot}__meta`, { formato: 'v2', backupAt: new Date(adesso).toISOString(), conteggi: cPrec, docIds: ids, attivita: ATTIVITA_DI_BASE }]);
+                        for (let i = 0; i < ops.length; i += 400) {
+                            const bb = writeBatch(db);
+                            ops.slice(i, i + 400).forEach(([id, dati]) => bb.set(doc(db, ...percorso, id), dati));
+                            await bb.commit();
+                        }
+                    };
                     if (adesso - ultimoBackupMs.current > 30 * 60000) {
-                        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'backup_m' + (Math.floor(adesso / (30 * 60000)) % 24)), dati);
+                        await scriviBackup('m' + (Math.floor(adesso / (30 * 60000)) % 24));
                         ultimoBackupMs.current = adesso;
                     }
                     if (ultimoBackupGiorno.current !== giornoStr) {
-                        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'backup_d' + (Math.floor(adesso / 86400000) % 14)), dati);
+                        await scriviBackup('d' + (Math.floor(adesso / 86400000) % 14));
                         ultimoBackupGiorno.current = giornoStr;
                     }
                 }
             } catch (errBk) { console.error("Backup automatico non riuscito:", errBk); }
-            // Firestore rifiuta qualunque campo con valore `undefined` (anche annidato) e fa fallire
-            // l'INTERO salvataggio. Il giro JSON elimina in blocco tali campi: rete di sicurezza
-            // contro dati incompleti (es. persone inserite prima che esistessero certi campi).
-            const payload = JSON.parse(JSON.stringify({ tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef || '', archivioSoci: archivioDaSalvare, listaAttesa: listaAttesaDaSalvare }));
+
+            // Costruiamo i blocchi nuovi e confrontiamoli con quelli già sul cloud: si scrive solo ciò che è cambiato.
             const adessoISO = new Date().toISOString();
-            await setDoc(docRef, { ...payload, updatedAt: adessoISO });
+            const docsNuovi = statoToDocs({ tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, archivioSoci: archivioDaSalvare, listaAttesa: listaAttesaDaSalvare });
+            docsNuovi['v2_meta'].updatedAt = adessoISO;
+            const strNuovi = {};
+            Object.keys(docsNuovi).forEach(id => {
+                // Il giro JSON elimina i campi `undefined` (Firestore li rifiuta).
+                docsNuovi[id] = JSON.parse(JSON.stringify(docsNuovi[id]));
+                strNuovi[id] = stableStringify(docsNuovi[id]);
+            });
+            const prima = lastSavedDocs.current || {};
+            const daScrivere = Object.keys(strNuovi).filter(id => id !== 'v2_meta' && prima[id] !== strNuovi[id]);
+            const daEliminare = Object.keys(prima).filter(id => !(id in strNuovi));
+            daScrivere.concat(['v2_meta']).forEach(id => {
+                const kb = Math.round(new Blob([strNuovi[id]]).size / 1024);
+                if (kb > 900) throw new Error(`Il blocco "${id}" è troppo grande (${kb} KB): limite di Firestore 1 MB.`);
+            });
+            // Prima i blocchi di dati, poi le eliminazioni, per ultimo l'intestazione (con la data di aggiornamento).
+            const ops = [...daScrivere.map(id => ['set', id]), ...daEliminare.map(id => ['del', id]), ['set', 'v2_meta']];
+            for (let i = 0; i < ops.length; i += 400) {
+                const bb = writeBatch(db);
+                ops.slice(i, i + 400).forEach(([tipo, id]) => {
+                    const r = doc(db, ...percorso, id);
+                    if (tipo === 'set') bb.set(r, docsNuovi[id]); else bb.delete(r);
+                });
+                await bb.commit();
+            }
+            lastSavedDocs.current = strNuovi;
             updatedAtNoto.current = adessoISO; updatedAtServer.current = adessoISO;
             ultimiConteggi.current = nuoviC;
             const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef, arch: archivioDaSalvare, la: listaAttesaDaSalvare });
             lastSavedPiano.current = statoAppenaSalvato;
             // Abbassiamo il flag "modifiche in sospeso" solo se, durante il salvataggio (che è
-            // asincrono), l'utente non ha nel frattempo fatto altre modifiche: in tal caso il
-            // flag deve restare attivo finché anche quelle non saranno salvate a loro volta.
+            // asincrono), l'utente non ha nel frattempo fatto altre modifiche.
             if (statoAppenaSalvato === ultimoStatoLocaleVisto.current) {
               hasModificheLocaliInSospeso.current = false;
             }
@@ -2411,17 +2468,36 @@
         setElencoBackup(null);
         try {
           const { db, appId, doc, getDoc } = firebaseInstances;
-          const ids = [];
-          for (let i = 0; i < 24; i++) ids.push('backup_m' + i);
-          for (let i = 0; i < 14; i++) ids.push('backup_d' + i);
-          const snaps = await Promise.all(ids.map(id => getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', id)).catch(() => null)));
-          const lista = snaps.filter(sn => sn && sn.exists()).map(sn => ({ id: sn.id, ...sn.data() })).sort((a, b) => (b.backupAt || '').localeCompare(a.backupAt || ''));
+          const percorso = ['artifacts', appId, 'users', user.uid, 'datiPianoVasca'];
+          const slots = [];
+          for (let i = 0; i < 24; i++) slots.push('m' + i);
+          for (let i = 0; i < 14; i++) slots.push('d' + i);
+          // backup a blocchi (nuovo formato) + eventuali backup a documento unico fatti in precedenza
+          const nuovi = await Promise.all(slots.map(sl => getDoc(doc(db, ...percorso, `bk2_${sl}__meta`)).catch(() => null)));
+          const vecchi = await Promise.all(slots.map(sl => getDoc(doc(db, ...percorso, 'backup_' + sl)).catch(() => null)));
+          const lista = [];
+          nuovi.forEach((sn, i) => { if (sn && sn.exists()) lista.push({ id: 'bk2_' + slots[i], slot: slots[i], nuovoFormato: true, ...sn.data() }); });
+          vecchi.forEach(sn => { if (sn && sn.exists()) lista.push({ id: sn.id, ...sn.data() }); });
+          lista.sort((a, b) => (b.backupAt || '').localeCompare(a.backupAt || ''));
           setElencoBackup(lista);
         } catch (err) { console.error(err); setElencoBackup([]); }
       };
-      const ripristinaBackupCloud = (b) => {
-        const c = b.conteggi || contaDati(b.tuttiPiani, b.archivioSoci);
-        if (!window.confirm(`Ripristinare la versione del ${new Date(b.backupAt).toLocaleString('it-IT')}?\n(${c.corsi} caselle corso, ${c.iscritti} iscritti, ${c.soci} soci)\n\nI dati attuali verranno sostituiti.`)) return;
+      const ripristinaBackupCloud = async (b0) => {
+        const c0 = b0.conteggi || contaDati(b0.tuttiPiani, b0.archivioSoci);
+        if (!window.confirm(`Ripristinare la versione del ${new Date(b0.backupAt).toLocaleString('it-IT')}?\n(${c0.corsi} caselle corso, ${c0.iscritti} iscritti, ${c0.soci} soci)\n\nI dati attuali verranno sostituiti.`)) return;
+        let b = b0;
+        if (b0.nuovoFormato) {
+          try {
+            const { db, appId, doc, getDoc } = firebaseInstances;
+            const percorso = ['artifacts', appId, 'users', user.uid, 'datiPianoVasca'];
+            const mappa = {};
+            const snaps = await Promise.all((b0.docIds || []).map(id => getDoc(doc(db, ...percorso, `bk2_${b0.slot}__${id}`))));
+            snaps.forEach((sn, i) => { if (sn.exists()) mappa[b0.docIds[i]] = sn.data(); });
+            if (!mappa['v2_meta']) { alert("Questo backup risulta incompleto: non lo ripristino."); return; }
+            const st = stateFromDocs(mappa);
+            b = { ...b0, tuttiPiani: st.tuttiPiani, stagioni: st.stagioni, stagionePredefinita: st.stagionePredefinita, archivioSoci: st.archivioSoci, listaAttesa: st.listaAttesa };
+          } catch (err) { console.error(err); alert("Non sono riuscito a leggere questo backup."); return; }
+        }
         setTuttiPiani(b.tuttiPiani || {});
         if (b.stagioni && b.stagioni.length) { setStagioni(b.stagioni); setStagioneSelezionata(b.stagionePredefinita && b.stagioni.includes(b.stagionePredefinita) ? b.stagionePredefinita : b.stagioni[0]); }
         if (b.stagionePredefinita) setStagionePredefinita(b.stagionePredefinita);
