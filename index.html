@@ -4513,7 +4513,7 @@
                         const nomeLivC = infoC?.isFreeTextLevel ? editModal.livello : infoC?.levels?.find(l => l.val === editModal.livello)?.name;
                         const nomeC = nomeLivC ? `${infoC?.name} - ${nomeLivC}` : (infoC?.name || '');
                         if (!nomeC) return <span>Gestione Corso</span>;
-                        return <><span className="bg-white/20 px-3 py-1 rounded-full text-base font-bold whitespace-nowrap">{GIORNI[editModal.giorno]} {editModal.oraInizio}</span><span>{nomeC}</span></>;
+                        return <><span className="bg-white/20 px-3 py-1 rounded-full text-base font-bold whitespace-nowrap">{GIORNI[editModal.giorno]} {editModal.oraInizio}</span><span>{nomeC}</span>{editModal.istruttore && <span className="text-base font-medium text-white/85 whitespace-nowrap">· {editModal.istruttore}</span>}</>;
                       })()}
                     </h3>
                     <button onClick={() => setEditModal(null)} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
