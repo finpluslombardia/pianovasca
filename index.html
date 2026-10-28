@@ -570,6 +570,9 @@
 
       // --- STATI "INSERITI OGGI" (iscrizioni odierne, con generazione messaggio WhatsApp) ---
       const [isInseritiOggiOpen, setIsInseritiOggiOpen] = useState(false);
+      const [isDisponibilitaOpen, setIsDisponibilitaOpen] = useState(false);
+      const [soloConPosti, setSoloConPosti] = useState(true);
+      const [catDispEspansa, setCatDispEspansa] = useState(null);
       const [tabOggi, setTabOggi] = useState('inserimenti'); // 'inserimenti' | 'compleanni'
       const [personaOggiEspansa, setPersonaOggiEspansa] = useState(null);
 
@@ -633,7 +636,7 @@
 
       // --- BLOCCO SCORRIMENTO SFONDO ---
       useEffect(() => {
-          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen;
+          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen || isDisponibilitaOpen;
           if (isAnyModalOpen) {
               document.body.style.overflow = 'hidden';
           } else {
@@ -1449,6 +1452,41 @@
           list.sort((a, b) => a.giorno - b.giorno || a.oraInizio.localeCompare(b.oraInizio));
           return list;
       }, [piano]);
+
+      // --- DISPONIBILITÀ RESIDUA PER CATEGORIA DI CORSO (settimana visualizzata) ---
+      const disponibilita = useMemo(() => {
+          const cat = {};
+          tuttiCorsiSelect.forEach(c => {
+              const info = attivita.find(a => a.id === c.data.id);
+              if (!info) return;
+              const max = Number(c.data.maxUtenti) || 0;
+              const attivi = (c.data.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)).length;
+              const lv = c.data.livello || '';
+              let etichetta = 'Generale';
+              if (lv) {
+                  if (info.isFreeTextLevel) etichetta = lv;
+                  else {
+                      const li = info.levels && info.levels.find(l => l.val === lv);
+                      etichetta = li ? (li.noNumero ? li.name : `Liv. ${lv} - ${li.name}`) : lv;
+                  }
+              }
+              if (!cat[info.id]) cat[info.id] = { info, posti: 0, iscritti: 0, liberi: 0, corsi: 0, senzaLimite: 0, livelli: {} };
+              const k = cat[info.id];
+              if (!k.livelli[etichetta]) k.livelli[etichetta] = { etichetta, ordine: lv, posti: 0, iscritti: 0, liberi: 0, elenco: [] };
+              const L = k.livelli[etichetta];
+              if (max > 0) {
+                  const liberi = Math.max(0, max - attivi);
+                  k.posti += max; k.iscritti += attivi; k.liberi += liberi; k.corsi++;
+                  L.posti += max; L.iscritti += attivi; L.liberi += liberi;
+                  L.elenco.push({ giorno: c.giorno, ora: c.oraInizio, vasca: c.vasca, corsie: c.corsie, istruttore: c.data.istruttore || '', max, attivi, liberi });
+              } else { k.senzaLimite++; }
+          });
+          const ordineAtt = attivita.map(a => a.id);
+          return Object.values(cat)
+              .filter(k => k.corsi > 0)
+              .sort((a, b) => ordineAtt.indexOf(a.info.id) - ordineAtt.indexOf(b.info.id))
+              .map(k => ({ ...k, livelli: Object.values(k.livelli).filter(L => L.elenco.length > 0).sort((a, b) => String(a.ordine).localeCompare(String(b.ordine), 'it', { numeric: true })) }));
+      }, [tuttiCorsiSelect, attivita, inizioSettimana]);
 
       // Formatta il/i periodo/i di iscrizione di un partecipante (es. "dal 01/09/2026 al 30/06/2027")
       const formattaPeriodoIscrizione = (iscrizioni) => {
@@ -3185,6 +3223,91 @@
                   </div>
                   <div className="px-6 py-3 border-t border-slate-200 flex justify-end bg-slate-50">
                     <button onClick={() => setSchedaSocio(null)} className="px-4 py-2 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition-colors">Chiudi</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* --- MODALE DISPONIBILITÀ CORSI --- */}
+          {isDisponibilitaOpen && (() => {
+            const giorniAbb = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+            const fine = new Date(new Date(inizioSettimana).getTime() + 6 * 24 * 60 * 60 * 1000);
+            const totPosti = disponibilita.reduce((t, k) => t + k.posti, 0);
+            const totLiberi = disponibilita.reduce((t, k) => t + k.liberi, 0);
+            const colLiberi = (n) => n === 0 ? 'text-red-600' : n <= 2 ? 'text-amber-600' : 'text-emerald-600';
+            return (
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsDisponibilitaOpen(false)}>
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
+                  <div className="px-2 pt-2 flex flex-col bg-[#1e3a5f] text-white">
+                    <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1">
+                      <h3 className="font-bold text-xl flex items-center gap-2"><UsersIcon size={24}/> Disponibilità corsi</h3>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-white/80">Stagione {stagioneSelezionata} · settimana {formatDate(toYMD(new Date(inizioSettimana)))} - {formatDate(toYMD(fine))}</span>
+                        <button onClick={() => setIsDisponibilitaOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={22}/></button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto bg-slate-50 p-5 flex flex-col gap-3">
+                    {disponibilita.length === 0 && <p className="text-sm text-slate-500">Nessun corso con un numero massimo di partecipanti impostato in questa stagione.</p>}
+                    {disponibilita.map(k => {
+                      const aperta = catDispEspansa === k.info.id;
+                      const perc = k.posti ? Math.min(100, Math.round(k.iscritti / k.posti * 100)) : 0;
+                      return (
+                        <div key={k.info.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                          <button onClick={() => setCatDispEspansa(aperta ? null : k.info.id)} className="w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-slate-50 transition-colors">
+                            <ChevronRightIcon size={18} className={`shrink-0 text-slate-400 transition-transform ${aperta ? 'rotate-90' : ''}`} />
+                            <span className={`shrink-0 px-3 py-1 rounded-md text-sm font-bold border ${k.info.color} ${k.info.border}`}>{k.info.name}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full rounded-full ${perc >= 100 ? 'bg-red-400' : perc >= 85 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: perc + '%' }}></div></div>
+                              <div className="text-xs text-slate-500 mt-1">{k.iscritti} iscritti su {k.posti} posti · {k.corsi} {k.corsi === 1 ? 'corso' : 'corsi'}{k.senzaLimite > 0 ? ` (+${k.senzaLimite} senza limite)` : ''}</div>
+                            </div>
+                            <div className="shrink-0 text-right w-28">
+                              <div className={`text-2xl font-bold leading-none ${colLiberi(k.liberi)}`}>{k.liberi}</div>
+                              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-1">{k.liberi === 1 ? 'posto libero' : 'posti liberi'}</div>
+                            </div>
+                          </button>
+                          {aperta && (
+                            <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/60 flex flex-col gap-3">
+                              {k.livelli.map(L => {
+                                const righe = soloConPosti ? L.elenco.filter(r => r.liberi > 0) : L.elenco;
+                                if (righe.length === 0) return null;
+                                return (
+                                  <div key={L.etichetta}>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <span className="text-sm font-bold text-slate-700">{L.etichetta}</span>
+                                      <span className={`text-sm font-bold ${colLiberi(L.liberi)}`}>{L.liberi} {L.liberi === 1 ? 'libero' : 'liberi'} <span className="text-xs font-medium text-slate-400">su {L.posti}</span></span>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                                      {[...righe].sort((a, b) => a.giorno - b.giorno || a.ora.localeCompare(b.ora)).map((r, i) => (
+                                        <div key={i} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm">
+                                          <div className="min-w-0">
+                                            <span className="font-bold text-slate-700">{giorniAbb[r.giorno]} {r.ora}</span>
+                                            <span className="text-slate-400"> · {r.vasca === 'esterna' ? 'Esterna' : 'Interna'}</span>
+                                            {r.istruttore && <span className="text-slate-500"> · {r.istruttore}</span>}
+                                          </div>
+                                          <div className={`shrink-0 font-bold ${colLiberi(r.liberi)}`}>{r.liberi}<span className="text-xs font-medium text-slate-400"> ({r.attivi}/{r.max})</span></div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="px-6 py-3 border-t border-slate-200 flex items-center justify-between bg-white">
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer select-none">
+                      <input type="checkbox" checked={soloConPosti} onChange={e => setSoloConPosti(e.target.checked)} className="w-4 h-4 accent-[#1e3a5f]" />
+                      Nel dettaglio mostra solo i corsi con posti liberi
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-bold text-slate-600">Totale: <span className={colLiberi(totLiberi)}>{totLiberi}</span> posti liberi su {totPosti}</span>
+                      <button onClick={() => setIsDisponibilitaOpen(false)} className="px-5 py-2.5 bg-[#1e3a5f] hover:bg-[#2a4d7c] text-white rounded-lg font-bold shadow-md transition-all">Chiudi</button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -5109,6 +5232,9 @@
                       )}
                     </div>
 
+              </div>
+              <div className="flex items-center gap-2">
+                    <button onClick={() => { setCatDispEspansa(null); setIsDisponibilitaOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] hover:bg-[#2a4d7c] text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Posti liberi per ogni categoria di corso"><UsersIcon size={16} /> Disponibilità corsi</button>
               </div>
               <div className="flex items-center gap-2">
                     <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci"><LogOutIcon size={16} /> Esci</button>
