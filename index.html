@@ -3254,7 +3254,7 @@
                       const aperta = catDispEspansa === k.info.id;
                       const perc = k.posti ? Math.min(100, Math.round(k.iscritti / k.posti * 100)) : 0;
                       return (
-                        <div key={k.info.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                        <div key={k.info.id} className="shrink-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                           <button onClick={() => setCatDispEspansa(aperta ? null : k.info.id)} className="w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-slate-50 transition-colors">
                             <ChevronRightIcon size={18} className={`shrink-0 text-slate-400 transition-transform ${aperta ? 'rotate-90' : ''}`} />
                             <span className={`shrink-0 px-3 py-1 rounded-md text-sm font-bold border ${k.info.color} ${k.info.border}`}>{k.info.name}</span>
