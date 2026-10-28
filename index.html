@@ -572,6 +572,7 @@
       const [isInseritiOggiOpen, setIsInseritiOggiOpen] = useState(false);
       const [isDisponibilitaOpen, setIsDisponibilitaOpen] = useState(false);
       const [soloConPosti, setSoloConPosti] = useState(true);
+      const [periodoDisp, setPeriodoDisp] = useState('settimana'); // 'settimana' | 'primo' | 'secondo' | 'annuale'
       const [catDispEspansa, setCatDispEspansa] = useState(null);
       const [tabOggi, setTabOggi] = useState('inserimenti'); // 'inserimenti' | 'compleanni'
       const [personaOggiEspansa, setPersonaOggiEspansa] = useState(null);
@@ -1453,14 +1454,61 @@
           return list;
       }, [piano]);
 
-      // --- DISPONIBILITÀ RESIDUA PER CATEGORIA DI CORSO (settimana visualizzata) ---
+      // --- DISPONIBILITÀ RESIDUA PER CATEGORIA DI CORSO ---
+      // Periodi selezionabili: settimana visualizzata, primo/secondo periodo, annuale (date della stagione selezionata,
+      // ricavate dai periodi di iscrizione preimpostati e spostate sull'anno della stagione).
+      const intervalliDisp = useMemo(() => {
+          const m = String(stagioneSelezionata).match(/(\d{4})/);
+          const shift = (m ? Number(m[1]) : 2026) - 2026;
+          const sh = (ymd) => `${Number(ymd.slice(0, 4)) + shift}${ymd.slice(4)}`;
+          const iniSet = new Date(inizioSettimana); iniSet.setHours(0, 0, 0, 0);
+          const fineSet = new Date(iniSet.getTime() + 6 * 24 * 60 * 60 * 1000);
+          return {
+              settimana: { label: 'Settimana corrente', inizio: toYMD(iniSet), fine: toYMD(fineSet) },
+              primo: { label: 'Primo periodo', inizio: sh(PRESET_ISCRIZIONI[0].inizio), fine: sh(PRESET_ISCRIZIONI[0].fine) },
+              secondo: { label: 'Secondo periodo', inizio: sh(PRESET_ISCRIZIONI[2].inizio), fine: sh(PRESET_ISCRIZIONI[2].fine) },
+              annuale: { label: 'Annuale', inizio: sh(PRESET_ISCRIZIONI[1].inizio), fine: sh(PRESET_ISCRIZIONI[1].fine) }
+          };
+      }, [stagioneSelezionata, inizioSettimana]);
+
       const disponibilita = useMemo(() => {
+          if (!isDisponibilitaOpen) return [];
+          const iv = intervalliDisp[periodoDisp] || intervalliDisp.settimana;
+          const ms = (ymd, fineGiorno) => { const [y, mo, d] = ymd.split('-').map(Number); return fineGiorno ? new Date(y, mo - 1, d, 23, 59, 59, 999).getTime() : new Date(y, mo - 1, d, 0, 0, 0, 0).getTime(); };
+          const startRange = ms(iv.inizio, false), endRange = ms(iv.fine, true);
+          // settimane (lunedì-domenica) comprese nel periodo, ritagliate sul periodo stesso
+          const settimane = [];
+          let cur = new Date(startRange);
+          cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7)); cur.setHours(0, 0, 0, 0);
+          while (cur.getTime() <= endRange) {
+              const fineSett = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 6, 23, 59, 59, 999).getTime();
+              settimane.push([Math.max(cur.getTime(), startRange), Math.min(fineSett, endRange)]);
+              cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 7);
+          }
+          const intervalliPersona = (p) => {
+              let lista = [];
+              if (p.iscrizioni && p.iscrizioni.length > 0) lista = p.iscrizioni.filter(i => i.inizio || i.fine);
+              else if (p.scadIscrizione) lista = [{ inizio: '', fine: p.scadIscrizione }];
+              if (lista.length === 0) return null; // nessun periodo indicato = sempre attivo
+              return lista.map(i => [i.inizio ? ms(i.inizio, false) : -Infinity, i.fine ? ms(i.fine, true) : Infinity]);
+          };
           const cat = {};
           tuttiCorsiSelect.forEach(c => {
               const info = attivita.find(a => a.id === c.data.id);
               if (!info) return;
+              const cS = c.data.dataInizio ? ms(c.data.dataInizio, false) : -Infinity;
+              const cE = c.data.dataFine ? ms(c.data.dataFine, true) : Infinity;
+              // il corso conta solo nelle settimane in cui è effettivamente attivo (date di inizio/fine del corso)
+              const sAttive = settimane.filter(([s0, e0]) => cS <= e0 && cE >= s0);
+              if (sAttive.length === 0) return;
               const max = Number(c.data.maxUtenti) || 0;
-              const attivi = (c.data.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)).length;
+              const pIv = (c.data.partecipanti || []).map(intervalliPersona);
+              // iscritti = il PICCO di presenze nelle settimane del periodo (chi si iscrive per tutto il periodo ha i posti rimasti al picco)
+              let attivi = 0;
+              sAttive.forEach(([s0, e0]) => {
+                  const n = pIv.filter(iv2 => iv2 === null || iv2.some(([a0, b0]) => a0 <= e0 && b0 >= s0)).length;
+                  if (n > attivi) attivi = n;
+              });
               const lv = c.data.livello || '';
               let etichetta = 'Generale';
               if (lv) {
@@ -1478,7 +1526,7 @@
                   const liberi = Math.max(0, max - attivi);
                   k.posti += max; k.iscritti += attivi; k.liberi += liberi; k.corsi++;
                   L.posti += max; L.iscritti += attivi; L.liberi += liberi;
-                  L.elenco.push({ giorno: c.giorno, ora: c.oraInizio, vasca: c.vasca, corsie: c.corsie, istruttore: c.data.istruttore || '', max, attivi, liberi });
+                  L.elenco.push({ giorno: c.giorno, ora: c.oraInizio, vasca: c.vasca, corsie: c.corsie, istruttore: c.data.istruttore || '', max, attivi, liberi, dal: c.data.dataInizio || '', al: c.data.dataFine || '' });
               } else { k.senzaLimite++; }
           });
           const ordineAtt = attivita.map(a => a.id);
@@ -1486,7 +1534,7 @@
               .filter(k => k.corsi > 0)
               .sort((a, b) => ordineAtt.indexOf(a.info.id) - ordineAtt.indexOf(b.info.id))
               .map(k => ({ ...k, livelli: Object.values(k.livelli).filter(L => L.elenco.length > 0).sort((a, b) => String(a.ordine).localeCompare(String(b.ordine), 'it', { numeric: true })) }));
-      }, [tuttiCorsiSelect, attivita, inizioSettimana]);
+      }, [isDisponibilitaOpen, periodoDisp, intervalliDisp, tuttiCorsiSelect, attivita]);
 
       // Formatta il/i periodo/i di iscrizione di un partecipante (es. "dal 01/09/2026 al 30/06/2027")
       const formattaPeriodoIscrizione = (iscrizioni) => {
@@ -3232,7 +3280,6 @@
           {/* --- MODALE DISPONIBILITÀ CORSI --- */}
           {isDisponibilitaOpen && (() => {
             const giorniAbb = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
-            const fine = new Date(new Date(inizioSettimana).getTime() + 6 * 24 * 60 * 60 * 1000);
             const totPosti = disponibilita.reduce((t, k) => t + k.posti, 0);
             const totLiberi = disponibilita.reduce((t, k) => t + k.liberi, 0);
             const colLiberi = (n) => n === 0 ? 'text-red-600' : n <= 2 ? 'text-amber-600' : 'text-emerald-600';
@@ -3240,16 +3287,25 @@
               <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsDisponibilitaOpen(false)}>
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
                   <div className="px-2 pt-2 flex flex-col bg-[#1e3a5f] text-white">
-                    <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1">
+                    <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1 border-b border-white/20">
                       <h3 className="font-bold text-xl flex items-center gap-2"><UsersIcon size={24}/> Disponibilità corsi</h3>
                       <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-white/80">Stagione {stagioneSelezionata} · settimana {formatDate(toYMD(new Date(inizioSettimana)))} - {formatDate(toYMD(fine))}</span>
+                        <span className="text-sm font-medium text-white/80">Stagione {stagioneSelezionata}</span>
                         <button onClick={() => setIsDisponibilitaOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={22}/></button>
                       </div>
                     </div>
+                    <div className="flex">
+                      {['settimana', 'primo', 'secondo', 'annuale'].map(id => (
+                        <button key={id} onClick={() => setPeriodoDisp(id)} className={`flex-1 py-2 text-sm font-bold transition-all border-b-4 border-transparent leading-tight ${periodoDisp === id ? 'bg-white/20' : 'opacity-80 hover:bg-white/5'}`}>
+                          {intervalliDisp[id].label}
+                          <div className="text-[11px] font-medium text-white/75">{formatDate(intervalliDisp[id].inizio)} - {formatDate(intervalliDisp[id].fine)}</div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="flex-1 overflow-y-auto bg-slate-50 p-5 flex flex-col gap-3">
-                    {disponibilita.length === 0 && <p className="text-sm text-slate-500">Nessun corso con un numero massimo di partecipanti impostato in questa stagione.</p>}
+                    {disponibilita.length === 0 && <p className="text-sm text-slate-500">Nessun corso con un numero massimo di partecipanti attivo in questo periodo.</p>}
+                    {periodoDisp !== 'settimana' && disponibilita.length > 0 && <p className="shrink-0 text-xs text-slate-500">Per i periodi, gli iscritti sono il <b>picco</b> di presenze nelle settimane del periodo: i posti liberi sono quelli rimasti per chi si iscrive per tutto il periodo. Contano solo i corsi attivi in quelle date.</p>}
                     {disponibilita.map(k => {
                       const aperta = catDispEspansa === k.info.id;
                       const perc = k.posti ? Math.min(100, Math.round(k.iscritti / k.posti * 100)) : 0;
