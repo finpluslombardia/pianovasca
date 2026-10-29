@@ -571,6 +571,11 @@
       // --- STATI "INSERITI OGGI" (iscrizioni odierne, con generazione messaggio WhatsApp) ---
       const [isInseritiOggiOpen, setIsInseritiOggiOpen] = useState(false);
       const [isDisponibilitaOpen, setIsDisponibilitaOpen] = useState(false);
+      const [menuIscrittiOpen, setMenuIscrittiOpen] = useState(false);
+      const [isIscrittiGiornoOpen, setIsIscrittiGiornoOpen] = useState(false);
+      const [giornoIscritti, setGiornoIscritti] = useState(() => (new Date().getDay() + 6) % 7); // 0 = Lunedì
+      const [iscrittiPeriodo, setIscrittiPeriodo] = useState(null); // null | 'primo' | 'secondo' | 'annuale'
+      const [ricercaIscrittiPeriodo, setRicercaIscrittiPeriodo] = useState('');
       const [soloConPosti, setSoloConPosti] = useState(true);
       const [periodoDisp, setPeriodoDisp] = useState('settimana'); // 'settimana' | 'primo' | 'secondo' | 'annuale'
       const [catDispEspansa, setCatDispEspansa] = useState(null);
@@ -637,7 +642,7 @@
 
       // --- BLOCCO SCORRIMENTO SFONDO ---
       useEffect(() => {
-          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen || isDisponibilitaOpen;
+          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen || isDisponibilitaOpen || !!iscrittiPeriodo || isIscrittiGiornoOpen;
           if (isAnyModalOpen) {
               document.body.style.overflow = 'hidden';
           } else {
@@ -1535,6 +1540,54 @@
               .sort((a, b) => ordineAtt.indexOf(a.info.id) - ordineAtt.indexOf(b.info.id))
               .map(k => ({ ...k, livelli: Object.values(k.livelli).filter(L => L.elenco.length > 0).sort((a, b) => String(a.ordine).localeCompare(String(b.ordine), 'it', { numeric: true })) }));
       }, [isDisponibilitaOpen, periodoDisp, intervalliDisp, tuttiCorsiSelect, attivita]);
+
+      // --- ELENCO ISCRITTI PER PERIODO (primo / secondo / annuale) della stagione selezionata ---
+      const iscrittiPerPeriodo = useMemo(() => {
+          if (!iscrittiPeriodo) return [];
+          const iv = intervalliDisp[iscrittiPeriodo];
+          const giorniAbb = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+          const mappa = {};
+          tuttiCorsiSelect.forEach(c => {
+              const info = attivita.find(a => a.id === c.data.id);
+              (c.data.partecipanti || []).forEach(p => {
+                  const ok = (p.iscrizioni || []).some(i => i.inizio === iv.inizio && i.fine === iv.fine);
+                  if (!ok) return;
+                  const key = String(p.nome || '').toLowerCase().trim();
+                  if (!key) return;
+                  if (!mappa[key]) mappa[key] = { nome: p.nome, telefono: p.telefono || '', corsi: [] };
+                  if (!mappa[key].telefono && p.telefono) mappa[key].telefono = p.telefono;
+                  const etichetta = `${info ? info.name : 'Corso'} · ${giorniAbb[c.giorno]} ${c.oraInizio}`;
+                  if (!mappa[key].corsi.includes(etichetta)) mappa[key].corsi.push(etichetta);
+              });
+          });
+          return Object.values(mappa).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+      }, [iscrittiPeriodo, intervalliDisp, tuttiCorsiSelect, attivita]);
+
+      // --- ISCRITTI DI UN GIORNO DELLA SETTIMANA VISUALIZZATA ---
+      const iscrittiGiorno = useMemo(() => {
+          if (!isIscrittiGiornoOpen) return { data: '', corsi: [], totale: 0 };
+          const dataG = new Date(inizioSettimana.getTime() + giornoIscritti * 24 * 60 * 60 * 1000);
+          const ymd = toYMD(dataG);
+          const persone = new Set();
+          const corsi = tuttiCorsiSelect
+              .filter(c => c.giorno === giornoIscritti)
+              .filter(c => (!c.data.dataInizio || c.data.dataInizio <= ymd) && (!c.data.dataFine || c.data.dataFine >= ymd))
+              .map(c => {
+                  const info = attivita.find(a => a.id === c.data.id);
+                  const att = (c.data.partecipanti || []).filter(pp => isAttivoInSettimana(pp, inizioSettimana));
+                  att.forEach(pp => persone.add(String(pp.nome || '').toLowerCase().trim()));
+                  const lv = c.data.livello || '';
+                  const li = info && !info.isFreeTextLevel && info.levels ? info.levels.find(l => l.val === lv) : null;
+                  const nomeLv = lv ? (info && info.isFreeTextLevel ? lv : (li ? li.name : lv)) : '';
+                  return {
+                      ora: c.oraInizio, vasca: c.vasca, corsie: c.corsie,
+                      titolo: `${info ? info.name : 'Corso'}${nomeLv ? ' - ' + nomeLv : ''}`,
+                      info, istruttore: c.data.istruttore || '', max: Number(c.data.maxUtenti) || 0,
+                      partecipanti: [...att].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'it'))
+                  };
+              });
+          return { data: formatDate(ymd), corsi, totale: persone.size };
+      }, [isIscrittiGiornoOpen, giornoIscritti, inizioSettimana, tuttiCorsiSelect, attivita]);
 
       // Formatta il/i periodo/i di iscrizione di un partecipante (es. "dal 01/09/2026 al 30/06/2027")
       const formattaPeriodoIscrizione = (iscrizioni) => {
@@ -3364,6 +3417,100 @@
                       <span className="text-sm font-bold text-slate-600">Totale: <span className={colLiberi(totLiberi)}>{totLiberi}</span> posti liberi su {totPosti}</span>
                       <button onClick={() => setIsDisponibilitaOpen(false)} className="px-5 py-2.5 bg-[#1e3a5f] hover:bg-[#2a4d7c] text-white rounded-lg font-bold shadow-md transition-all">Chiudi</button>
                     </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* --- MODALE ISCRITTI GIORNO --- */}
+          {isIscrittiGiornoOpen && (() => {
+            const nomiGiorni = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+            return (
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsIscrittiGiornoOpen(false)}>
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
+                  <div className="px-2 pt-2 flex flex-col bg-[#1e3a5f] text-white">
+                    <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1 border-b border-white/20">
+                      <h3 className="font-bold text-xl flex items-center gap-2 flex-wrap"><UsersIcon size={24}/> Iscritti giorno
+                        <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold">{nomiGiorni[giornoIscritti]} {iscrittiGiorno.data}</span>
+                        <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold">{iscrittiGiorno.totale} persone</span>
+                      </h3>
+                      <button onClick={() => setIsIscrittiGiornoOpen(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={22}/></button>
+                    </div>
+                    <div className="flex">
+                      {nomiGiorni.map((g, i) => (
+                        <button key={g} onClick={() => setGiornoIscritti(i)} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${giornoIscritti === i ? 'bg-white/20' : 'opacity-80 hover:bg-white/5'}`}>{g.slice(0, 3)}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex-1 overflow-y-auto bg-slate-50 p-5 flex flex-col gap-3">
+                    {iscrittiGiorno.corsi.length === 0 && <p className="text-sm text-slate-500 text-center py-6">Nessun corso in questo giorno nella settimana visualizzata.</p>}
+                    {iscrittiGiorno.corsi.map((c, idx) => (
+                      <div key={idx} className="shrink-0 bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 flex items-center gap-3 flex-wrap text-sm">
+                          <span className="font-bold text-slate-800">{c.ora}</span>
+                          <span className="font-semibold text-slate-700">{c.titolo}</span>
+                          <span className="text-slate-500">{c.vasca === 'interna' ? 'Interna' : c.vasca === 'esterna' ? 'Esterna' : c.vasca}{c.istruttore ? ` · ${c.istruttore}` : ''}</span>
+                          <span className="ml-auto text-xs font-bold text-slate-600">{c.partecipanti.length}{c.max ? `/${c.max}` : ''} iscritti</span>
+                        </div>
+                        {c.partecipanti.length === 0 ? (
+                          <div className="px-4 py-2 text-sm text-slate-400">Nessun iscritto attivo</div>
+                        ) : (
+                          <div className="px-4 py-2 grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-1 text-sm text-slate-700">
+                            {c.partecipanti.map((pp, j) => <div key={j}>{pp.nome}</div>)}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-6 py-3 border-t border-slate-200 flex justify-between items-center bg-slate-50">
+                    <span className="text-xs text-slate-500">Settimana visualizzata nel calendario · solo iscritti attivi in quella settimana</span>
+                    <button onClick={() => setIsIscrittiGiornoOpen(false)} className="px-4 py-2 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition-colors">Chiudi</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* --- MODALE ISCRITTI PER PERIODO --- */}
+          {iscrittiPeriodo && (() => {
+            const iv = intervalliDisp[iscrittiPeriodo];
+            const titolo = iscrittiPeriodo === 'annuale' ? 'Iscritti annuali' : `Iscritti ${iscrittiPeriodo} periodo`;
+            const q = ricercaIscrittiPeriodo.trim().toLowerCase();
+            const lista = q ? iscrittiPerPeriodo.filter(x => x.nome.toLowerCase().includes(q)) : iscrittiPerPeriodo;
+            return (
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIscrittiPeriodo(null)}>
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
+                  <div className="px-2 pt-2 flex flex-col bg-[#1e3a5f] text-white">
+                    <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1">
+                      <h3 className="font-bold text-xl flex items-center gap-2 flex-wrap"><UsersIcon size={24}/> {titolo}
+                        <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold">{formatDate(iv.inizio)} - {formatDate(iv.fine)}</span>
+                        <span className="bg-white/20 px-3 py-1 rounded-full text-sm font-bold">{iscrittiPerPeriodo.length} iscritti</span>
+                      </h3>
+                      <button onClick={() => setIscrittiPeriodo(null)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={22}/></button>
+                    </div>
+                  </div>
+                  <div className="px-5 pt-4 pb-2 bg-slate-50">
+                    <input type="text" value={ricercaIscrittiPeriodo} onChange={e => setRicercaIscrittiPeriodo(e.target.value)} placeholder="Cerca per cognome o nome..." className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#1e3a5f]/30" />
+                  </div>
+                  <div className="flex-1 overflow-y-auto bg-slate-50 px-5 pb-5">
+                    {lista.length === 0 ? (
+                      <p className="text-sm text-slate-500 py-6 text-center">Nessun iscritto trovato per questo periodo in questa stagione.</p>
+                    ) : (
+                      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        {lista.map((x, i) => (
+                          <div key={x.nome} className="flex items-start gap-4 px-4 py-2.5 border-b border-slate-100 last:border-b-0 text-sm">
+                            <div className="w-8 shrink-0 text-slate-400 text-xs pt-0.5">{i + 1}</div>
+                            <div className="w-64 shrink-0 font-semibold text-slate-800">{x.nome}</div>
+                            <div className="w-36 shrink-0 text-slate-500">{x.telefono || '-'}</div>
+                            <div className="flex-1 text-slate-600">{x.corsi.join('  |  ')}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="px-6 py-3 border-t border-slate-200 flex justify-end bg-slate-50">
+                    <button onClick={() => setIscrittiPeriodo(null)} className="px-4 py-2 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition-colors">Chiudi</button>
                   </div>
                 </div>
               </div>
@@ -5290,6 +5437,24 @@
 
               </div>
               <div className="flex items-center gap-2">
+                    <div className="relative">
+                      <button onClick={() => setMenuIscrittiOpen(!menuIscrittiOpen)} className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] hover:bg-[#2a4d7c] text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Elenco iscritti per periodo"><UsersIcon size={16} /> Iscritti per periodo</button>
+                      {menuIscrittiOpen && (
+                        <div className="absolute bottom-full mb-2 left-0 bg-white border border-slate-200 shadow-xl rounded-lg py-2 z-50 min-w-[250px] flex flex-col">
+                          {['primo', 'secondo', 'annuale'].map(id => (
+                            <button key={id} onClick={() => { setRicercaIscrittiPeriodo(''); setIscrittiPeriodo(id); setMenuIscrittiOpen(false); }} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 font-medium">
+                              Iscritti {id === 'annuale' ? 'annuali' : `${id} periodo`}
+                              <div className="text-xs text-slate-400 font-normal">{formatDate(intervalliDisp[id].inizio)} - {formatDate(intervalliDisp[id].fine)}</div>
+                            </button>
+                          ))}
+                          <div className="h-px bg-slate-200 my-1"></div>
+                          <button onClick={() => { setIsIscrittiGiornoOpen(true); setMenuIscrittiOpen(false); }} className="px-4 py-2 text-sm text-left hover:bg-slate-50 text-slate-700 font-medium">
+                            Iscritti giorno
+                            <div className="text-xs text-slate-400 font-normal">Scegli il giorno della settimana</div>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     <button onClick={() => { setCatDispEspansa(null); setIsDisponibilitaOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] hover:bg-[#2a4d7c] text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Posti liberi per ogni categoria di corso"><UsersIcon size={16} /> Disponibilità corsi</button>
               </div>
               <div className="flex items-center gap-2">
