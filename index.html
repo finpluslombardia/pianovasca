@@ -536,6 +536,8 @@
         if (corsieHeaderRef.current) corsieHeaderRef.current.scrollLeft = e.target.scrollLeft;
       }, []);
       const [corsiEsclusiFiltro, setCorsiEsclusiFiltro] = useState([]); // chiavi "attivitaId::livello" nascoste/attenuate dal filtro
+      const [ricercaFiltro, setRicercaFiltro] = useState('');
+      const [istruttoriFiltro, setIstruttoriFiltro] = useState([]); // nomi istruttori selezionati (vuoto = tutti)
       const [modalitaFiltro, setModalitaFiltro] = useState('nascondi'); // 'nascondi' | 'evidenzia'
       const [inizioSettimana, setInizioSettimana] = useState(getStartOfWeek(new Date()));
 
@@ -1053,6 +1055,13 @@
           return { key, label, attivitaId: cellData.id, attivitaNome: info ? info.name : cellData.id };
       }, [attivita]);
 
+      // Un corso è fuori dal filtro se il suo tipo/livello è escluso OPPURE (se ci sono istruttori scelti) il suo istruttore non è tra quelli.
+      const fuoriFiltro = (cell) => {
+          if (corsiEsclusiFiltro.includes(chiaveELabelCorso(cell)?.key)) return true;
+          if (istruttoriFiltro.length > 0 && !istruttoriFiltro.includes(String((cell && cell.istruttore) || '').trim())) return true;
+          return false;
+      };
+
       // --- LOGICA RICOSTRUZIONE ASSOLUTA CORSI ---
       const getCorsiForDay = useCallback((giornoIdx) => {
           const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
@@ -1078,7 +1087,7 @@
                   // In modalità "nascondi" i corsi non selezionati vengono esclusi dalla griglia
                   // (comportamento originale). In modalità "evidenzia" restano tutti visibili: verranno
                   // solo attenuati graficamente in fase di rendering, senza spezzare la struttura della griglia.
-                  if (modalitaFiltro === 'nascondi' && corsiEsclusiFiltro.includes(chiaveELabelCorso(cell)?.key)) return;
+                  if (modalitaFiltro === 'nascondi' && fuoriFiltro(cell)) return;
 
                   // --- FILTRO CALENDARIO ---
                   const isInizioValido = !cell.dataInizio || cell.dataInizio <= dataGiornoYMD;
@@ -1147,7 +1156,7 @@
           });
 
           return corsiUnici;
-      }, [piano, vascaSelezionata, corsiEsclusiFiltro, modalitaFiltro, chiaveELabelCorso, inizioSettimana]);
+      }, [piano, vascaSelezionata, corsiEsclusiFiltro, istruttoriFiltro, modalitaFiltro, chiaveELabelCorso, inizioSettimana]);
 
       const corsiOggi = useMemo(() => {
           if (giornoSelezionato === 7) return [];
@@ -1157,6 +1166,12 @@
       // --- LOGICA UTENTE RAPIDO E AUTOSUGGERIMENTO ---
       // Elenco dei corsi realmente presenti nel piano della stagione corrente, raggruppati per
       // attività, da usare come opzioni nel filtro (così riflette sempre "come sono ora").
+      const elencoIstruttori = useMemo(() => {
+          const set = new Set();
+          Object.values(piano).forEach(cell => { const n = String((cell && cell.istruttore) || '').trim(); if (n) set.add(n); });
+          return Array.from(set).sort((a, b) => a.localeCompare(b, 'it'));
+      }, [piano]);
+
       const corsiRaggruppatiPerFiltro = useMemo(() => {
           const map = new Map();
           Object.values(piano).forEach(cell => {
@@ -3177,7 +3192,7 @@
 
                                                           // Modalità "evidenzia": i corsi non selezionati nel filtro restano visibili
                                                           // ma vengono attenuati (opacità ridotta e desaturati), invece di sparire.
-                                                          const attenuato = modalitaFiltro === 'evidenzia' && corsiEsclusiFiltro.includes(chiaveELabelCorso(corso.data)?.key);
+                                                          const attenuato = modalitaFiltro === 'evidenzia' && fuoriFiltro(corso.data);
 
                                                           // Applicazione dello zoom dinamico sui box
                                                           const topOffset = (corso.startMin - fasciaStartMin) * pixelsPerMin;
@@ -5398,73 +5413,90 @@
                       onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
                       className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
                     >
-                      <FilterIcon size={16} className={corsiEsclusiFiltro.length > 0 ? "text-blue-500 fill-blue-100" : "text-slate-500"} />
+                      <FilterIcon size={16} className={(corsiEsclusiFiltro.length > 0 || istruttoriFiltro.length > 0) ? "text-blue-500 fill-blue-100" : "text-slate-500"} />
                       <span className="hidden sm:inline">Filtri:</span>
                       <span className="font-bold text-slate-800">
-                        {corsiEsclusiFiltro.length === 0 ? 'Tutti' : `${corsiRaggruppatiPerFiltro.reduce((n, g) => n + g.corsi.length, 0) - corsiEsclusiFiltro.length}`}
+                        {(corsiEsclusiFiltro.length === 0 && istruttoriFiltro.length > 0) ? (istruttoriFiltro.length === 1 ? istruttoriFiltro[0] : `${istruttoriFiltro.length} istruttori`) : corsiEsclusiFiltro.length === 0 ? 'Tutti' : `${corsiRaggruppatiPerFiltro.reduce((n, g) => n + g.corsi.length, 0) - corsiEsclusiFiltro.length}`}
                       </span>
-                      {corsiEsclusiFiltro.length > 0 && modalitaFiltro === 'evidenzia' && (
+                      {(corsiEsclusiFiltro.length > 0 || istruttoriFiltro.length > 0) && modalitaFiltro === 'evidenzia' && (
                         <span className="hidden sm:inline text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">EVIDENZIA</span>
                       )}
                     </button>
                     
                     {isFilterMenuOpen && (
-                      <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 z-50 min-w-[260px] flex flex-col gap-2">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtra Corsi</span>
-                          <button 
-                            onClick={() => setCorsiEsclusiFiltro([])}
-                            className="text-xs font-bold text-blue-600 hover:underline"
-                          >
-                            Tutti
-                          </button>
-                        </div>
-                        <div className="flex bg-slate-100 rounded-lg p-1 mb-1">
-                          <button
-                            type="button"
-                            onClick={() => setModalitaFiltro('nascondi')}
-                            className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${modalitaFiltro === 'nascondi' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                          >
-                            Nascondi
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setModalitaFiltro('evidenzia')}
-                            className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${modalitaFiltro === 'evidenzia' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                          >
-                            Evidenzia
-                          </button>
-                        </div>
-                        <div className="h-px bg-slate-200 mb-1"></div>
-                        <div className="max-h-72 overflow-y-auto flex flex-col gap-3 pr-1">
-                          {corsiRaggruppatiPerFiltro.map(gruppo => (
-                            <div key={gruppo.attivitaNome}>
-                              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">{gruppo.attivitaNome}</div>
-                              <div className="flex flex-col gap-1">
-                                {gruppo.corsi.map(c => (
-                                  <label key={c.key} className="flex items-center gap-2.5 cursor-pointer text-sm font-medium text-slate-700 hover:bg-slate-50 p-1.5 rounded transition-colors">
-                                    <input 
-                                      type="checkbox" 
-                                      checked={!corsiEsclusiFiltro.includes(c.key)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setCorsiEsclusiFiltro(corsiEsclusiFiltro.filter(k => k !== c.key));
-                                        } else {
-                                          setCorsiEsclusiFiltro([...corsiEsclusiFiltro, c.key]);
-                                        }
-                                      }}
-                                      className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                    />
-                                    {c.label}
-                                  </label>
-                                ))}
+                      <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 z-50 min-w-[300px] flex flex-col gap-2">
+                        {(() => {
+                          const tutteChiavi = corsiRaggruppatiPerFiltro.flatMap(g => g.corsi.map(c => c.key));
+                          const q = ricercaFiltro.trim().toLowerCase();
+                          const gruppiVisibili = corsiRaggruppatiPerFiltro
+                            .map(g => ({ ...g, corsi: q ? g.corsi.filter(c => (c.label + ' ' + g.attivitaNome).toLowerCase().includes(q)) : g.corsi }))
+                            .filter(g => g.corsi.length > 0);
+                          const soloQuesti = (chiavi) => setCorsiEsclusiFiltro(tutteChiavi.filter(k => !chiavi.includes(k)));
+                          const linkCls = "text-xs font-bold text-blue-600 hover:underline";
+                          return (
+                            <>
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtra Corsi</span>
+                                <div className="flex gap-3">
+                                  <button onClick={() => { setCorsiEsclusiFiltro([]); setIstruttoriFiltro([]); }} className={linkCls}>Tutti</button>
+                                  <button onClick={() => setCorsiEsclusiFiltro(tutteChiavi)} className={linkCls}>Nessuno</button>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                              <input type="text" value={ricercaFiltro} onChange={e => setRicercaFiltro(e.target.value)} placeholder="Cerca un corso..." className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
+                              <div className="flex bg-slate-100 rounded-lg p-1 mb-1">
+                                <button type="button" onClick={() => setModalitaFiltro('nascondi')} className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${modalitaFiltro === 'nascondi' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Nascondi</button>
+                                <button type="button" onClick={() => setModalitaFiltro('evidenzia')} className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${modalitaFiltro === 'evidenzia' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Evidenzia</button>
+                              </div>
+                              <div className="h-px bg-slate-200 mb-1"></div>
+                              {elencoIstruttori.length > 0 && (
+                                <div className="mb-1">
+                                  <div className="flex justify-between items-center mb-1">
+                                    <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Istruttore</div>
+                                    {istruttoriFiltro.length > 0 && <button onClick={() => setIstruttoriFiltro([])} className={linkCls}>Tutti</button>}
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                                    {elencoIstruttori.filter(n => !q || n.toLowerCase().includes(q)).map(n => {
+                                      const sel = istruttoriFiltro.includes(n);
+                                      return <button key={n} onClick={() => setIstruttoriFiltro(sel ? istruttoriFiltro.filter(x => x !== n) : [...istruttoriFiltro, n])} className={`px-2.5 py-1 rounded-full text-xs font-bold border transition-colors ${sel ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>{n}</button>;
+                                    })}
+                                  </div>
+                                  <div className="h-px bg-slate-200 mt-2"></div>
+                                </div>
+                              )}
+                              <div className="max-h-[55vh] overflow-y-auto flex flex-col gap-3 pr-1">
+                                {gruppiVisibili.map(gruppo => {
+                                  const chiaviG = gruppo.corsi.map(c => c.key);
+                                  const tuttiSel = chiaviG.every(k => !corsiEsclusiFiltro.includes(k));
+                                  return (
+                                    <div key={gruppo.attivitaNome}>
+                                      <div className="flex justify-between items-center mb-1">
+                                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">{gruppo.attivitaNome}</div>
+                                        <div className="flex gap-3">
+                                          <button onClick={() => soloQuesti(chiaviG)} className={linkCls} title="Mostra solo i corsi di questa attività">Solo</button>
+                                          <button onClick={() => setCorsiEsclusiFiltro(tuttiSel ? [...new Set([...corsiEsclusiFiltro, ...chiaviG])] : corsiEsclusiFiltro.filter(k => !chiaviG.includes(k)))} className={linkCls}>{tuttiSel ? 'Togli tutti' : 'Tutti'}</button>
+                                        </div>
+                                      </div>
+                                      <div className="flex flex-col gap-1">
+                                        {gruppo.corsi.map(c => (
+                                          <div key={c.key} className="group flex items-center justify-between hover:bg-slate-50 rounded transition-colors">
+                                            <label className="flex-1 flex items-center gap-2.5 cursor-pointer text-sm font-medium text-slate-700 p-1.5">
+                                              <input type="checkbox" checked={!corsiEsclusiFiltro.includes(c.key)} onChange={(e) => { if (e.target.checked) setCorsiEsclusiFiltro(corsiEsclusiFiltro.filter(k => k !== c.key)); else setCorsiEsclusiFiltro([...corsiEsclusiFiltro, c.key]); }} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                                              {c.label}
+                                            </label>
+                                            <button onClick={() => soloQuesti([c.key])} className="text-xs font-bold text-blue-600 hover:underline px-2 opacity-0 group-hover:opacity-100 transition-opacity" title="Mostra solo questo corso">Solo</button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                           {corsiRaggruppatiPerFiltro.length === 0 && (
                             <div className="text-sm text-slate-400 italic p-2">Nessun corso ancora presente in questa stagione.</div>
                           )}
-                        </div>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
