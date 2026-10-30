@@ -194,7 +194,7 @@
           (cell?.partecipanti || []).forEach(p => {
             if (p && p.nome && p.nome.trim()) {
               const key = p.nome.toLowerCase().trim();
-              map[key] = { nome: p.nome.trim(), anno: p.anno || '', dataNascita: p.dataNascita || (map[key] ? map[key].dataNascita : '') || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '', telefono: p.telefono || (map[key] ? map[key].telefono : '') || '', email: p.email || (map[key] ? map[key].email : '') || '', sesso: p.sesso || (map[key] ? map[key].sesso : '') || '' };
+              map[key] = { nome: p.nome.trim(), anno: p.anno || '', dataNascita: p.dataNascita || (map[key] ? map[key].dataNascita : '') || '', scadCertificato: p.scadCertificato || '', card: p.card || (map[key] ? map[key].card : '') || '', telefono: p.telefono || (map[key] ? map[key].telefono : '') || '', email: p.email || (map[key] ? map[key].email : '') || '', sesso: p.sesso || (map[key] ? map[key].sesso : '') || '', livelloSocio: p.livelloSocio || (map[key] ? map[key].livelloSocio : '') || '' };
             }
           });
         });
@@ -221,6 +221,16 @@
       M: { campo: '!border-sky-300 !bg-sky-50 focus:!border-sky-400 focus:!ring-sky-100', simbolo: '♂', col: 'text-sky-600', nome: 'text-sky-700' },
       F: { campo: '!border-pink-300 !bg-pink-50 focus:!border-pink-400 focus:!ring-pink-100', simbolo: '♀', col: 'text-pink-500', nome: 'text-pink-600' },
       N: { campo: '', simbolo: '○', col: 'text-slate-300', nome: 'text-slate-800' }
+    };
+    // Livello attuale della persona (portato avanti in tutte le stagioni): valore "idAttivita:livello".
+    const etichettaLivelloSocio = (v, attivitaList) => {
+      if (!v) return '';
+      const [aid, lv] = String(v).split(':');
+      const a = (attivitaList || []).find(x => x.id === aid);
+      if (!a) return '';
+      const l = (a.levels || []).find(x => x.val === lv);
+      if (!l) return a.name;
+      return l.noNumero ? l.name : `${a.name} - ${l.name}`;
     };
     const sessoSuccessivo = (x) => x === 'M' ? 'F' : x === 'F' ? 'N' : 'M';
     const rilevaSesso = (nomeCompleto) => {
@@ -1206,7 +1216,7 @@
       // Crea o aggiorna la scheda di un socio nell'archivio permanente. Se l'anno di nascita o
       // il certificato vengono lasciati vuoti, mantiene il valore già presente in archivio
       // invece di cancellarlo: evita di perdere dati già noti per una semplice dimenticanza.
-      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card, telefono, dataNascita, email, sesso) => {
+      const aggiornaArchivioSoci = useCallback((nome, anno, scadCertificato, card, telefono, dataNascita, email, sesso, livelloSocio) => {
           if (!nome || !nome.trim()) return;
           const key = nome.toLowerCase().trim();
           setArchivioSoci(prev => {
@@ -1222,6 +1232,7 @@
                       telefono: telefono || (esistente ? esistente.telefono : '') || '',
                       email: normalizzaEmail(email || (esistente ? esistente.email : '') || ''),
                       sesso: sesso || (esistente ? esistente.sesso : '') || rilevaSesso(nome),
+                      livelloSocio: livelloSocio !== undefined ? (livelloSocio || '') : ((esistente && esistente.livelloSocio) || ''),
                       certMsgScad: (esistente && esistente.certMsgScad) || ''
                   }
               };
@@ -1269,6 +1280,7 @@
                   card: esisteGia ? (esisteGia.card || '') : '',
                   telefono: esisteGia ? (esisteGia.telefono || '') : '',
                   email: esisteGia ? (esisteGia.email || '') : '',
+                  livelloSocio: esisteGia ? (esisteGia.livelloSocio || '') : '',
                   certMsgScad: esisteGia ? (esisteGia.certMsgScad || '') : ''
               };
 
@@ -2140,7 +2152,7 @@
 
         // Archivio soci permanente: memorizziamo/aggiorniamo questo socio così non andrà
         // ridigitato da capo la prossima volta (anche in un'altra stagione).
-        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card, addUtenteRapido.telefono, addUtenteRapido.dataNascita, addUtenteRapido.email, addUtenteRapido.sesso);
+        aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card, addUtenteRapido.telefono, addUtenteRapido.dataNascita, addUtenteRapido.email, addUtenteRapido.sesso, addUtenteRapido.livelloSocio);
 
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
@@ -2173,6 +2185,7 @@
                         telefono: addUtenteRapido.telefono || arcRapido.telefono || '',
                         email: normalizzaEmail(addUtenteRapido.email || arcRapido.email || ''),
                         sesso: addUtenteRapido.sesso || arcRapido.sesso || rilevaSesso(normalizzaNome(addUtenteRapido.nome)),
+                        livelloSocio: addUtenteRapido.livelloSocio !== undefined ? addUtenteRapido.livelloSocio : (arcRapido.livelloSocio || ''),
                         iscrizioni: iscrizioniPulite
                     };
                     // BUGFIX: se la persona è già iscritta a questo corso (es. lo si usa per
@@ -2258,6 +2271,7 @@
                     anno: inArchivio.anno || p.anno,
                     dataNascita: inArchivio.dataNascita || p.dataNascita || '',
                     sesso: inArchivio.sesso || p.sesso || '',
+                    livelloSocio: inArchivio.livelloSocio || p.livelloSocio || '',
                     scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
                   card: inArchivio.card || p.card || '',
                   telefono: inArchivio.telefono || p.telefono || '',
@@ -2371,6 +2385,7 @@
                   anno: inArchivio.anno || p.anno,
                   dataNascita: inArchivio.dataNascita || p.dataNascita || '',
                   sesso: inArchivio.sesso || p.sesso || '',
+                  livelloSocio: inArchivio.livelloSocio || p.livelloSocio || '',
                   scadCertificato: inArchivio.scadCertificato || p.scadCertificato,
                   card: inArchivio.card || p.card || '',
                   telefono: inArchivio.telefono || p.telefono || '',
@@ -2409,6 +2424,7 @@
             nome: normalizzaNome(nuovoPartecipante.nome),
             email: normalizzaEmail(nuovoPartecipante.email),
             sesso: nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome)),
+            livelloSocio: nuovoPartecipante.livelloSocio || '',
             iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
         };
 
@@ -2499,6 +2515,7 @@
                 nome: normalizzaNome(nuovoPartecipante.nome),
                 email: normalizzaEmail(nuovoPartecipante.email),
                 sesso: nuovoPartecipante.sesso || rilevaSesso(normalizzaNome(nuovoPartecipante.nome)),
+                livelloSocio: nuovoPartecipante.livelloSocio || '',
                 iscrizioni: (nuovoPartecipante.iscrizioni || []).filter(i => i.inizio || i.fine)
             };
             const nomeNorm = partecipantePulito.nome.toLowerCase().trim();
@@ -2530,6 +2547,7 @@
             if (!arc) return p;
             const out = { ...p };
             ['dataNascita', 'email', 'telefono', 'card', 'sesso'].forEach(c => { if (!out[c] && arc[c]) out[c] = arc[c]; });
+            if (out.livelloSocio === undefined && arc.livelloSocio) out.livelloSocio = arc.livelloSocio;
             if (!out.anno && arc.anno) out.anno = arc.anno;
             if (out.dataNascita && /^\d{4}-/.test(out.dataNascita)) out.anno = out.dataNascita.slice(0, 4);
             return out;
@@ -2539,7 +2557,7 @@
         // così i loro dati (anno, certificato) restano disponibili per l'autocompletamento
         // anche in altre stagioni o altri corsi, senza doverli ridigitare.
         finalPartecipanti.forEach(p => {
-            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card, p.telefono, p.dataNascita, p.email, p.sesso);
+            if (p && p.nome) aggiornaArchivioSoci(p.nome, p.anno, p.scadCertificato, p.card, p.telefono, p.dataNascita, p.email, p.sesso, p.livelloSocio);
         });
         
         setTuttiPiani(prevTutti => {
@@ -2552,7 +2570,7 @@
           // --- Sincronizzazione globale dei certificati medici, anagrafica e documenti firmati ---
           const mapAggiornamenti = new Map();
           finalPartecipanti.forEach(p => {
-              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { sesso: p.sesso || '', scadCertificato: p.scadCertificato || '', anno: p.anno || '', dataNascita: p.dataNascita || '', documentiFirmati: p.documentiFirmati || '', card: p.card || '', telefono: p.telefono || '', email: p.email || '' });
+              if (p.nome) mapAggiornamenti.set(p.nome.toLowerCase().trim(), { sesso: p.sesso || '', livelloSocio: p.livelloSocio !== undefined ? (p.livelloSocio || '') : undefined, scadCertificato: p.scadCertificato || '', anno: p.anno || '', dataNascita: p.dataNascita || '', documentiFirmati: p.documentiFirmati || '', card: p.card || '', telefono: p.telefono || '', email: p.email || '' });
           });
 
           Object.keys(nuovoPiano).forEach(k => {
@@ -2569,12 +2587,13 @@
                           telefono: updateInfoRaw.telefono || esistente.telefono || '',
                           card: updateInfoRaw.card || esistente.card || '',
                           sesso: updateInfoRaw.sesso || esistente.sesso || '',
+                          livelloSocio: updateInfoRaw.livelloSocio !== undefined ? updateInfoRaw.livelloSocio : (esistente.livelloSocio || ''),
                           anno: updateInfoRaw.anno || esistente.anno || ''
                       } : null;
                       if (updateInfo) {
-                          if (updateInfo.scadCertificato !== (esistente.scadCertificato || '') || updateInfo.anno !== (esistente.anno || '') || updateInfo.dataNascita !== (esistente.dataNascita || '') || updateInfo.documentiFirmati !== (esistente.documentiFirmati || '') || updateInfo.card !== (esistente.card || '') || updateInfo.telefono !== (esistente.telefono || '') || updateInfo.email !== (esistente.email || '') || updateInfo.sesso !== (esistente.sesso || '')) {
+                          if (updateInfo.scadCertificato !== (esistente.scadCertificato || '') || updateInfo.anno !== (esistente.anno || '') || updateInfo.dataNascita !== (esistente.dataNascita || '') || updateInfo.documentiFirmati !== (esistente.documentiFirmati || '') || updateInfo.card !== (esistente.card || '') || updateInfo.telefono !== (esistente.telefono || '') || updateInfo.email !== (esistente.email || '') || updateInfo.sesso !== (esistente.sesso || '') || (updateInfo.livelloSocio || '') !== (esistente.livelloSocio || '')) {
                               changed = true;
-                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, dataNascita: updateInfo.dataNascita, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card, telefono: updateInfo.telefono, email: updateInfo.email, sesso: updateInfo.sesso };
+                              return { ...esistente, scadCertificato: updateInfo.scadCertificato, anno: updateInfo.anno, dataNascita: updateInfo.dataNascita, documentiFirmati: updateInfo.documentiFirmati, card: updateInfo.card, telefono: updateInfo.telefono, email: updateInfo.email, sesso: updateInfo.sesso, livelloSocio: updateInfo.livelloSocio || '' };
                           }
                       }
                       return esistente;
@@ -3293,6 +3312,7 @@
                     <div className="grid grid-cols-2 gap-4">
                       <div><div className={lbl}>Data di nascita</div><div className="text-sm text-slate-700">{dn ? formatDate(dn) : (an || '-')}</div></div>
                       <div><div className={lbl}>Scad. certificato</div><div className="text-sm text-slate-700">{cert ? formatDate(cert) : '-'}</div></div>
+                      <div><div className={lbl}>Livello attuale</div><div className="text-sm text-slate-700">{etichettaLivelloSocio(arch.livelloSocio || schedaSocio.livelloSocio, attivita) || '-'}</div></div>
                       <div><div className={lbl}>Documenti firmati</div><div className="text-sm text-slate-700">{schedaSocio.documentiFirmati === 'si' ? 'Sì' : schedaSocio.documentiFirmati === 'no' ? 'No' : 'Da verificare'}</div></div>
                       <div><div className={lbl}>Card</div><div className="text-sm text-slate-700">{card === 'si' ? 'Sì' : card === 'no' ? 'No' : '-'}</div></div>
                     </div>
@@ -4303,6 +4323,7 @@
                                             telefono: existing.telefono || '',
                                             email: existing.email || '',
                                             sesso: existing.sesso || '',
+                                            livelloSocio: existing.livelloSocio || '',
                                             iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
                                         });
                                     } else {
@@ -4335,6 +4356,17 @@
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Scadenza Certificato</label>
                               <input type="date" value={addUtenteRapido.scadCertificato} onChange={e => setAddUtenteRapido({...addUtenteRapido, scadCertificato: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
+                           </div>
+                           <div className="lg:col-span-1">
+                              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Livello attuale</label>
+                              <select value={addUtenteRapido.livelloSocio || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, livelloSocio: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer">
+                                <option value="">—</option>
+                                {attivita.filter(a => a.levels && a.levels.length > 0).map(a => (
+                                  <optgroup key={a.id} label={a.name}>
+                                    {a.levels.map(l => <option key={a.id + ':' + l.val} value={a.id + ':' + l.val}>{l.noNumero ? l.name : `Liv. ${l.val} - ${l.name}`}</option>)}
+                                  </optgroup>
+                                ))}
+                              </select>
                            </div>
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Documenti Firmati</label>
@@ -4860,6 +4892,7 @@
                                             telefono: existing.telefono || '',
                                             email: existing.email || '',
                                             sesso: existing.sesso || '',
+                                            livelloSocio: existing.livelloSocio || '',
                                                 iscrizioni: existing.iscrizioni && existing.iscrizioni.length > 0 ? [...existing.iscrizioni] : [{inizio: '', fine: ''}]
                                             });
                                         } else {
@@ -4890,6 +4923,17 @@
                                   <div>
                                     <label className={LBL}>Scadenza Certificato</label>
                                     <input type="date" value={nuovoPartecipante.scadCertificato} onChange={e => setNuovoPartecipante({...nuovoPartecipante, scadCertificato: e.target.value})} className={CLS_CAMPO + " cursor-pointer"} />
+                                  </div>
+                                  <div>
+                                    <label className={LBL}>Livello attuale</label>
+                                    <select value={nuovoPartecipante.livelloSocio || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, livelloSocio: e.target.value})} className={CLS_CAMPO + " cursor-pointer"}>
+                                      <option value="">—</option>
+                                      {attivita.filter(a => a.levels && a.levels.length > 0).map(a => (
+                                        <optgroup key={a.id} label={a.name}>
+                                          {a.levels.map(l => <option key={a.id + ':' + l.val} value={a.id + ':' + l.val}>{l.noNumero ? l.name : `Liv. ${l.val} - ${l.name}`}</option>)}
+                                        </optgroup>
+                                      ))}
+                                    </select>
                                   </div>
                                   <div>
                                     <label className={LBL}>Documenti Firmati</label>
