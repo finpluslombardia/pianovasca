@@ -3300,6 +3300,7 @@
                         const certObblRic = certificatoObbligatorio(annoNascitaRic, annoRifRic, dataNascitaRic);
                         const certScadutoRic = certObblRic && !!scadCertRic && isScaduto(scadCertRic);
                         const docRic = res.partecipante.documentiFirmati;
+                        const livSocioRic = etichettaLivelloSocio((inArchivioRic && inArchivioRic.livelloSocio) || res.partecipante.livelloSocio, attivita);
                         const docOkRic = docRic === 'si';
                         const chipBase = 'px-2 py-0.5 rounded font-bold border text-sm';
 
@@ -3314,6 +3315,8 @@
                                 {GIORNI[res.corso.giorno]} {res.corso.oraInizio} · {res.corso.vasca === 'interna' ? 'V. Interna' : 'V. Esterna'} · <span className="text-blue-600">{nomeCompleto}</span>
                               </div>
                               <div className="text-sm mt-0.5">
+                                <span className={livSocioRic ? 'text-slate-700 font-semibold' : 'text-slate-400'}>Livello {livSocioRic || 'non indicato'}</span>
+                                <span className="text-slate-300"> · </span>
                                 <span className={certScadutoRic ? 'text-red-600 font-semibold' : 'text-slate-400'}>Certificato {!certObblRic && !scadCertRic ? 'non obbligatorio' : scadCertRic ? formatDate(scadCertRic) : '-'}{certScadutoRic ? ' (scaduto)' : ''}</span>
                                 <span className="text-slate-300"> · </span>
                                 <span className={docOkRic ? 'text-slate-400' : 'text-red-600 font-semibold'}>Documenti {docRic === 'si' ? 'firmati' : docRic === 'no' ? 'non firmati' : 'da verificare'}</span>
