@@ -1253,7 +1253,8 @@
                       sesso: sesso || (esistente ? esistente.sesso : '') || rilevaSesso(nome),
                       livelloSocio: livelloSocio !== undefined ? (livelloSocio || '') : ((esistente && esistente.livelloSocio) || ''),
                       certMsgScad: (esistente && esistente.certMsgScad) || '',
-                      rinnovoMsgFine: (esistente && esistente.rinnovoMsgFine) || ''
+                      rinnovoMsgFine: (esistente && esistente.rinnovoMsgFine) || '',
+                      auguriMsgData: (esistente && esistente.auguriMsgData) || ''
                   }
               };
           });
@@ -1302,7 +1303,8 @@
                   email: esisteGia ? (esisteGia.email || '') : '',
                   livelloSocio: esisteGia ? (esisteGia.livelloSocio || '') : '',
                   certMsgScad: esisteGia ? (esisteGia.certMsgScad || '') : '',
-                  rinnovoMsgFine: esisteGia ? (esisteGia.rinnovoMsgFine || '') : ''
+                  rinnovoMsgFine: esisteGia ? (esisteGia.rinnovoMsgFine || '') : '',
+                  auguriMsgData: esisteGia ? (esisteGia.auguriMsgData || '') : ''
               };
 
               if (esisteGia) aggiornati++; else nuovi++;
@@ -1651,6 +1653,12 @@
           return { lista, daRinnovare: lista.filter(r => !r.rinnovato), rinnovati: lista.filter(r => r.rinnovato), fine: prim.fine, giorniAlla, inFinestra: giorniAlla >= -7 && giorniAlla <= 30 };
       }, [tuttiCorsiSelect, attivita, archivioSoci, intervalliDisp]);
 
+      const segnaAuguriInviati = (key, nome, inviato) => {
+          setArchivioSoci(prev => {
+              const esistente = prev[key] || { nome: nome };
+              return { ...prev, [key]: { ...esistente, auguriMsgData: inviato ? toYMD(new Date()) : '' } };
+          });
+      };
       const segnaRinnovoInviato = (key, nome, inviato) => {
           setArchivioSoci(prev => {
               const esistente = prev[key] || { nome: nome };
@@ -1765,7 +1773,7 @@
                   if (!dn || String(dn).slice(5) !== mmdd) return;
                   let voce = mappa.get(key);
                   if (!voce) {
-                      voce = { nome: p.nome, eta: oggi.getFullYear() - parseInt(String(dn).slice(0, 4), 10), telefono: arch.telefono || p.telefono || '', corsi: [] };
+                      voce = { key, nome: p.nome, eta: oggi.getFullYear() - parseInt(String(dn).slice(0, 4), 10), telefono: arch.telefono || p.telefono || '', corsi: [], inviato: arch.auguriMsgData === toYMD(oggi) };
                       mappa.set(key, voce);
                   }
                   if (!voce.corsi.some(co => co.nomeCorso === nomeCorsoStr && co.oraInizio === c.oraInizio && co.giorno === c.giorno)) {
@@ -4088,9 +4096,12 @@
                       const num = numeroPerWhatsapp(persona.telefono);
                       const testo = messaggioCompleanno(persona.nome, persona.eta);
                       return (
-                        <li key={i} className="p-3 flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="font-semibold text-sm text-slate-800">{persona.nome} <span className="font-medium text-slate-500">· {persona.eta} anni</span></div>
+                        <li key={i} className={`p-3 flex items-center justify-between gap-3 ${persona.inviato ? 'bg-slate-50' : ''}`}>
+                          <button onClick={() => segnaAuguriInviati(persona.key, persona.nome, !persona.inviato)} title={persona.inviato ? "Auguri inviati: clicca per togliere la spunta" : "Spunta quando gli auguri sono stati inviati"} className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${persona.inviato ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white hover:border-emerald-400'}`}>
+                            {persona.inviato && <CheckIcon size={14} className="text-white"/>}
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <div className={`font-semibold text-sm ${persona.inviato ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{persona.nome} <span className="font-medium text-slate-500">· {persona.eta} anni</span></div>
                             <div className="text-sm font-medium text-slate-500 flex items-center gap-2 flex-wrap mt-1">
                               {persona.corsi.map((c, ci) => (
                                 <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">{GIORNI[c.giorno].substring(0,3)} {c.oraInizio} · {c.nomeCorso}</span>
@@ -4098,8 +4109,8 @@
                             </div>
                           </div>
                           {num
-                            ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" title="Invia gli auguri su WhatsApp"><WhatsAppIcon size={18}/></a>
-                            : <span title="Numero di telefono mancante" className="shrink-0 p-2 rounded-md text-slate-300 bg-slate-100 cursor-not-allowed"><WhatsAppIcon size={18}/></span>}
+                            ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" title="Invia gli auguri su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="shrink-0 p-2 rounded-md hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
+                            : <span title="Numero di telefono mancante" style={{ color: '#cbd5e1', backgroundColor: '#f1f5f9' }} className="shrink-0 p-2 rounded-md cursor-not-allowed"><WhatsAppIcon size={18}/></span>}
                         </li>
                       );
                     })}
