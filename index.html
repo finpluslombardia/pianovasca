@@ -588,6 +588,10 @@
       const [giornoIscritti, setGiornoIscritti] = useState(() => (new Date().getDay() + 6) % 7); // 0 = Lunedì
       const [iscrittiPeriodo, setIscrittiPeriodo] = useState(null); // null | 'primo' | 'secondo' | 'annuale'
       const [ricercaIscrittiPeriodo, setRicercaIscrittiPeriodo] = useState('');
+      const [soloDaRinnovare, setSoloDaRinnovare] = useState(true);
+      const [filtroLivelloRic, setFiltroLivelloRic] = useState('');   // '' | 'idAttivita:livello'
+      const [filtroPeriodoRic, setFiltroPeriodoRic] = useState('');   // '' | 'primo' | 'secondo' | 'annuale'
+      const [filtroCertRic, setFiltroCertRic] = useState('');         // '' | 'scaduto' | 'scade30' | 'mancante'
       const [soloConPosti, setSoloConPosti] = useState(true);
       const [periodoDisp, setPeriodoDisp] = useState('settimana'); // 'settimana' | 'primo' | 'secondo' | 'annuale'
       const [catDispEspansa, setCatDispEspansa] = useState(null);
@@ -1248,7 +1252,8 @@
                       email: normalizzaEmail(email || (esistente ? esistente.email : '') || ''),
                       sesso: sesso || (esistente ? esistente.sesso : '') || rilevaSesso(nome),
                       livelloSocio: livelloSocio !== undefined ? (livelloSocio || '') : ((esistente && esistente.livelloSocio) || ''),
-                      certMsgScad: (esistente && esistente.certMsgScad) || ''
+                      certMsgScad: (esistente && esistente.certMsgScad) || '',
+                      rinnovoMsgFine: (esistente && esistente.rinnovoMsgFine) || ''
                   }
               };
           });
@@ -1296,7 +1301,8 @@
                   telefono: esisteGia ? (esisteGia.telefono || '') : '',
                   email: esisteGia ? (esisteGia.email || '') : '',
                   livelloSocio: esisteGia ? (esisteGia.livelloSocio || '') : '',
-                  certMsgScad: esisteGia ? (esisteGia.certMsgScad || '') : ''
+                  certMsgScad: esisteGia ? (esisteGia.certMsgScad || '') : '',
+                  rinnovoMsgFine: esisteGia ? (esisteGia.rinnovoMsgFine || '') : ''
               };
 
               if (esisteGia) aggiornati++; else nuovi++;
@@ -1504,7 +1510,7 @@
       }, [stagioneSelezionata, inizioSettimana]);
 
       const disponibilita = useMemo(() => {
-          if (!isDisponibilitaOpen) return [];
+          if (!isDisponibilitaOpen || periodoDisp === 'rinnovi') return [];
           const iv = intervalliDisp[periodoDisp] || intervalliDisp.settimana;
           const ms = (ymd, fineGiorno) => { const [y, mo, d] = ymd.split('-').map(Number); return fineGiorno ? new Date(y, mo - 1, d, 23, 59, 59, 999).getTime() : new Date(y, mo - 1, d, 0, 0, 0, 0).getTime(); };
           const startRange = ms(iv.inizio, false), endRange = ms(iv.fine, true);
@@ -1615,6 +1621,64 @@
               });
           return { data: formatDate(ymd), corsi, totale: persone.size };
       }, [isIscrittiGiornoOpen, giornoIscritti, inizioSettimana, tuttiCorsiSelect, attivita]);
+
+      // --- RINNOVI: chi ha il primo periodo (che finisce a fine gennaio) e va ricontattato per il secondo ---
+      const statoRinnovi = useMemo(() => {
+          const prim = intervalliDisp.primo;
+          const giorniAbb = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+          const mappa = {};
+          tuttiCorsiSelect.forEach(c => {
+              const info = attivita.find(a => a.id === c.data.id);
+              (c.data.partecipanti || []).forEach(p => {
+                  if (!p || !p.nome) return;
+                  const per = (p.iscrizioni || []).filter(i => i.fine);
+                  if (per.length === 0) return;
+                  const key = String(p.nome).toLowerCase().trim();
+                  if (!mappa[key]) mappa[key] = { key, nome: p.nome, telefono: '', corsi: [], haPrimo: false, rinnovato: false };
+                  const m = mappa[key];
+                  if (!m.telefono && p.telefono) m.telefono = p.telefono;
+                  per.forEach(i => { if (i.fine === prim.fine) m.haPrimo = true; if (i.fine > prim.fine) m.rinnovato = true; });
+                  const lab = `${giorniAbb[c.giorno]} ${c.oraInizio} · ${info ? info.name : 'Corso'}`;
+                  if (!m.corsi.includes(lab)) m.corsi.push(lab);
+              });
+          });
+          const lista = Object.values(mappa).filter(m => m.haPrimo).map(m => {
+              const arc = archivioSoci[m.key] || {};
+              return { ...m, nome: arc.nome || m.nome, telefono: arc.telefono || m.telefono, inviato: arc.rinnovoMsgFine === prim.fine };
+          });
+          lista.sort((a, b) => (a.rinnovato - b.rinnovato) || a.nome.localeCompare(b.nome, 'it'));
+          const giorniAlla = Math.round((new Date(prim.fine + 'T00:00:00') - new Date(new Date().setHours(0, 0, 0, 0))) / 86400000);
+          return { lista, daRinnovare: lista.filter(r => !r.rinnovato), rinnovati: lista.filter(r => r.rinnovato), fine: prim.fine, giorniAlla, inFinestra: giorniAlla >= -7 && giorniAlla <= 30 };
+      }, [tuttiCorsiSelect, attivita, archivioSoci, intervalliDisp]);
+
+      const segnaRinnovoInviato = (key, nome, inviato) => {
+          setArchivioSoci(prev => {
+              const esistente = prev[key] || { nome: nome };
+              return { ...prev, [key]: { ...esistente, rinnovoMsgFine: inviato ? intervalliDisp.primo.fine : '' } };
+          });
+      };
+      const messaggioRinnovo = (r) => {
+          const sec = intervalliDisp.secondo;
+          return `Ciao ${soloNomeProprio(r.nome)}! 👋\nIl tuo periodo di iscrizione ai corsi del Centro Federale Lampugnano termina il ${formatDate(intervalliDisp.primo.fine)}.\nVuoi rinnovare per il secondo periodo (${formatDate(sec.inizio)} - ${formatDate(sec.fine)})? Scrivici e ti riserviamo il posto 🏊\nGrazie!`;
+      };
+      const renderRigaRinnovo = (r) => {
+          const num = numeroPerWhatsapp(r.telefono);
+          return (
+              <li key={r.key} className={`flex items-center gap-3 px-4 py-2.5 ${r.rinnovato || r.inviato ? 'bg-slate-50' : ''}`}>
+                  <button onClick={() => segnaRinnovoInviato(r.key, r.nome, !r.inviato)} title={r.inviato ? 'Messaggio inviato: clicca per togliere la spunta' : 'Spunta quando il messaggio è stato inviato'} className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${r.inviato ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white hover:border-emerald-400'}`}>
+                      {r.inviato && <CheckIcon size={14} className="text-white"/>}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                      <div className={`font-semibold text-sm ${r.inviato || r.rinnovato ? 'text-slate-400' : 'text-slate-800'} ${r.inviato ? 'line-through' : ''}`}>{r.nome}</div>
+                      <div className="flex flex-wrap gap-1.5 mt-1">{r.corsi.map((c, i) => <span key={i} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">{c}</span>)}</div>
+                  </div>
+                  <span className={`shrink-0 text-[11px] font-bold uppercase px-2 py-1 rounded-full ${r.rinnovato ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{r.rinnovato ? 'Già rinnovato' : 'Da rinnovare'}</span>
+                  {num
+                      ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(messaggioRinnovo(r))}`} target="_blank" rel="noopener noreferrer" title="Proponi il rinnovo su WhatsApp" className="shrink-0 p-2 rounded-md text-[#25D366] hover:text-[#1ebe57] bg-green-50 hover:bg-green-100"><WhatsAppIcon size={18}/></a>
+                      : <span title="Numero di telefono mancante" className="shrink-0 p-2 rounded-md text-slate-300 bg-slate-100 cursor-not-allowed"><WhatsAppIcon size={18}/></span>}
+              </li>
+          );
+      };
 
       // Formatta il/i periodo/i di iscrizione di un partecipante (es. "dal 01/09/2026 al 30/06/2027")
       const formattaPeriodoIscrizione = (iscrizioni) => {
@@ -2235,27 +2299,37 @@
       };
 
       // --- LOGICA RICERCA SOCIO ---
+      const filtriRicAttivi = !!(filtroLivelloRic || filtroPeriodoRic || filtroCertRic);
       const searchResults = useMemo(() => {
-          if (!searchQuery.trim() || searchQuery.length < 2) return [];
+          const q = searchQuery.trim().toLowerCase();
+          const usaTesto = q.length >= 2;
+          if (!usaTesto && !filtriRicAttivi) return [];
+          const oggiYMD = toYMD(new Date());
+          const tra30YMD = toYMD(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+          const ivP = filtroPeriodoRic ? intervalliDisp[filtroPeriodoRic] : null;
           const results = [];
-          const query = searchQuery.toLowerCase();
-          
+          const visti = new Set();
           tuttiCorsiSelect.forEach(c => {
-              if (c.data.partecipanti) {
-                  c.data.partecipanti.forEach(p => {
-                      if (p.nome.toLowerCase().includes(query)) {
-                          results.push({
-                              partecipante: p,
-                              corso: c
-                          });
-                      }
-                  });
-              }
+              (c.data.partecipanti || []).forEach(p => {
+                  if (!p || !p.nome) return;
+                  const key = p.nome.toLowerCase().trim();
+                  if (usaTesto && !key.includes(q)) return;
+                  const arc = archivioSoci[key] || {};
+                  if (filtroLivelloRic && (arc.livelloSocio || p.livelloSocio || '') !== filtroLivelloRic) return;
+                  if (ivP && !(p.iscrizioni || []).some(i => i.inizio === ivP.inizio && i.fine === ivP.fine)) return;
+                  if (filtroCertRic) {
+                      const sc = arc.scadCertificato || p.scadCertificato || '';
+                      if (filtroCertRic === 'mancante' && sc) return;
+                      if (filtroCertRic === 'scaduto' && !(sc && sc < oggiYMD)) return;
+                      if (filtroCertRic === 'scade30' && !(sc && sc >= oggiYMD && sc <= tra30YMD)) return;
+                  }
+                  if (!usaTesto) { if (visti.has(key)) return; visti.add(key); }
+                  results.push({ partecipante: p, corso: c });
+              });
           });
-          // Ordina alfabeticamente
           results.sort((a, b) => a.partecipante.nome.localeCompare(b.partecipante.nome));
           return results;
-      }, [searchQuery, tuttiCorsiSelect]);
+      }, [searchQuery, tuttiCorsiSelect, archivioSoci, filtroLivelloRic, filtroPeriodoRic, filtroCertRic, intervalliDisp]);
 
       // Quando si apre un corso dalla ricerca, la persona cercata viene evidenziata nell'elenco
       // iscritti (e l'elenco scorre fino a lei). L'informazione vive dentro editModal: quando il
@@ -3295,13 +3369,41 @@
                       className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm text-lg" 
                     />
                   </div>
+                  <div className="grid grid-cols-3 gap-3 mt-3">
+                    <select value={filtroLivelloRic} onChange={e => setFiltroLivelloRic(e.target.value)} className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white outline-none cursor-pointer" title="Filtra per livello attuale della persona">
+                      <option value="">Livello: tutti</option>
+                      {attivita.filter(a => a.levels && a.levels.length > 0).map(a => (
+                        <optgroup key={a.id} label={a.name}>
+                          {a.levels.map(l => <option key={a.id + ':' + l.val} value={a.id + ':' + l.val}>{l.noNumero ? l.name : `Liv. ${l.val} - ${l.name}`}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <select value={filtroPeriodoRic} onChange={e => setFiltroPeriodoRic(e.target.value)} className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white outline-none cursor-pointer" title="Filtra per periodo di iscrizione">
+                      <option value="">Periodo: tutti</option>
+                      <option value="primo">Primo periodo</option>
+                      <option value="secondo">Secondo periodo</option>
+                      <option value="annuale">Annuale</option>
+                    </select>
+                    <select value={filtroCertRic} onChange={e => setFiltroCertRic(e.target.value)} className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white outline-none cursor-pointer" title="Filtra per certificato medico">
+                      <option value="">Certificato: tutti</option>
+                      <option value="scaduto">Scaduto</option>
+                      <option value="scade30">In scadenza (30 giorni)</option>
+                      <option value="mancante">Mancante</option>
+                    </select>
+                  </div>
+                  {filtriRicAttivi && (
+                    <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                      <span>{searchResults.length} risultati{searchResults.length >= 300 ? ' (mostrati i primi 300)' : ''}</span>
+                      <button onClick={() => { setFiltroLivelloRic(''); setFiltroPeriodoRic(''); setFiltroCertRic(''); }} className="font-bold text-blue-600 hover:underline">Azzera filtri</button>
+                    </div>
+                  )}
                 </div>
                 <div className="overflow-y-auto flex-1 bg-white" style={{ minHeight: '300px' }}>
-                  {searchQuery.length > 0 && searchQuery.length < 2 ? (
+                  {searchQuery.length > 0 && searchQuery.length < 2 && !filtriRicAttivi ? (
                     <div className="p-8 text-center text-slate-500">Digita almeno 2 caratteri per cercare...</div>
                   ) : searchResults.length > 0 ? (
                     <ul className="divide-y divide-slate-100">
-                      {searchResults.map((res, i) => {
+                      {searchResults.slice(0, 300).map((res, i) => {
                         const infoAtt = attivita.find(a => a.id === res.corso.data.id);
                         const nomeLiv = infoAtt?.isFreeTextLevel ? res.corso.data.livello : infoAtt?.levels?.find(l => l.val === res.corso.data.livello)?.name;
                         const nomeCompleto = nomeLiv ? `${infoAtt?.name} - ${nomeLiv}` : infoAtt?.name;
@@ -3344,8 +3446,8 @@
                         );
                       })}
                     </ul>
-                  ) : searchQuery.length >= 2 ? (
-                    <div className="p-8 text-center text-slate-500">Nessun socio trovato con "{searchQuery}"</div>
+                  ) : (searchQuery.length >= 2 || filtriRicAttivi) ? (
+                    <div className="p-8 text-center text-slate-500">Nessun socio trovato{searchQuery.length >= 2 ? ` con "${searchQuery}"` : ''}{filtriRicAttivi ? ' con questi filtri' : ''}</div>
                   ) : (
                     <div className="p-8 text-center text-slate-400">Inserisci il nome da cercare nel campo in alto.</div>
                   )}
@@ -3435,20 +3537,33 @@
                       </div>
                     </div>
                     <div className="flex">
-                      {['settimana', 'primo', 'secondo', 'annuale'].map(id => (
+                      {['settimana', 'primo', 'secondo', 'annuale', 'rinnovi'].map(id => (
                         <button key={id} onClick={() => setPeriodoDisp(id)} className={`flex-1 py-2 text-sm font-bold transition-all border-b-4 border-transparent leading-tight ${periodoDisp === id ? 'bg-white/20' : 'opacity-80 hover:bg-white/5'}`}>
-                          {intervalliDisp[id].label}
-                          <div className="text-[11px] font-medium text-white/75">{formatDate(intervalliDisp[id].inizio)} - {formatDate(intervalliDisp[id].fine)}</div>
+                          {id === 'rinnovi' ? <>Rinnovi {statoRinnovi.daRinnovare.length > 0 && <span className="ml-1 bg-amber-400 text-slate-900 text-[11px] px-1.5 py-0.5 rounded-full">{statoRinnovi.daRinnovare.length}</span>}</> : intervalliDisp[id].label}
+                          <div className="text-[11px] font-medium text-white/75">{id === 'rinnovi' ? 'Primo → secondo periodo' : `${formatDate(intervalliDisp[id].inizio)} - ${formatDate(intervalliDisp[id].fine)}`}</div>
                         </button>
                       ))}
                     </div>
                   </div>
+                  {periodoDisp === 'rinnovi' ? (
+                  <div className="flex-1 overflow-y-auto bg-slate-50 p-5 flex flex-col gap-3">
+                    <p className="shrink-0 text-xs text-slate-500">Persone con il <b>primo periodo</b> ({formatDate(intervalliDisp.primo.inizio)} - {formatDate(intervalliDisp.primo.fine)}) da ricontattare per il <b>secondo</b> ({formatDate(intervalliDisp.secondo.inizio)} - {formatDate(intervalliDisp.secondo.fine)}). Chi ha già un periodo oltre il {formatDate(intervalliDisp.primo.fine)} risulta "Già rinnovato". La spunta verde (messaggio inviato) viene salvata.</p>
+                    {(soloDaRinnovare ? statoRinnovi.daRinnovare : statoRinnovi.lista).length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">{statoRinnovi.lista.length === 0 ? 'Nessuna persona con il primo periodo in questa stagione.' : 'Tutti hanno già rinnovato.'}</div>
+                    ) : (
+                      <ul className="shrink-0 bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                        {(soloDaRinnovare ? statoRinnovi.daRinnovare : statoRinnovi.lista).map(r => renderRigaRinnovo(r))}
+                      </ul>
+                    )}
+                  </div>
+                  ) : (
                   <div className="flex-1 overflow-y-auto bg-slate-50 p-5 flex flex-col gap-3">
                     {disponibilita.length === 0 && <p className="text-sm text-slate-500">Nessun corso con un numero massimo di partecipanti attivo in questo periodo.</p>}
                     {periodoDisp !== 'settimana' && disponibilita.length > 0 && <p className="shrink-0 text-xs text-slate-500">Per i periodi, gli iscritti sono il <b>picco</b> di presenze nelle settimane del periodo: i posti liberi sono quelli rimasti per chi si iscrive per tutto il periodo. Contano solo i corsi attivi in quelle date.</p>}
                     {disponibilita.map(k => {
                       const aperta = catDispEspansa === k.info.id;
                       const perc = k.posti ? Math.min(100, Math.round(k.iscritti / k.posti * 100)) : 0;
+                      const attesaCat = contattiAttesaAttivi.filter(c => c.motivazione === 'corso' && c.corsoRichiesto === k.info.id);
                       return (
                         <div key={k.info.id} className="shrink-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                           <button onClick={() => setCatDispEspansa(aperta ? null : k.info.id)} className="w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-slate-50 transition-colors">
@@ -3456,7 +3571,9 @@
                             <span className={`shrink-0 px-3 py-1 rounded-md text-sm font-bold border ${k.info.color} ${k.info.border}`}>{k.info.name}</span>
                             <div className="flex-1 min-w-0">
                               <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full rounded-full ${perc >= 100 ? 'bg-red-400' : perc >= 85 ? 'bg-amber-400' : 'bg-emerald-400'}`} style={{ width: perc + '%' }}></div></div>
-                              <div className="text-xs text-slate-500 mt-1">{k.iscritti} iscritti su {k.posti} posti · {k.corsi} {k.corsi === 1 ? 'corso' : 'corsi'}{k.senzaLimite > 0 ? ` (+${k.senzaLimite} senza limite)` : ''}</div>
+                              <div className="text-xs text-slate-500 mt-1">{k.iscritti} iscritti su {k.posti} posti · {k.corsi} {k.corsi === 1 ? 'corso' : 'corsi'}{k.senzaLimite > 0 ? ` (+${k.senzaLimite} senza limite)` : ''}
+                                {attesaCat.length > 0 && <span className={`ml-2 px-2 py-0.5 rounded-full font-bold ${k.liberi > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>⏳ {attesaCat.length} in lista d'attesa{k.liberi > 0 ? ' · posti disponibili!' : ''}</span>}
+                              </div>
                             </div>
                             <div className="shrink-0 text-right w-28">
                               <div className={`text-2xl font-bold leading-none ${colLiberi(k.liberi)}`}>{k.liberi}</div>
@@ -3465,6 +3582,27 @@
                           </button>
                           {aperta && (
                             <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/60 flex flex-col gap-3">
+                              {attesaCat.length > 0 && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                  <div className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-1">In lista d'attesa per {k.info.name} ({attesaCat.length}){k.liberi > 0 ? ' · avvisali: ci sono posti' : ''}</div>
+                                  <div className="flex flex-col gap-1">
+                                    {attesaCat.map((c, ci) => {
+                                      const num = numeroPerWhatsapp(c.telefono);
+                                      const testoA = c.nomeGenitore
+                                        ? `Buongiorno ${soloNomeProprio(c.nomeGenitore)}, dal Centro Federale Lampugnano: si è liberato un posto nei corsi di ${k.info.name} per ${soloNomeProprio(c.nome)}. Siete ancora interessati? Fateci sapere 🏊`
+                                        : `Ciao ${soloNomeProprio(c.nome)}! Dal Centro Federale Lampugnano: si è liberato un posto nei corsi di ${k.info.name}. Sei ancora interessato/a? Fammi sapere 🏊`;
+                                      return (
+                                        <div key={ci} className="flex items-center justify-between gap-2 text-sm">
+                                          <span className="text-slate-700"><b>{c.nome}</b>{c.eta ? ` · ${c.eta} anni` : ''}{c.dataCreazione ? <span className="text-slate-400"> · dal {formatDate(c.dataCreazione)}</span> : null}</span>
+                                          {num
+                                            ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testoA)}`} target="_blank" rel="noopener noreferrer" title="Avvisa su WhatsApp" className="shrink-0 p-1.5 rounded-md text-[#25D366] bg-white hover:bg-green-100"><WhatsAppIcon size={16}/></a>
+                                            : <span title="Numero mancante" className="shrink-0 p-1.5 rounded-md text-slate-300 bg-slate-100"><WhatsAppIcon size={16}/></span>}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                               {k.livelli.map(L => {
                                 const righe = soloConPosti ? L.elenco.filter(r => r.liberi > 0) : L.elenco;
                                 if (righe.length === 0) return null;
@@ -3495,13 +3633,23 @@
                       );
                     })}
                   </div>
+                  )}
                   <div className="px-6 py-3 border-t border-slate-200 flex items-center justify-between bg-white">
+                    {periodoDisp === 'rinnovi' ? (
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer select-none">
+                      <input type="checkbox" checked={soloDaRinnovare} onChange={e => setSoloDaRinnovare(e.target.checked)} className="w-4 h-4 accent-[#1e3a5f]" />
+                      Mostra solo chi è da rinnovare
+                    </label>
+                    ) : (
                     <label className="flex items-center gap-2 text-sm font-medium text-slate-600 cursor-pointer select-none">
                       <input type="checkbox" checked={soloConPosti} onChange={e => setSoloConPosti(e.target.checked)} className="w-4 h-4 accent-[#1e3a5f]" />
                       Nel dettaglio mostra solo i corsi con posti liberi
                     </label>
+                    )}
                     <div className="flex items-center gap-4">
-                      <span className="text-sm font-bold text-slate-600">Totale: <span className={colLiberi(totLiberi)}>{totLiberi}</span> posti liberi su {totPosti}</span>
+                      {periodoDisp === 'rinnovi'
+                        ? <span className="text-sm font-bold text-slate-600">Da rinnovare: <span className="text-amber-600">{statoRinnovi.daRinnovare.length}</span> · Già rinnovati: <span className="text-emerald-600">{statoRinnovi.rinnovati.length}</span></span>
+                        : <span className="text-sm font-bold text-slate-600">Totale: <span className={colLiberi(totLiberi)}>{totLiberi}</span> posti liberi su {totPosti}</span>}
                       <button onClick={() => setIsDisponibilitaOpen(false)} className="px-5 py-2.5 bg-[#1e3a5f] hover:bg-[#2a4d7c] text-white rounded-lg font-bold shadow-md transition-all">Chiudi</button>
                     </div>
                   </div>
@@ -3809,6 +3957,8 @@
                   <div className="flex">
                     <button onClick={() => setTabOggi('inserimenti')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'inserimenti' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Nuovi inserimenti<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{inseritiOggi.length}</span></button>
                     <button onClick={() => setTabOggi('compleanni')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'compleanni' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Compleanni<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{compleanniOggi.length}</span></button>
+                    <button onClick={() => setTabOggi('certificati')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'certificati' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Certificati<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{utentiConScadenze.scaduti.length + utentiConScadenze.inScadenza.length}</span></button>
+                    <button onClick={() => setTabOggi('rinnovi')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'rinnovi' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Rinnovi<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{statoRinnovi.inFinestra ? statoRinnovi.daRinnovare.length : 0}</span></button>
                   </div>
                 </div>
                 <div className="overflow-y-auto flex-1 bg-white" style={{ minHeight: '240px' }}>
@@ -3885,6 +4035,49 @@
                 </div>
 
                 )}
+                {/* CERTIFICATI IN SCADENZA / SCADUTI */}
+                {tabOggi === 'certificati' && (
+                  <div>
+                    <div className="px-5 py-2 border-b border-slate-100 flex justify-end">
+                      <button onClick={() => { setIsInseritiOggiOpen(false); setIsScadenzeModalOpen(true); }} className="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">Apri Scadenze (messaggi e WhatsApp)</button>
+                    </div>
+                    {utentiConScadenze.scaduti.length + utentiConScadenze.inScadenza.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">Nessun certificato scaduto o in scadenza nei prossimi 30 giorni.</div>
+                    ) : (
+                      <ul className="divide-y divide-slate-100">
+                        {[...utentiConScadenze.scaduti.map(u => ({ ...u, scaduto: true })), ...utentiConScadenze.inScadenza.map(u => ({ ...u, scaduto: false }))].map((u, i) => (
+                          <li key={i} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                            <div className="min-w-0">
+                              <div className="font-semibold text-sm text-slate-800">{u.nome}</div>
+                              <div className="flex flex-wrap gap-1.5 mt-1">{(u.corsi || []).slice(0, 4).map((c, ci) => <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">{c.testo || c}</span>)}</div>
+                            </div>
+                            <span className={`shrink-0 text-xs font-bold px-2 py-1 rounded-full ${u.scaduto ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>{u.scaduto ? 'Scaduto' : 'Scade'} {formatDate(u.scadCertificato)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* RINNOVI DEL PRIMO PERIODO */}
+                {tabOggi === 'rinnovi' && (
+                  <div>
+                    {!statoRinnovi.inFinestra ? (
+                      <div className="p-8 text-center text-slate-500">
+                        Il primo periodo termina il <b>{formatDate(statoRinnovi.fine)}</b>: i rinnovi compariranno qui nei 30 giorni precedenti.
+                        <div className="mt-3"><button onClick={() => { setIsInseritiOggiOpen(false); setPeriodoDisp('rinnovi'); setIsDisponibilitaOpen(true); }} className="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">Apri l'elenco completo dei rinnovi</button></div>
+                      </div>
+                    ) : statoRinnovi.daRinnovare.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">Tutti hanno già rinnovato.</div>
+                    ) : (
+                      <>
+                        <div className="px-5 py-2 border-b border-slate-100 text-xs text-slate-500">Il primo periodo termina il {formatDate(statoRinnovi.fine)} ({statoRinnovi.giorniAlla >= 0 ? `tra ${statoRinnovi.giorniAlla} giorni` : `${-statoRinnovi.giorniAlla} giorni fa`}).</div>
+                        <ul className="divide-y divide-slate-100">{statoRinnovi.daRinnovare.map(r => renderRigaRinnovo(r))}</ul>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* COMPLEANNI DI OGGI */}
                 {tabOggi === 'compleanni' && (<>
                 {compleanniOggi.length === 0 ? (
@@ -5316,6 +5509,7 @@
                     <button
                       onClick={() => {
                         setSearchQuery('');
+                        setFiltroLivelloRic(''); setFiltroPeriodoRic(''); setFiltroCertRic('');
                         setIsSearchModalOpen(true);
                       }}
                       className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-800 rounded-md text-sm font-medium transition-colors"
