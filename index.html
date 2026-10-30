@@ -600,7 +600,7 @@
       const [soloConPosti, setSoloConPosti] = useState(true);
       const [periodoDisp, setPeriodoDisp] = useState('settimana'); // 'settimana' | 'primo' | 'secondo' | 'annuale'
       const [catDispEspansa, setCatDispEspansa] = useState(null);
-      const [tabOggi, setTabOggi] = useState('inserimenti'); // 'inserimenti' | 'compleanni'
+      const [tabOggi, setTabOggi] = useState('compleanni'); // 'inserimenti' | 'compleanni'
       const [personaOggiEspansa, setPersonaOggiEspansa] = useState(null);
 
       // --- STATI LISTA D'ATTESA (contatti da ricontattare, indipendente dal piano vasca) ---
@@ -2084,6 +2084,14 @@
 
           return { scaduti, inScadenza };
       }, [tuttiCorsiSelect, attivita, archivioSoci, stagioneSelezionata]);
+
+      // Per "Oggi": certificati SCADUTI di chi ha un corso nel giorno della settimana di oggi (mostrati solo i corsi di oggi).
+      const certificatiScadutiOggi = useMemo(() => {
+          const giornoOggi = (new Date().getDay() + 6) % 7;
+          return utentiConScadenze.scaduti
+              .map(u => ({ ...u, corsiOggi: (u.corsi || []).filter(c => c.giorno === giornoOggi).sort((a, b) => String(a.oraInizio).localeCompare(String(b.oraInizio))) }))
+              .filter(u => u.corsiOggi.length > 0);
+      }, [utentiConScadenze]);
 
       // Elenco di chi non ha "documentiFirmati" a "sì" (quindi "no" oppure ancora da verificare),
       // indipendentemente dal certificato medico. Stessa logica di raccolta corsi delle scadenze.
@@ -4126,11 +4134,11 @@
                     <button onClick={() => { setIsInseritiOggiOpen(false); setPersonaOggiEspansa(null); }} className="hover:bg-black/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                   </div>
                   <div className="flex">
-                    <button onClick={() => setTabOggi('inserimenti')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'inserimenti' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Nuovi inserimenti<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{inseritiOggi.length}</span></button>
                     <button onClick={() => setTabOggi('compleanni')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'compleanni' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Compleanni<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{compleanniOggi.length}</span></button>
-                    <button onClick={() => setTabOggi('certificati')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'certificati' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Certificati<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{utentiConScadenze.scaduti.length + utentiConScadenze.inScadenza.length}</span></button>
-                    <button onClick={() => setTabOggi('rinnovi')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'rinnovi' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Rinnovi<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{statoRinnovi.inFinestra ? statoRinnovi.daRinnovare.length : 0}</span></button>
+                    <button onClick={() => setTabOggi('certificati')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'certificati' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Certificati<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{certificatiScadutiOggi.length}</span></button>
+                    <button onClick={() => setTabOggi('inserimenti')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'inserimenti' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Nuovi inserimenti<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{inseritiOggi.length}</span></button>
                     <button onClick={() => setTabOggi('spostamenti')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'spostamenti' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Spostamenti<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{spostamentiOggi.length}</span></button>
+                    <button onClick={() => setTabOggi('rinnovi')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'rinnovi' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Rinnovi<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{statoRinnovi.inFinestra ? statoRinnovi.daRinnovare.length : 0}</span></button>
                   </div>
                 </div>
                 <div className="overflow-y-auto flex-1 bg-white" style={{ minHeight: '240px' }}>
@@ -4242,25 +4250,34 @@
                   </div>
                 )}
 
-                {/* CERTIFICATI IN SCADENZA / SCADUTI */}
+                {/* CERTIFICATI SCADUTI DI CHI HA UN CORSO OGGI */}
                 {tabOggi === 'certificati' && (
                   <div>
-                    <div className="px-5 py-2 border-b border-slate-100 flex justify-end">
-                      <button onClick={() => { setIsInseritiOggiOpen(false); setIsScadenzeModalOpen(true); }} className="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">Apri Scadenze (messaggi e WhatsApp)</button>
+                    <div className="px-5 py-2 border-b border-slate-100 flex items-center justify-between gap-3">
+                      <span className="text-xs text-slate-500">Certificati <b>scaduti</b> di chi ha un corso oggi ({GIORNI[(new Date().getDay() + 6) % 7]}).</span>
+                      <button onClick={() => { setIsInseritiOggiOpen(false); setIsScadenzeModalOpen(true); }} className="shrink-0 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-bold transition-colors">Apri Scadenze (tutte, con messaggi e WhatsApp)</button>
                     </div>
-                    {utentiConScadenze.scaduti.length + utentiConScadenze.inScadenza.length === 0 ? (
-                      <div className="p-8 text-center text-slate-400">Nessun certificato scaduto o in scadenza nei prossimi 30 giorni.</div>
+                    {certificatiScadutiOggi.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">Nessun certificato scaduto tra gli iscritti ai corsi di oggi.</div>
                     ) : (
                       <ul className="divide-y divide-slate-100">
-                        {[...utentiConScadenze.scaduti.map(u => ({ ...u, scaduto: true })), ...utentiConScadenze.inScadenza.map(u => ({ ...u, scaduto: false }))].map((u, i) => (
+                        {certificatiScadutiOggi.map((u, i) => {
+                          const num = numeroPerWhatsapp(u.telefono);
+                          return (
                           <li key={i} className="flex items-center justify-between gap-3 px-4 py-2.5">
                             <div className="min-w-0">
                               <div className="font-semibold text-sm text-slate-800">{u.nome}</div>
-                              <div className="flex flex-wrap gap-1.5 mt-1">{(u.corsi || []).slice(0, 4).map((c, ci) => <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">{c.testo || c}</span>)}</div>
+                              <div className="flex flex-wrap gap-1.5 mt-1">{u.corsiOggi.map((c, ci) => <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">{c.oraInizio} · {c.nomeCorso}</span>)}</div>
                             </div>
-                            <span className={`shrink-0 text-xs font-bold px-2 py-1 rounded-full ${u.scaduto ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>{u.scaduto ? 'Scaduto' : 'Scade'} {formatDate(u.scadCertificato)}</span>
+                            <div className="shrink-0 flex items-center gap-3">
+                              <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-100 text-red-700">Scaduto {formatDate(u.scadCertificato)}</span>
+                              {num
+                                ? <a href={`https://wa.me/${num}`} target="_blank" rel="noopener noreferrer" title="Apri chat WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="p-2 rounded-md hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
+                                : <span title="Numero di telefono mancante" style={{ color: '#cbd5e1', backgroundColor: '#f1f5f9' }} className="p-2 rounded-md cursor-not-allowed"><WhatsAppIcon size={18}/></span>}
+                            </div>
                           </li>
-                        ))}
+                          );
+                        })}
                       </ul>
                     )}
                   </div>
