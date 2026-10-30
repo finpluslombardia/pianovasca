@@ -1743,6 +1743,60 @@
           return lista;
       }, [tuttiCorsiSelect, attivita, archivioSoci]);
 
+      // --- SPOSTAMENTI DI OGGI (persone spostate da un corso a un altro) ---
+      const spostamentiOggi = useMemo(() => {
+          const oggiStr = toYMD(new Date());
+          const mappa = new Map();
+          tuttiCorsiSelect.forEach(c => {
+              const infoAtt = attivita.find(a => a.id === c.data.id);
+              const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
+              const nomeCorsoStr = nomeLiv ? `${infoAtt?.name} - ${nomeLiv}` : (infoAtt?.name || 'Corso');
+              (c.data.partecipanti || []).forEach(p => {
+                  if (!p || !p.nome || p.dataSpostamento !== oggiStr) return;
+                  const key = p.nome.toLowerCase().trim();
+                  let voce = mappa.get(key);
+                  if (!voce) {
+                      const arc = archivioSoci[key] || {};
+                      voce = { key, nome: p.nome, telefono: arc.telefono || p.telefono || '', da: p.spostatoDa || '', a: [], inviato: true };
+                      mappa.set(key, voce);
+                  }
+                  if (!p.spostamentoInviato) voce.inviato = false;
+                  if (!voce.a.some(x => x.nomeCorso === nomeCorsoStr && x.oraInizio === c.oraInizio && x.giorno === c.giorno)) {
+                      voce.a.push({ nomeCorso: nomeCorsoStr, giorno: c.giorno, oraInizio: c.oraInizio || '', periodo: formattaPeriodoIscrizione(p.iscrizioni) });
+                  }
+              });
+          });
+          const lista = Array.from(mappa.values());
+          lista.sort((x, y) => x.nome.localeCompare(y.nome));
+          return lista;
+      }, [tuttiCorsiSelect, attivita, archivioSoci]);
+
+      const messaggioSpostamento = (v) => {
+          const dest = v.a.map(x => `${x.nomeCorso} il ${GIORNI[x.giorno]} alle ore ${x.oraInizio}${x.periodo ? `, nel periodo ${x.periodo}` : ''}`).join('; ');
+          return `Ciao ${soloNomeProprio(v.nome)}, ti confermiamo lo spostamento dal corso ${v.da || 'precedente'} al nuovo corso: ${dest}.\n\nA presto in vasca! 🏊\nCentro Federale Lampugnano`;
+      };
+      const aggiornaSpostamentoOggi = (nomePersona, patch) => {
+          const pKey = nomePersona.toLowerCase().trim();
+          const oggiStr = toYMD(new Date());
+          setTuttiPiani(prevTutti => {
+              const prevSeason = prevTutti[stagioneSelezionata] || {};
+              const nuovoPiano = { ...prevSeason };
+              Object.keys(nuovoPiano).forEach(k => {
+                  const cell = nuovoPiano[k];
+                  if (!cell.partecipanti || cell.partecipanti.length === 0) return;
+                  let cambiata = false;
+                  const nuovi = cell.partecipanti.map(pp => {
+                      if (pp && pp.nome && pp.nome.toLowerCase().trim() === pKey && pp.dataSpostamento === oggiStr) { cambiata = true; return { ...pp, ...patch }; }
+                      return pp;
+                  });
+                  if (cambiata) nuovoPiano[k] = { ...cell, partecipanti: nuovi };
+              });
+              return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
+          });
+      };
+      const segnaSpostamentoInviato = (nome, inviato) => aggiornaSpostamentoOggi(nome, { spostamentoInviato: !!inviato });
+      const rimuoviSpostamentoOggi = (nome) => aggiornaSpostamentoOggi(nome, { dataSpostamento: '', spostatoDa: '', spostamentoInviato: false });
+
       // Messaggio di auguri per i compleanni (Oggi → Compleanni). I nomi sono salvati come "Cognome Nome":
       // per il saluto si usa solo il nome (si salta il cognome, anche se composto da particelle come "Dal Lago").
       const soloNomeProprio = (nomeCompleto) => {
@@ -2596,10 +2650,15 @@
         if (max > 0 && attivi >= max && !window.confirm(`Il corso di destinazione è al completo (${attivi}/${max}). Spostare comunque ${p.nome}?`)) return;
         const infoD = attivita.find(a => a.id === corsoDest.data.id);
         const etichettaD = `${GIORNI[corsoDest.giorno]} ${corsoDest.oraInizio} · ${infoD ? infoD.name : 'Corso'}`;
+        // Etichetta del corso di provenienza (per il messaggio "Spostamenti" in Oggi)
+        const infoO = attivita.find(a => a.id === editModal.attivitaId);
+        const nomeLivO = infoO && (infoO.isFreeTextLevel ? editModal.livello : (infoO.levels || []).find(l => l.val === editModal.livello)?.name);
+        const daEtichetta = `${infoO ? infoO.name : 'Corso'}${nomeLivO ? ' - ' + nomeLivO : ''} (${GIORNI[editModal.giorno]} ${editModal.oraInizio})`;
+        const pSpostato = { ...p, dataSpostamento: toYMD(new Date()), spostatoDa: daEtichetta, spostamentoInviato: false };
         setTuttiPiani(prev => {
             const season = { ...(prev[stagioneSelezionata] || {}) };
             (corsoDest.keys || []).forEach(k => {
-                if (season[k]) season[k] = { ...season[k], partecipanti: [...(season[k].partecipanti || []), p].sort((a, b) => String(a.nome).localeCompare(String(b.nome))) };
+                if (season[k]) season[k] = { ...season[k], partecipanti: [...(season[k].partecipanti || []), pSpostato].sort((a, b) => String(a.nome).localeCompare(String(b.nome))) };
             });
             ((editModal.corsoOriginale && editModal.corsoOriginale.keys) || []).forEach(k => {
                 if (season[k]) season[k] = { ...season[k], partecipanti: (season[k].partecipanti || []).filter(x => String(x.nome || '').toLowerCase().trim() !== nomeKey) };
@@ -4071,6 +4130,7 @@
                     <button onClick={() => setTabOggi('compleanni')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'compleanni' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Compleanni<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{compleanniOggi.length}</span></button>
                     <button onClick={() => setTabOggi('certificati')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'certificati' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Certificati<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{utentiConScadenze.scaduti.length + utentiConScadenze.inScadenza.length}</span></button>
                     <button onClick={() => setTabOggi('rinnovi')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'rinnovi' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Rinnovi<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{statoRinnovi.inFinestra ? statoRinnovi.daRinnovare.length : 0}</span></button>
+                    <button onClick={() => setTabOggi('spostamenti')} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent ${tabOggi === 'spostamenti' ? 'bg-white/20' : 'hover:bg-white/5 opacity-80'}`}>Spostamenti<span className="ml-2 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{spostamentiOggi.length}</span></button>
                   </div>
                 </div>
                 <div className="overflow-y-auto flex-1 bg-white" style={{ minHeight: '240px' }}>
@@ -4147,6 +4207,41 @@
                 </div>
 
                 )}
+                {/* SPOSTAMENTI DI OGGI */}
+                {tabOggi === 'spostamenti' && (
+                  <div>
+                    {spostamentiOggi.length === 0 ? (
+                      <div className="p-8 text-center text-slate-400">Nessuno spostamento di corso registrato oggi.<div className="text-xs mt-1">Si registrano con i tre pallini → "Sposta in un altro corso…" nella lista iscritti.</div></div>
+                    ) : (
+                      <ul className="divide-y divide-slate-100">
+                        {spostamentiOggi.map(v => {
+                          const num = numeroPerWhatsapp(v.telefono);
+                          const testo = messaggioSpostamento(v);
+                          return (
+                            <li key={v.key} className={`p-3 flex items-center justify-between gap-3 ${v.inviato ? 'bg-slate-50' : ''}`}>
+                              <button onClick={() => segnaSpostamentoInviato(v.nome, !v.inviato)} title={v.inviato ? 'Messaggio inviato: clicca per togliere la spunta' : 'Spunta quando il messaggio è stato inviato'} className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${v.inviato ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300 bg-white hover:border-emerald-400'}`}>
+                                {v.inviato && <CheckIcon size={14} className="text-white"/>}
+                              </button>
+                              <div className="min-w-0 flex-1">
+                                <div className={`font-semibold text-sm ${v.inviato ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{v.nome}</div>
+                                <div className="text-sm text-slate-500 flex items-center gap-2 flex-wrap mt-1">
+                                  <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-500 font-bold border border-slate-200 text-xs">{v.da || 'Corso precedente'}</span>
+                                  <span className="text-slate-400">→</span>
+                                  {v.a.map((x, i) => <span key={i} className="bg-blue-50 px-2 py-0.5 rounded text-blue-800 font-bold border border-blue-200 text-xs">{GIORNI[x.giorno].substring(0, 3)} {x.oraInizio} · {x.nomeCorso}</span>)}
+                                </div>
+                              </div>
+                              {num
+                                ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" title="Invia il messaggio di spostamento su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="shrink-0 p-2 rounded-md hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
+                                : <button onClick={() => copiaMessaggioOggi(testo)} title="Numero mancante: copia il messaggio" className="shrink-0 p-2 rounded-md text-slate-500 bg-slate-100 hover:bg-slate-200"><CopyIcon size={18}/></button>}
+                              <button onClick={() => rimuoviSpostamentoOggi(v.nome)} title="Rimuovi da questo elenco" className="shrink-0 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"><XIcon size={16}/></button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
                 {/* CERTIFICATI IN SCADENZA / SCADUTI */}
                 {tabOggi === 'certificati' && (
                   <div>
