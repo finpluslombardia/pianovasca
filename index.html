@@ -613,7 +613,7 @@
       const creaContattoAttesaVuoto = () => ({
         nome: '', eta: '', telefono: '', email: '', nomeGenitore: '',
         dataCreazione: new Date().toISOString().split('T')[0], dataScadenza: '',
-        motivazione: '', corsoRichiesto: '', note: '',
+        motivazione: '', corsoRichiesto: '', livelloRichiesto: '', periodoRichiesto: '', note: '',
         operatore: '', andrea: '', istruttore: '', completato: false
       });
       const [nuovoContattoAttesa, setNuovoContattoAttesa] = useState(creaContattoAttesaVuoto());
@@ -1445,9 +1445,16 @@
       const motivazioniNascoste = vociFiltroAttesa.filter(voceFiltroNascosta).length;
       const toggleCorsoAttesa = (checked) => setFiltroMotivazioniAttesa(prev => { const n = { ...prev, corso: checked }; attivita.forEach(a => { n[`corso:${a.id}`] = checked; }); return n; });
       const toggleSottoCorsoAttesa = (id, checked) => setFiltroMotivazioniAttesa(prev => { const n = { ...prev, [`corso:${id}`]: checked }; n.corso = attivita.some(a => n[`corso:${a.id}`] !== false); return n; });
+      const extraCorsoAttesa = (c) => {
+          if (!c || c.motivazione !== 'corso') return '';
+          const info = attivita.find(a => a.id === c.corsoRichiesto);
+          const liv = info && c.livelloRichiesto ? (info.levels || []).find(l => l.val === c.livelloRichiesto) : null;
+          const per = { primo: 'Primo periodo', secondo: 'Secondo periodo', annuale: 'Annuale' }[c.periodoRichiesto] || '';
+          return [liv ? liv.name : '', per].filter(Boolean).join(' · ');
+      };
       const etichettaMotivazioneAttesa = useCallback((c) => {
           if (c.motivazione === 'private') return 'Private';
-          if (c.motivazione === 'corso') return `Corso: ${attivita.find(a => a.id === c.corsoRichiesto)?.name || '-'}`;
+          if (c.motivazione === 'corso') { const ex = extraCorsoAttesa(c); return `Corso: ${attivita.find(a => a.id === c.corsoRichiesto)?.name || '-'}${ex ? ' · ' + ex : ''}`; }
           if (c.motivazione === 'prova') return 'Prova';
           if (c.motivazione === 'altro') return 'Informazioni/Altro';
           return '';
@@ -3704,6 +3711,9 @@
             const totPosti = disponibilita.reduce((t, k) => t + k.posti, 0);
             const totLiberi = disponibilita.reduce((t, k) => t + k.liberi, 0);
             const colLiberi = (n) => n === 0 ? 'text-red-600' : n <= 2 ? 'text-amber-600' : 'text-emerald-600';
+            // Stima netta: dai posti liberi si tolgono le persone in lista d'attesa compatibili con il periodo mostrato.
+            const periodoVista = periodoDisp === 'settimana' ? (intervalliDisp.settimana.inizio <= intervalliDisp.primo.fine ? 'primo' : 'secondo') : periodoDisp;
+            const attesaCompat = (c) => { const pr = c.periodoRichiesto || ''; return !pr || pr === 'annuale' || periodoVista === 'annuale' || pr === periodoVista; };
             return (
               <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsDisponibilitaOpen(false)}>
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
@@ -3743,6 +3753,7 @@
                       const aperta = catDispEspansa === k.info.id;
                       const perc = k.posti ? Math.min(100, Math.round(k.iscritti / k.posti * 100)) : 0;
                       const attesaCat = contattiAttesaAttivi.filter(c => c.motivazione === 'corso' && c.corsoRichiesto === k.info.id);
+                      const nCompatCat = attesaCat.filter(attesaCompat).length;
                       return (
                         <div key={k.info.id} className="shrink-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                           <button onClick={() => setCatDispEspansa(aperta ? null : k.info.id)} className="w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-slate-50 transition-colors">
@@ -3757,6 +3768,7 @@
                             <div className="shrink-0 text-right w-28">
                               <div className={`text-2xl font-bold leading-none ${colLiberi(k.liberi)}`}>{k.liberi}</div>
                               <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mt-1">{k.liberi === 1 ? 'posto libero' : 'posti liberi'}</div>
+                              {nCompatCat > 0 && <div className="text-[11px] font-bold text-amber-700 mt-0.5">≈ {Math.max(0, k.liberi - nCompatCat)} netti</div>}
                             </div>
                           </button>
                           {aperta && (
@@ -3772,7 +3784,7 @@
                                         : `Ciao ${soloNomeProprio(c.nome)}! Dal Centro Federale Lampugnano: si è liberato un posto nei corsi di ${k.info.name}. Sei ancora interessato/a? Fammi sapere 🏊`;
                                       return (
                                         <div key={ci} className="flex items-center justify-between gap-2 text-sm">
-                                          <span className="text-slate-700"><b>{c.nome}</b>{c.eta ? ` · ${c.eta} anni` : ''}{c.dataCreazione ? <span className="text-slate-400"> · dal {formatDate(c.dataCreazione)}</span> : null}</span>
+                                          <span className="text-slate-700"><b>{c.nome}</b>{c.eta ? ` · ${c.eta} anni` : ''}{extraCorsoAttesa(c) ? <span className="text-amber-800"> · {extraCorsoAttesa(c)}</span> : null}{c.dataCreazione ? <span className="text-slate-400"> · dal {formatDate(c.dataCreazione)}</span> : null}</span>
                                           {num
                                             ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testoA)}`} target="_blank" rel="noopener noreferrer" title="Avvisa su WhatsApp" className="shrink-0 p-1.5 rounded-md text-[#25D366] bg-white hover:bg-green-100"><WhatsAppIcon size={16}/></a>
                                             : <span title="Numero mancante" className="shrink-0 p-1.5 rounded-md text-slate-300 bg-slate-100"><WhatsAppIcon size={16}/></span>}
@@ -3789,7 +3801,7 @@
                                   <div key={L.etichetta}>
                                     <div className="flex items-center justify-between mb-1.5">
                                       <span className="text-sm font-bold text-slate-700">{L.etichetta}</span>
-                                      <span className={`text-sm font-bold ${colLiberi(L.liberi)}`}>{L.liberi} {L.liberi === 1 ? 'libero' : 'liberi'} <span className="text-xs font-medium text-slate-400">su {L.posti}</span></span>
+                                      <span className={`text-sm font-bold ${colLiberi(L.liberi)}`}>{L.liberi} {L.liberi === 1 ? 'libero' : 'liberi'} <span className="text-xs font-medium text-slate-400">su {L.posti}</span>{(() => { const nL = attesaCat.filter(c => c.livelloRichiesto && c.livelloRichiesto === L.ordine && attesaCompat(c)).length; return nL > 0 ? <span className="ml-2 text-xs font-bold text-amber-700">· {nL} in attesa → ≈ {Math.max(0, L.liberi - nL)} netti</span> : null; })()}</span>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
                                       {[...righe].sort((a, b) => a.giorno - b.giorno || a.ora.localeCompare(b.ora)).map((r, i) => (
@@ -4420,7 +4432,7 @@
                         const scaduto = dataScadRif && dataScadRif < oggiRifRiga;
                         const scadeOggi = dataScadRif && dataScadRif.getTime() === oggiRifRiga.getTime();
                         const infoCorso = c.motivazione === 'corso' ? attivita.find(a => a.id === c.corsoRichiesto) : null;
-                        const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Corso: ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'prova' ? 'Prova' : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
+                        const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Corso: ${infoCorso ? infoCorso.name : '-'}${extraCorsoAttesa(c) ? ' · ' + extraCorsoAttesa(c) : ''}` : c.motivazione === 'prova' ? 'Prova' : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
                         return (
                             <tr key={c.id} className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors ${c.completato ? 'opacity-60' : ''}`}>
                               <td className="p-3">
@@ -4570,7 +4582,7 @@
             const scaduto = dataScadRif && dataScadRif < oggiRif;
             const scadeOggi = dataScadRif && dataScadRif.getTime() === oggiRif.getTime();
             const infoCorso = c.motivazione === 'corso' ? attivita.find(a => a.id === c.corsoRichiesto) : null;
-            const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Apertura/Inserimento Corso — ${infoCorso ? infoCorso.name : '-'}` : c.motivazione === 'prova' ? 'Prova' : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
+            const etichettaMotivazione = c.motivazione === 'private' ? 'Private' : c.motivazione === 'corso' ? `Apertura/Inserimento Corso — ${infoCorso ? infoCorso.name : '-'}${extraCorsoAttesa(c) ? ' · ' + extraCorsoAttesa(c) : ''}` : c.motivazione === 'prova' ? 'Prova' : c.motivazione === 'altro' ? 'Informazioni/Altro' : '-';
             return (
               <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
                 <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
@@ -4698,7 +4710,7 @@
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Motivazione</label>
-                      <select value={nuovoContattoAttesa.motivazione} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, motivazione: e.target.value, corsoRichiesto: e.target.value === 'corso' ? nuovoContattoAttesa.corsoRichiesto : ''})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
+                      <select value={nuovoContattoAttesa.motivazione} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, motivazione: e.target.value, corsoRichiesto: e.target.value === 'corso' ? nuovoContattoAttesa.corsoRichiesto : '', livelloRichiesto: e.target.value === 'corso' ? nuovoContattoAttesa.livelloRichiesto : '', periodoRichiesto: e.target.value === 'corso' ? nuovoContattoAttesa.periodoRichiesto : ''})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
                         <option value="">-- Seleziona --</option>
                         <option value="private">Private</option>
                         <option value="corso">Apertura/Inserimento Corso</option>
@@ -4707,12 +4719,36 @@
                       </select>
                     </div>
                     {nuovoContattoAttesa.motivazione === 'corso' && (
-                      <div className="sm:col-span-3">
-                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Corso di Interesse</label>
-                        <select value={nuovoContattoAttesa.corsoRichiesto} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, corsoRichiesto: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
-                          <option value="">-- Seleziona un corso --</option>
-                          {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                        </select>
+                      <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Corso di Interesse</label>
+                          <select value={nuovoContattoAttesa.corsoRichiesto} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, corsoRichiesto: e.target.value, livelloRichiesto: ''})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
+                            <option value="">-- Seleziona un corso --</option>
+                            {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Livello <span className="normal-case font-normal text-slate-400">(se noto)</span></label>
+                          {(() => {
+                            const infoRic = attivita.find(a => a.id === nuovoContattoAttesa.corsoRichiesto);
+                            const livelli = infoRic && !infoRic.isFreeTextLevel && infoRic.levels ? infoRic.levels : [];
+                            return (
+                              <select value={nuovoContattoAttesa.livelloRichiesto || ''} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, livelloRichiesto: e.target.value})} disabled={livelli.length === 0} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none disabled:bg-slate-100 disabled:text-slate-400">
+                                <option value="">{livelli.length === 0 ? '—' : 'Qualsiasi / da definire'}</option>
+                                {livelli.map(l => <option key={l.val} value={l.val}>{l.noNumero ? l.name : `Liv. ${l.val} - ${l.name}`}</option>)}
+                              </select>
+                            );
+                          })()}
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Periodo</label>
+                          <select value={nuovoContattoAttesa.periodoRichiesto || ''} onChange={e => setNuovoContattoAttesa({...nuovoContattoAttesa, periodoRichiesto: e.target.value})} className="w-full p-2.5 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none">
+                            <option value="">Da definire</option>
+                            <option value="primo">Primo periodo</option>
+                            <option value="secondo">Secondo periodo</option>
+                            <option value="annuale">Annuale</option>
+                          </select>
+                        </div>
                       </div>
                     )}
                     <div className="sm:col-span-3">
