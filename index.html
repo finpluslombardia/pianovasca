@@ -4071,10 +4071,15 @@
                                       {scadenzeScadutiFiltrati.map((u, i) => (
                                           <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
                                               <td className="p-3 w-2/3">
-                                                  <div className="font-semibold text-slate-800">{u.nome}</div>
-                                                  <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">{(u.corsi || []).map(co => co.testo).join(', ')}</div>
+                                                  <div className="flex items-start gap-3">
+                                                      <span className="mt-0.5">{spuntaCertMsg(u)}</span>
+                                                      <div>
+                                                          <div className="font-semibold text-slate-800">{u.nome}</div>
+                                                          <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">{(u.corsi || []).map(co => co.testo).join(', ')}</div>
+                                                      </div>
+                                                  </div>
                                               </td>
-                                              <td className="p-3 font-bold text-red-600 text-right w-1/3"><div className="flex items-center justify-end gap-3"><span>Scaduto il {formatDate(u.scadCertificato)}</span>{bottoneWhatsappCertificato(u, true)}{bottoneModificaAnagrafica(u)}{spuntaCertMsg(u)}</div></td>
+                                              <td className="p-3 font-bold text-red-600 text-right w-1/3"><div className="flex items-center justify-end gap-3"><span>Scaduto il {formatDate(u.scadCertificato)}</span>{bottoneWhatsappCertificato(u, true)}{bottoneModificaAnagrafica(u)}</div></td>
                                           </tr>
                                       ))}
                                   </tbody>
@@ -4099,10 +4104,15 @@
                                       {scadenzeInScadenzaFiltrati.map((u, i) => (
                                           <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
                                               <td className="p-3 w-2/3">
-                                                  <div className="font-semibold text-slate-800">{u.nome}</div>
-                                                  <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">{(u.corsi || []).map(co => co.testo).join(', ')}</div>
+                                                  <div className="flex items-start gap-3">
+                                                      <span className="mt-0.5">{spuntaCertMsg(u)}</span>
+                                                      <div>
+                                                          <div className="font-semibold text-slate-800">{u.nome}</div>
+                                                          <div className="text-[11px] text-slate-500 mt-0.5 leading-tight">{(u.corsi || []).map(co => co.testo).join(', ')}</div>
+                                                      </div>
+                                                  </div>
                                               </td>
-                                              <td className="p-3 font-bold text-orange-600 text-right w-1/3"><div className="flex items-center justify-end gap-3"><span>Scade il {formatDate(u.scadCertificato)}</span>{bottoneWhatsappCertificato(u, false)}{bottoneModificaAnagrafica(u)}{spuntaCertMsg(u)}</div></td>
+                                              <td className="p-3 font-bold text-orange-600 text-right w-1/3"><div className="flex items-center justify-end gap-3"><span>Scade il {formatDate(u.scadCertificato)}</span>{bottoneWhatsappCertificato(u, false)}{bottoneModificaAnagrafica(u)}</div></td>
                                           </tr>
                                       ))}
                                   </tbody>
