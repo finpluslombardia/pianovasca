@@ -4273,7 +4273,7 @@
                     {disponibilita.map(k => {
                       const aperta = catDispEspansa === k.info.id;
                       const perc = k.posti ? Math.min(100, Math.round(k.iscritti / k.posti * 100)) : 0;
-                      const attesaCat = contattiAttesaAttivi.filter(c => c.motivazione === 'corso' && c.corsoRichiesto === k.info.id);
+                      const attesaCat = contattiAttesaAttivi.filter(c => c.motivazione === 'corso' && c.corsoRichiesto === k.info.id && attesaCompat(c)); // solo chi è interessato a questo periodo
                       const nCompatCat = attesaCat.filter(attesaCompat).length;
                       return (
                         <div key={k.info.id} className="shrink-0 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
