@@ -237,6 +237,7 @@
       const [formTurno, setFormTurno] = useState(null); // {id?, data, personaIds, inizio, fine, nota}
       const [ultimiOrari, setUltimiOrari] = useState({ inizio: '18:00', fine: '19:00' });
       const [tabElenco, setTabElenco] = useState('corso');
+      const [vista, setVista] = useState('calendario');
       const [filtroAtt, setFiltroAtt] = useState('');
       const fileRef = useRef(null);
 
@@ -254,11 +255,10 @@
         const m = {};
         tirocinanti.forEach(p => {
           if (selId && p.id !== selId) return;
-          if (filtroAtt && !selId && p.attivita !== filtroAtt) return;
           (p.presenze || []).forEach(x => { (m[x.data] = m[x.data] || []).push({ p, x }); });
         });
         return m;
-      }, [tirocinanti, selId, filtroAtt]);
+      }, [tirocinanti, selId]);
 
       const anno = mese.getFullYear(), mm = mese.getMonth();
       const offset = (new Date(anno, mm, 1).getDay() + 6) % 7;
@@ -366,68 +366,38 @@
       return (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center px-5 py-3 bg-[#1e3a5f] text-white">
-              <h3 className="font-bold text-xl flex items-center gap-2"><CalendarIcon size={24}/> Calendario tirocinanti</h3>
-              <div className="flex items-center gap-2">
-                <button onClick={scarica} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-md text-sm font-semibold" title="Scarica un file separato con solo i tirocinanti"><DownloadIcon size={15}/> Scarica file</button>
-                <button onClick={() => fileRef.current && fileRef.current.click()} className="px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-md text-sm font-semibold" title="Ripristina i tirocinanti da un file scaricato">Carica file</button>
-                <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={carica} />
-                <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors ml-1"><XIcon size={20}/></button>
+            <div className="px-2 pt-2 flex flex-col bg-[#1e3a5f] text-white">
+              <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1 border-b border-white/20">
+                <h3 className="font-bold text-xl flex items-center gap-2"><CalendarIcon size={24}/> Tirocinanti</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={scarica} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-md text-sm font-semibold" title="Scarica un file separato con solo i tirocinanti"><DownloadIcon size={15}/> Scarica file</button>
+                  <button onClick={() => fileRef.current && fileRef.current.click()} className="px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-md text-sm font-semibold" title="Ripristina i tirocinanti da un file scaricato">Carica file</button>
+                  <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={carica} />
+                  <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors ml-1"><XIcon size={22}/></button>
+                </div>
+              </div>
+              <div className="flex">
+                {[['calendario', 'Calendario', null], ['tirocinanti', 'Tirocinanti', tirocinanti.length]].map(([id, label, n]) => (
+                  <button key={id} onClick={() => setVista(id)} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent leading-tight ${vista === id ? 'bg-white/20' : 'opacity-80 hover:bg-white/5'}`}>{label}{n !== null && <span className="ml-1.5 bg-white/25 text-[11px] px-1.5 py-0.5 rounded-full">{n}</span>}</button>
+                ))}
               </div>
             </div>
-            <div className="flex-1 flex min-h-0">
-              {/* ELENCO TIROCINANTI */}
-              <div className="w-80 shrink-0 border-r border-slate-200 flex flex-col bg-slate-50">
-                <div className="p-3 border-b border-slate-200 space-y-2">
-                  <button onClick={() => setFormP({ nome: '', cognome: '', attivita: 'Assistente bagnanti' })} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold"><PlusIcon size={16}/> Nuovo tirocinante</button>
-                  <select value={filtroAtt} onChange={e => setFiltroAtt(e.target.value)} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white">
-                    <option value="">Tutte le attività</option>
-                    {Object.keys(ORE_TIROCINIO).map(a => <option key={a} value={a}>{a} ({ORE_TIROCINIO[a]} ore)</option>)}
-                  </select>
-                </div>
-                <div className="flex border-b border-slate-200 bg-white text-sm font-bold">
-                  <button onClick={() => setTabElenco('corso')} className={`flex-1 py-2 ${tabElenco === 'corso' ? 'text-[#1e3a5f] border-b-2 border-[#1e3a5f]' : 'text-slate-400 hover:text-slate-600'}`}>In corso ({inCorso.length})</button>
-                  <button onClick={() => setTabElenco('completati')} className={`flex-1 py-2 ${tabElenco === 'completati' ? 'text-green-700 border-b-2 border-green-600' : 'text-slate-400 hover:text-slate-600'}`}>Completati ({completati.length})</button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                  {elencoMostrato.length === 0 && <p className="text-sm text-slate-400 text-center mt-6 px-4">{tabElenco === 'completati' ? 'Nessun tirocinio ancora completato.' : (tirocinanti.length === 0 ? 'Nessun tirocinante. Aggiungine uno con il tasto qui sopra.' : (nCompletatiTot && !inCorso.length ? 'Tutti i tirocinanti hanno completato le ore.' : 'Nessun tirocinante per questa attività.'))}</p>}
-                  {elencoMostrato.map(p => {
-                    const tot = oreFatte(p), target = ORE_TIROCINIO[p.attivita] || 0;
-                    const pct = target ? Math.min(100, Math.round(tot / target * 100)) : 0;
-                    const fatto = target && tot >= target;
-                    const col = COLORI_TIROCINIO[p.attivita] || COLORI_TIROCINIO['Istruttore'];
-                    return (
-                      <div key={p.id} onClick={() => setSelId(selId === p.id ? null : p.id)} className={`rounded-lg border p-2.5 cursor-pointer transition-colors ${selId === p.id ? 'border-[#1e3a5f] bg-white ring-2 ring-[#1e3a5f]/30' : 'border-slate-200 bg-white hover:border-slate-400'}`}>
-                        <div className="flex items-start justify-between gap-1">
-                          <div className="min-w-0">
-                            <div className="font-bold text-sm text-slate-800 truncate">{nomeTiro(p)}</div>
-                            <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[11px] font-semibold ${col.badge}`}>{p.attivita}</span>
-                          </div>
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <button onClick={e => { e.stopPropagation(); setFormP({ id: p.id, nome: p.nome, cognome: p.cognome, attivita: p.attivita }); }} className="p-1 text-slate-400 hover:text-blue-600" title="Modifica"><EditIcon size={14}/></button>
-                            <button onClick={e => { e.stopPropagation(); eliminaPersona(p); }} className="p-1 text-slate-400 hover:text-red-600" title="Elimina"><XIcon size={14}/></button>
-                          </div>
-                        </div>
-                        <div className="mt-2 h-2 bg-slate-200 rounded-full overflow-hidden"><div className={`h-full ${fatto ? 'bg-green-500' : col.barra}`} style={{ width: pct + '%' }}></div></div>
-                        <div className="mt-1 flex justify-between text-xs">
-                          <span className="font-semibold text-slate-700">{fmtOre(tot)} / {target} ore</span>
-                          {fatto ? <span className="font-bold text-green-600">Completato ✓{ultimaData(p) ? ' ' + ultimaData(p).split('-').reverse().join('/') : ''}</span> : <span className="text-slate-500">mancano {fmtOre(target - tot)} h</span>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              {/* CALENDARIO */}
-              <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200">
+            {vista === 'calendario' ? (
+              <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-white">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-slate-200">
                   <div className="flex items-center gap-2">
                     <button onClick={() => setMese(new Date(anno, mm - 1, 1))} className="p-1.5 rounded-md hover:bg-slate-100"><ChevronLeftIcon size={18}/></button>
                     <div className="font-bold text-lg text-slate-800 w-44 text-center">{MESI_TIRO[mm]} {anno}</div>
                     <button onClick={() => setMese(new Date(anno, mm + 1, 1))} className="p-1.5 rounded-md hover:bg-slate-100"><ChevronRightIcon size={18}/></button>
                     <button onClick={() => { const d = new Date(); setMese(new Date(d.getFullYear(), d.getMonth(), 1)); }} className="ml-1 px-2.5 py-1 text-xs font-semibold border border-slate-300 rounded-md hover:bg-slate-100">Oggi</button>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-slate-500">{sel && <span>Solo <b className="text-slate-800">{nomeTiro(sel)}</b> · <button className="underline" onClick={() => setSelId(null)}>mostra tutti</button></span>}<button onClick={() => apriTurno(giorno)} disabled={tirocinanti.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white rounded-md text-sm font-bold"><PlusIcon size={14}/> Aggiungi turno</button></div>
+                  <div className="flex items-center gap-2">
+                    <select value={selId || ''} onChange={e => setSelId(e.target.value || null)} className="px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white max-w-[260px]">
+                      <option value="">Tutti i tirocinanti</option>
+                      {ordinati.map(p => <option key={p.id} value={p.id}>{nomeTiro(p)} — {p.attivita}</option>)}
+                    </select>
+                    <button onClick={() => apriTurno(giorno)} disabled={tirocinanti.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white rounded-md text-sm font-bold"><PlusIcon size={14}/> Aggiungi turno</button>
+                  </div>
                 </div>
                 <div className="flex-1 overflow-auto p-3">
                   <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-500 mb-1">
@@ -472,7 +442,55 @@
                   </div>
                 )}
               </div>
-            </div>
+            ) : (
+              <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 bg-white border-b border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setTabElenco('corso')} className={`px-3 py-1.5 rounded-md text-sm font-bold ${tabElenco === 'corso' ? 'bg-[#1e3a5f] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>In corso ({inCorso.length})</button>
+                    <button onClick={() => setTabElenco('completati')} className={`px-3 py-1.5 rounded-md text-sm font-bold ${tabElenco === 'completati' ? 'bg-green-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Completati ({completati.length})</button>
+                    <select value={filtroAtt} onChange={e => setFiltroAtt(e.target.value)} className="ml-2 px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white">
+                      <option value="">Tutte le attività</option>
+                      {Object.keys(ORE_TIROCINIO).map(a => <option key={a} value={a}>{a} ({ORE_TIROCINIO[a]} ore)</option>)}
+                    </select>
+                  </div>
+                  <button onClick={() => setFormP({ nome: '', cognome: '', attivita: 'Assistente bagnanti' })} className="flex items-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold"><PlusIcon size={16}/> Nuovo tirocinante</button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-5">
+                  {elencoMostrato.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400">{tabElenco === 'completati' ? 'Nessun tirocinio ancora completato.' : (tirocinanti.length === 0 ? 'Nessun tirocinante. Aggiungine uno con il tasto in alto a destra.' : (nCompletatiTot && !inCorso.length ? 'Tutti i tirocinanti hanno completato le ore.' : 'Nessun tirocinante per questa attività.'))}</div>
+                  ) : (
+                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="grid grid-cols-[1.6fr_1.2fr_2fr_1fr_auto] gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-sm font-semibold text-slate-600">
+                        <div>Cognome e Nome</div><div>Attività</div><div>Ore svolte</div><div>Ultimo turno</div><div className="w-28 text-right">Azioni</div>
+                      </div>
+                      {elencoMostrato.map(p => {
+                        const tot = oreFatte(p), target = ORE_TIROCINIO[p.attivita] || 0;
+                        const pct = target ? Math.min(100, Math.round(tot / target * 100)) : 0;
+                        const fatto = target && tot >= target;
+                        const col = COLORI_TIROCINIO[p.attivita] || COLORI_TIROCINIO['Istruttore'];
+                        const ult = ultimaData(p);
+                        return (
+                          <div key={p.id} className="grid grid-cols-[1.6fr_1.2fr_2fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                            <div className="font-bold text-slate-800 truncate">{nomeTiro(p)}</div>
+                            <div><span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${col.badge}`}>{p.attivita}</span></div>
+                            <div>
+                              <div className="h-2 bg-slate-200 rounded-full overflow-hidden"><div className={`h-full ${fatto ? 'bg-green-500' : col.barra}`} style={{ width: pct + '%' }}></div></div>
+                              <div className="mt-1 flex justify-between text-xs"><span className="font-semibold text-slate-700">{fmtOre(tot)} / {target} ore</span>{fatto ? <span className="font-bold text-green-600">Completato ✓</span> : <span className="text-slate-500">mancano {fmtOre(target - tot)} h</span>}</div>
+                            </div>
+                            <div className="text-sm text-slate-600">{ult ? ult.split('-').reverse().join('/') : '—'}</div>
+                            <div className="w-28 flex items-center justify-end gap-1">
+                              <button onClick={() => { setSelId(p.id); setVista('calendario'); }} className="p-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600" title="Vedi i turni nel calendario"><CalendarIcon size={15}/></button>
+                              <button onClick={() => setFormP({ id: p.id, nome: p.nome, cognome: p.cognome, attivita: p.attivita })} className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600" title="Modifica anagrafica"><EditIcon size={15}/></button>
+                              <button onClick={() => eliminaPersona(p)} className="p-1.5 rounded-md bg-red-50 hover:bg-red-100 text-red-600" title="Elimina"><XIcon size={15}/></button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             {/* FORM TURNO */}
             {formTurno && (
               <div className="fixed inset-0 z-[60] bg-slate-900/40 flex items-center justify-center p-4" onClick={() => setFormTurno(null)}>
@@ -1026,6 +1044,11 @@
       const ultimoBackupGiorno = useRef('');
       const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
       const [elencoBackup, setElencoBackup] = useState(null);
+      const tirocinantiRef = useRef([]); tirocinantiRef.current = tirocinanti;
+      const lastSavedTi = useRef(null);
+      const tiPending = useRef(false);
+      const [tiLoaded, setTiLoaded] = useState(false);
+      const [tiRetry, setTiRetry] = useState(0);
       const hasModificheLocaliInSospeso = useRef(false); // true = ci sono modifiche locali non ancora confermate su Firestore
       const ultimoStatoLocaleVisto = useRef(""); // ultima "istantanea" locale osservata dal debounce di salvataggio
 
@@ -1134,7 +1157,6 @@
           const archivioCaricato = archivioVuoto ? costruisciArchivioDaPiani(st.tuttiPiani) : st.archivioSoci;
           setArchivioSoci(archivioCaricato);
           setListaAttesa(st.listaAttesa || []);
-          setTirocinanti(st.tirocinanti || []);
           let defaultSeason = st.stagionePredefinita;
           if (st.stagioni && st.stagioni.length > 0) {
             setStagioni(st.stagioni);
@@ -1148,7 +1170,7 @@
             });
           }
           // Se l'archivio era vuoto e lo abbiamo ricostruito dai corsi, lo lasciamo "da salvare".
-          lastSavedPiano.current = daMigrazione ? 'MIGRAZIONE' : JSON.stringify({ t: st.tuttiPiani, s: st.stagioni, def: defaultSeason, arch: archivioVuoto ? (st.archivioSoci || {}) : archivioCaricato, la: st.listaAttesa || [], ti: st.tirocinanti || [] });
+          lastSavedPiano.current = daMigrazione ? 'MIGRAZIONE' : JSON.stringify({ t: st.tuttiPiani, s: st.stagioni, def: defaultSeason, arch: archivioVuoto ? (st.archivioSoci || {}) : archivioCaricato, la: st.listaAttesa || [] });
           ultimiConteggi.current = contaDati(st.tuttiPiani, archivioCaricato);
         };
 
@@ -1270,7 +1292,7 @@
                     const limiteOra = new Date(oraBk); limiteOra.setHours(13, 0, 0, 0);
                     if (oraBk < limiteOra) limiteOra.setDate(limiteOra.getDate() - 1);
                     const chiaveGiorno = toYMD(limiteOra);
-                    const docsPrec = statoToDocs({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], tirocinanti: prec.ti || [] });
+                    const docsPrec = statoToDocs({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], tirocinanti: tirocinantiRef.current });
                     const scriviBackup = async (slot) => {
                         const ids = Object.keys(docsPrec);
                         const ops = ids.map(id => [`bk2_${slot}__${id}`, JSON.parse(JSON.stringify(docsPrec[id]))]);
@@ -1296,6 +1318,9 @@
             // Costruiamo i blocchi nuovi e confrontiamoli con quelli già sul cloud: si scrive solo ciò che è cambiato.
             const adessoISO = new Date().toISOString();
             const docsNuovi = statoToDocs({ tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, archivioSoci: archivioDaSalvare, listaAttesa: listaAttesaDaSalvare, tirocinanti: tirocinantiDaSalvare });
+            // I tirocinanti NON stanno nel gruppo v2_: hanno un documento tutto loro (vedi sotto), così
+            // nessuna altra versione/scheda della pagina può cancellarli per sbaglio.
+            delete docsNuovi['v2_tirocinanti'];
             docsNuovi['v2_meta'].updatedAt = adessoISO;
             const strNuovi = {};
             Object.keys(docsNuovi).forEach(id => {
@@ -1323,7 +1348,7 @@
             lastSavedDocs.current = strNuovi;
             updatedAtNoto.current = adessoISO; updatedAtServer.current = adessoISO;
             ultimiConteggi.current = nuoviC;
-            const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef, arch: archivioDaSalvare, la: listaAttesaDaSalvare, ti: tirocinantiDaSalvare });
+            const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef, arch: archivioDaSalvare, la: listaAttesaDaSalvare });
             lastSavedPiano.current = statoAppenaSalvato;
             // Abbassiamo il flag "modifiche in sospeso" solo se, durante il salvataggio (che è
             // asincrono), l'utente non ha nel frattempo fatto altre modifiche.
@@ -1351,15 +1376,46 @@
         // i dati reali appena letti da Firestore — e il salvataggio automatico, sbloccato subito
         // dopo, finiva per scrivere lo stato ancora vuoto sopra ai dati reali, cancellandoli.
         if (!user || !firebaseInstances || !isDataLoaded) return;
-        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita, arch: archivioSoci, la: listaAttesa, ti: tirocinanti });
+        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita, arch: archivioSoci, la: listaAttesa });
         if (currentStateStr === lastSavedPiano.current) return; 
         // Registriamo lo stato locale più recente e segnaliamo che c'è una modifica da salvare:
         // questo impedisce all'onSnapshot di sovrascriverla nel frattempo (vedi BUGFIX sopra).
         ultimoStatoLocaleVisto.current = currentStateStr;
         hasModificheLocaliInSospeso.current = true;
-        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, tirocinanti), 1500);
+        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa), 1500);
         return () => clearTimeout(timer);
-      }, [tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, tirocinanti, user, firebaseInstances, isDataLoaded]);
+      }, [tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, user, firebaseInstances, isDataLoaded]);
+
+      // --- TIROCINANTI: documento cloud dedicato 'tirocinanti_v1' (letto e salvato per conto suo) ---
+      useEffect(() => {
+        if (!user || !firebaseInstances) return;
+        const { db, appId, doc, onSnapshot } = firebaseInstances;
+        const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'tirocinanti_v1');
+        const unsub = onSnapshot(ref, (snap) => {
+          if (snap.metadata.hasPendingWrites) return;
+          if (snap.exists()) {
+            const lista = snap.data().tirocinanti || [];
+            if (!tiPending.current) { lastSavedTi.current = JSON.stringify(lista); setTirocinanti(lista); }
+          } else if (!tiPending.current) { lastSavedTi.current = JSON.stringify([]); }
+          setTiLoaded(true);
+        }, (err) => { console.error('Errore lettura tirocinanti:', err); });
+        return () => unsub();
+      }, [user, firebaseInstances]);
+      useEffect(() => {
+        if (!tiLoaded || !user || !firebaseInstances) return;
+        const str = JSON.stringify(tirocinanti);
+        if (str === lastSavedTi.current) return;
+        tiPending.current = true;
+        const timer = setTimeout(async () => {
+          try {
+            const { db, appId, doc, setDoc } = firebaseInstances;
+            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', 'tirocinanti_v1'), { tirocinanti: JSON.parse(str), updatedAt: new Date().toISOString() });
+            lastSavedTi.current = str;
+            if (JSON.stringify(tirocinantiRef.current) === str) tiPending.current = false;
+          } catch (err) { console.error('Salvataggio tirocinanti non riuscito:', err); mostraToast('Salvataggio tirocinanti non riuscito: riprovo.', 'error'); setTiRetry(n => n + 1); }
+        }, 700);
+        return () => clearTimeout(timer);
+      }, [tirocinanti, tiLoaded, tiRetry, user, firebaseInstances]);
 
       // --- NORMALIZZAZIONE DATI: nomi con iniziali maiuscole ed email in minuscolo (anche per i dati già presenti) ---
       useEffect(() => {
@@ -1379,7 +1435,7 @@
       // in tempo a salvarsi. Il browser mostrerà un avviso nativo in quel caso.
       useEffect(() => {
         const handleBeforeUnload = (e) => {
-          if (hasModificheLocaliInSospeso.current) {
+          if (hasModificheLocaliInSospeso.current || tiPending.current) {
             e.preventDefault();
             e.returnValue = '';
             return '';
