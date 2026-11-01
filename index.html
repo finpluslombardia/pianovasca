@@ -1066,6 +1066,17 @@
       const tiPending = useRef(false);
       const [tiLoaded, setTiLoaded] = useState(false);
       const [ultimoBackupAt, setUltimoBackupAt] = useState(null);
+      // Posizione di scorrimento dell'elenco iscritti: si ricorda quando si apre la modifica di una persona
+      // e si ripristina al ritorno all'elenco (dopo Salva o Annulla).
+      const scrollIscrittiRef = useRef(null);
+      const scrollIscrittiPos = useRef(0);
+      const tabCorsoCorrente = editModal ? editModal.tab : null;
+      React.useLayoutEffect(() => {
+        if (!editModal) { scrollIscrittiPos.current = 0; return; }
+        if (tabCorsoCorrente === 'iscritti' && scrollIscrittiRef.current && scrollIscrittiPos.current > 0) {
+          scrollIscrittiRef.current.scrollTop = scrollIscrittiPos.current;
+        }
+      }, [tabCorsoCorrente, !!editModal]);
       const [tiRetry, setTiRetry] = useState(0);
       const hasModificheLocaliInSospeso = useRef(false); // true = ci sono modifiche locali non ancora confermate su Firestore
       const ultimoStatoLocaleVisto = useRef(""); // ultima "istantanea" locale osservata dal debounce di salvataggio
@@ -3128,6 +3139,7 @@
       };
 
       const avviaModificaPartecipante = (idx) => {
+        if (scrollIscrittiRef.current) scrollIscrittiPos.current = scrollIscrittiRef.current.scrollTop;
         const p = editModal.partecipanti[idx];
         let iscrizioni = p.iscrizioni && p.iscrizioni.length > 0 ? [...p.iscrizioni] : (p.scadIscrizione ? [{ inizio: '', fine: p.scadIscrizione }] : [{ inizio: '', fine: '' }]);
         setNuovoPartecipante({ ...p, iscrizioni });
@@ -6066,7 +6078,7 @@
                     <div className="flex flex-col h-full gap-5">
 
                       {/* LISTE SEPARATE */}
-                      <div className={`flex-1 overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-sm flex flex-col relative min-h-[300px]`}>
+                      <div ref={scrollIscrittiRef} className={`flex-1 overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-sm flex flex-col relative min-h-[300px]`}>
                         {(() => {
                           const attivi = editModal.partecipanti.filter(p => isAttivoInSettimana(p, inizioSettimana));
                           const inattivi = editModal.partecipanti.filter(p => !isAttivoInSettimana(p, inizioSettimana));
