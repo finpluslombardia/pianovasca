@@ -580,7 +580,9 @@
       N: { campo: '', simbolo: '○', col: 'text-slate-300', nome: 'text-slate-800' }
     };
     // Livello attuale della persona (portato avanti in tutte le stagioni): valore "idAttivita:livello".
-    const etichettaLivelloSocio = (v, attivitaList) => {
+    // Più livelli possono essere salvati nello stesso campo, separati da virgola ("id:liv,id:liv").
+    const livelliSocioArray = (v) => String(v || '').split(',').map(x => x.trim()).filter(Boolean);
+    const etichettaUnLivello = (v, attivitaList) => {
       if (!v) return '';
       const [aid, lv] = String(v).split(':');
       const a = (attivitaList || []).find(x => x.id === aid);
@@ -588,6 +590,59 @@
       const l = (a.levels || []).find(x => x.val === lv);
       if (!l) return a.name;
       return l.name;
+    };
+    const etichettaLivelloSocio = (v, attivitaList) => livelliSocioArray(v).map(x => etichettaUnLivello(x, attivitaList)).filter(Boolean).join(', ');
+    // Menu a selezione multipla (caselle da spuntare) per il livello attuale.
+    const SelettoreLivelli = ({ value, onChange, attivita, className }) => {
+      const [aperto, setAperto] = useState(false);
+      const [pos, setPos] = useState(null);
+      const btnRef = useRef(null);
+      const sel = livelliSocioArray(value);
+      const apri = () => {
+        const r = btnRef.current.getBoundingClientRect();
+        const sotto = window.innerHeight - r.bottom - 12, sopra = r.top - 12;
+        const su = sotto < 260 && sopra > sotto;
+        setPos({ left: r.left, width: Math.max(r.width, 300), ...(su ? { bottom: window.innerHeight - r.top + 4, maxHeight: Math.min(sopra, 380) } : { top: r.bottom + 4, maxHeight: Math.min(sotto, 380) }) });
+        setAperto(true);
+      };
+      const toggle = (v) => onChange((sel.includes(v) ? sel.filter(x => x !== v) : [...sel, v]).join(','));
+      const testo = etichettaLivelloSocio(value, attivita);
+      return (
+        <>
+          <button type="button" ref={btnRef} onClick={() => aperto ? setAperto(false) : apri()} className={(className || '') + ' flex items-center justify-between gap-2 text-left'}>
+            <span className={`truncate ${testo ? '' : 'text-slate-400'}`}>{testo || '—'}</span>
+            <span className="shrink-0 text-slate-400 text-xs">{sel.length > 1 ? `${sel.length} ▾` : '▾'}</span>
+          </button>
+          {aperto && pos && (
+            <>
+              <div className="fixed inset-0 z-[90]" onClick={() => setAperto(false)}></div>
+              <div className="fixed z-[91] bg-white border border-slate-200 shadow-xl rounded-lg overflow-y-auto py-1" style={pos}>
+                <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 sticky top-0 bg-white">
+                  <span className="text-xs text-slate-500">{sel.length ? `${sel.length} selezionat${sel.length === 1 ? 'o' : 'i'}` : 'Spunta uno o più livelli'}</span>
+                  <span className="flex items-center gap-3">
+                    {sel.length > 0 && <button type="button" className="text-xs underline text-slate-500" onClick={() => onChange('')}>Svuota</button>}
+                    <button type="button" className="text-xs font-bold text-blue-600" onClick={() => setAperto(false)}>Fatto</button>
+                  </span>
+                </div>
+                {(attivita || []).filter(a => a.levels && a.levels.length > 0).map(a => (
+                  <div key={a.id}>
+                    <div className="px-3 pt-2 pb-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">{a.name}</div>
+                    {a.levels.map(l => {
+                      const v = a.id + ':' + l.val; const on = sel.includes(v);
+                      return (
+                        <label key={v} className={`flex items-center gap-2.5 px-3 py-1.5 text-sm cursor-pointer hover:bg-slate-50 ${on ? 'bg-blue-50 font-semibold' : ''}`}>
+                          <input type="checkbox" checked={on} onChange={() => toggle(v)} className="w-4 h-4" />
+                          {l.noNumero ? l.name : `Liv. ${l.val} - ${l.name}`}
+                        </label>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      );
     };
     const sessoSuccessivo = (x) => x === 'M' ? 'F' : x === 'F' ? 'N' : 'M';
     const rilevaSesso = (nomeCompleto) => {
@@ -2825,7 +2880,7 @@
                   const key = p.nome.toLowerCase().trim();
                   if (usaTesto && !key.includes(q)) return;
                   const arc = archivioSoci[key] || {};
-                  if (filtroLivelloRic && (arc.livelloSocio || p.livelloSocio || '') !== filtroLivelloRic) return;
+                  if (filtroLivelloRic && !livelliSocioArray(arc.livelloSocio || p.livelloSocio || '').includes(filtroLivelloRic)) return;
                   if (ivP && !(p.iscrizioni || []).some(i => i.inizio === ivP.inizio && i.fine === ivP.fine)) return;
                   if (filtroCertRic) {
                       const sc = arc.scadCertificato || p.scadCertificato || '';
@@ -5382,14 +5437,7 @@
                            </div>
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Livello attuale</label>
-                              <select value={addUtenteRapido.livelloSocio || ''} onChange={e => setAddUtenteRapido({...addUtenteRapido, livelloSocio: e.target.value})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer">
-                                <option value="">—</option>
-                                {attivita.filter(a => a.levels && a.levels.length > 0).map(a => (
-                                  <optgroup key={a.id} label={a.name}>
-                                    {a.levels.map(l => <option key={a.id + ':' + l.val} value={a.id + ':' + l.val}>{l.noNumero ? l.name : `Liv. ${l.val} - ${l.name}`}</option>)}
-                                  </optgroup>
-                                ))}
-                              </select>
+                              <SelettoreLivelli value={addUtenteRapido.livelloSocio || ''} onChange={v => setAddUtenteRapido({...addUtenteRapido, livelloSocio: v})} attivita={attivita} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none cursor-pointer" />
                            </div>
                            <div className="lg:col-span-1">
                               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Documenti Firmati</label>
@@ -5949,14 +5997,7 @@
                                   </div>
                                   <div>
                                     <label className={LBL}>Livello attuale</label>
-                                    <select value={nuovoPartecipante.livelloSocio || ''} onChange={e => setNuovoPartecipante({...nuovoPartecipante, livelloSocio: e.target.value})} className={CLS_CAMPO + " cursor-pointer"}>
-                                      <option value="">—</option>
-                                      {attivita.filter(a => a.levels && a.levels.length > 0).map(a => (
-                                        <optgroup key={a.id} label={a.name}>
-                                          {a.levels.map(l => <option key={a.id + ':' + l.val} value={a.id + ':' + l.val}>{l.noNumero ? l.name : `Liv. ${l.val} - ${l.name}`}</option>)}
-                                        </optgroup>
-                                      ))}
-                                    </select>
+                                    <SelettoreLivelli value={nuovoPartecipante.livelloSocio || ''} onChange={v => setNuovoPartecipante({...nuovoPartecipante, livelloSocio: v})} attivita={attivita} className={CLS_CAMPO + " cursor-pointer"} />
                                   </div>
                                   <div>
                                     <label className={LBL}>Documenti Firmati</label>
