@@ -409,38 +409,18 @@
                       const voci = perGiorno[g] || [];
                       const isOggi = g === oggiYMD, isSel = g === giorno;
                       return (
-                        <div key={i} onClick={() => apriGiorno(g)} className={`min-h-[78px] rounded-md border p-1 cursor-pointer transition-colors ${isSel ? 'border-[#1e3a5f] ring-2 ring-[#1e3a5f]/30 bg-blue-50' : isOggi ? 'border-teal-400 bg-teal-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                        <div key={i} onClick={() => apriTurno(g)} title="Clicca per aggiungere un turno in questo giorno" className={`min-h-[78px] rounded-md border p-1 cursor-pointer transition-colors ${isSel ? 'border-[#1e3a5f] ring-2 ring-[#1e3a5f]/30 bg-blue-50' : isOggi ? 'border-teal-400 bg-teal-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
                           <div className={`text-xs font-bold flex justify-between ${isOggi ? 'text-teal-700' : 'text-slate-500'}`}><span>{parseInt(g.slice(8), 10)}</span>{voci.some(v => conflitti.has(v.x.id)) && <span className="text-red-600" title="Più di 2 persone nello stesso orario">⚠</span>}</div>
                           <div className="space-y-0.5 mt-0.5">
-                            {voci.slice(0, 3).map(({ p, x }) => (
-                              <div key={x.id} className={`text-[10px] leading-tight px-1 py-0.5 rounded border truncate ${conflitti.has(x.id) ? 'bg-red-100 text-red-800 border-red-400 font-bold' : (COLORI_TIROCINIO[p.attivita] || COLORI_TIROCINIO['Istruttore']).chip}`} title={`${nomeTiro(p)} · ${x.inizio ? x.inizio + '–' + x.fine + ' · ' : ''}${fmtOre(x.ore)} h${conflitti.has(x.id) ? ' · ATTENZIONE: più di 2 persone insieme' : ''}`}>{conflitti.has(x.id) ? '⚠ ' : ''}{p.cognome} {(p.nome || '').charAt(0)}. · {x.inizio ? x.inizio + '–' + x.fine : fmtOre(x.ore) + 'h'}</div>
+                            {voci.map(({ p, x }) => (
+                              <div key={x.id} onClick={e => { e.stopPropagation(); apriTurno(x.data, x, p); }} className={`cursor-pointer hover:brightness-95 text-[10px] leading-tight px-1 py-0.5 rounded border truncate ${conflitti.has(x.id) ? 'bg-red-100 text-red-800 border-red-400 font-bold' : (COLORI_TIROCINIO[p.attivita] || COLORI_TIROCINIO['Istruttore']).chip}`} title={`${nomeTiro(p)} · ${x.inizio ? x.inizio + '–' + x.fine + ' · ' : ''}${fmtOre(x.ore)} h${conflitti.has(x.id) ? ' · ATTENZIONE: più di 2 persone insieme' : ''}`}>{conflitti.has(x.id) ? '⚠ ' : ''}{p.cognome} {(p.nome || '').charAt(0)}. · {x.inizio ? x.inizio + '–' + x.fine : fmtOre(x.ore) + 'h'}</div>
                             ))}
-                            {voci.length > 3 && <div className="text-[10px] text-slate-500 font-semibold">+{voci.length - 3} altri</div>}
                           </div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-                {/* PANNELLO GIORNO */}
-                {giorno && (
-                  <div className="border-t border-slate-200 bg-slate-50 p-3 max-h-[42%] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="font-bold text-slate-800 capitalize">{fmtGiornoLungo(giorno)}</div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => apriTurno(giorno)} disabled={tirocinanti.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white rounded-md text-sm font-bold"><PlusIcon size={14}/> Aggiungi turno</button>
-                        <button onClick={() => setGiorno(null)} className="p-1 text-slate-400 hover:text-slate-700"><XIcon size={16}/></button>
-                      </div>
-                    </div>
-                    {tirocinanti.filter(p => !selId || p.id === selId).flatMap(p => (p.presenze || []).filter(x => x.data === giorno).map(x => ({ p, x }))).map(({ p, x }) => (
-                      <div key={x.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-md px-2.5 py-1.5 mb-1 text-sm">
-                        <span>{conflitti.has(x.id) && <span className="text-red-600 font-bold mr-1" title="Più di 2 persone nello stesso orario">⚠</span>}<b>{nomeTiro(p)}</b> <span className="text-slate-500">· {p.attivita}</span> · {x.inizio ? <b>{x.inizio}–{x.fine}</b> : null} <b>{x.inizio ? '(' + fmtOre(x.ore) + ' h)' : fmtOre(x.ore) + ' h'}</b>{x.nota ? <span className="text-slate-500"> · {x.nota}</span> : null}</span>
-                        <span className="flex items-center"><button onClick={() => apriTurno(giorno, x, p)} className="text-slate-400 hover:text-blue-600 p-1" title="Modifica"><EditIcon size={14}/></button><button onClick={() => eliminaPresenza(p.id, x.id)} className="text-slate-400 hover:text-red-600 p-1" title="Elimina"><XIcon size={14}/></button></span>
-                      </div>
-                    ))}
-                    {dellGiorno.length === 0 && <p className="text-xs text-slate-400">Nessuna presenza registrata in questo giorno.</p>}
-                  </div>
-                )}
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
@@ -547,6 +527,7 @@
                     {conflittoForm && <div className="px-3 py-2 bg-red-50 border border-red-300 text-red-700 rounded-md text-sm font-bold">⚠ In questo orario ci sarebbero più di {MAX_CONTEMPORANEI} tirocinanti insieme. Puoi salvare comunque, ma il turno sarà segnalato.</div>}
                   </div>
                   <div className="px-5 py-3 bg-slate-50 border-t flex justify-end gap-2">
+                    {formTurno.id && <button onClick={() => { if (window.confirm('Eliminare questo turno?')) { eliminaPresenza(formTurno.personaIds[0], formTurno.id); setFormTurno(null); } }} className="mr-auto px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-50 rounded-md">Elimina turno</button>}
                     <button onClick={() => setFormTurno(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>
                     <button onClick={salvaTurno} className="px-4 py-2 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md">Salva turno</button>
                   </div>
