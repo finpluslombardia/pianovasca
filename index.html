@@ -1069,12 +1069,15 @@
       // Posizione di scorrimento dell'elenco iscritti: si ricorda quando si apre la modifica di una persona
       // e si ripristina al ritorno all'elenco (dopo Salva o Annulla).
       const scrollIscrittiRef = useRef(null);
-      const scrollIscrittiPos = useRef(0);
+      const scrollIscrittiPos = useRef([]);
+      // Nell'elenco possono scorrere più contenitori (il riquadro e la tabella al suo interno): li salviamo tutti.
+      const contenitoriScorrevoli = (root) => root ? [root, ...root.querySelectorAll('.overflow-x-auto, .overflow-y-auto, .overflow-auto')] : [];
       const tabCorsoCorrente = editModal ? editModal.tab : null;
       React.useLayoutEffect(() => {
-        if (!editModal) { scrollIscrittiPos.current = 0; return; }
-        if (tabCorsoCorrente === 'iscritti' && scrollIscrittiRef.current && scrollIscrittiPos.current > 0) {
-          scrollIscrittiRef.current.scrollTop = scrollIscrittiPos.current;
+        if (!editModal) { scrollIscrittiPos.current = []; return; }
+        if (tabCorsoCorrente === 'iscritti' && scrollIscrittiRef.current && scrollIscrittiPos.current.some(v => v > 0)) {
+          const pos = scrollIscrittiPos.current;
+          contenitoriScorrevoli(scrollIscrittiRef.current).forEach((el, i) => { if (pos[i]) el.scrollTop = pos[i]; });
         }
       }, [tabCorsoCorrente, !!editModal]);
       const [tiRetry, setTiRetry] = useState(0);
@@ -3139,7 +3142,7 @@
       };
 
       const avviaModificaPartecipante = (idx) => {
-        if (scrollIscrittiRef.current) scrollIscrittiPos.current = scrollIscrittiRef.current.scrollTop;
+        scrollIscrittiPos.current = contenitoriScorrevoli(scrollIscrittiRef.current).map(el => el.scrollTop);
         const p = editModal.partecipanti[idx];
         let iscrizioni = p.iscrizioni && p.iscrizioni.length > 0 ? [...p.iscrizioni] : (p.scadIscrizione ? [{ inizio: '', fine: p.scadIscrizione }] : [{ inizio: '', fine: '' }]);
         setNuovoPartecipante({ ...p, iscrizioni });
