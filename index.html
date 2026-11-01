@@ -201,6 +201,31 @@
     const fmtOre = (n) => String(Math.round((Number(n) || 0) * 100) / 100).replace('.', ',');
     const MESI_TIRO = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
     const oreFatte = (p) => (p.presenze || []).reduce((t, x) => t + (Number(x.ore) || 0), 0);
+    const MAX_CONTEMPORANEI = 2;
+    const minDaOra = (t) => { if (!t || !/^\d{1,2}:\d{2}$/.test(t)) return null; const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+    const oreDaOrari = (ini, fin) => { const a = minDaOra(ini), b = minDaOra(fin); if (a === null || b === null || b <= a) return 0; return Math.round((b - a) / 60 * 100) / 100; };
+    // Restituisce l'insieme degli id di presenza coinvolti in un momento con più di 2 persone insieme.
+    const trovaConflitti = (elenco) => {
+      const perData = {};
+      elenco.forEach(p => (p.presenze || []).forEach(x => {
+        const a = minDaOra(x.inizio), b = minDaOra(x.fine);
+        if (a === null || b === null || b <= a) return;
+        (perData[x.data] = perData[x.data] || []).push({ id: x.id, a, b, pid: p.id });
+      }));
+      const out = new Set();
+      Object.keys(perData).forEach(d => {
+        const ev = perData[d];
+        ev.forEach(e => {
+          // controlliamo ogni istante di inizio all'interno dell'intervallo di e
+          const punti = [e.a, ...ev.filter(o => o.a > e.a && o.a < e.b).map(o => o.a)];
+          punti.forEach(t => {
+            const dentro = ev.filter(o => o.a <= t && t < o.b);
+            if (new Set(dentro.map(o => o.pid)).size > MAX_CONTEMPORANEI) dentro.forEach(o => out.add(o.id));
+          });
+        });
+      });
+      return out;
+    };
     const nomeTiro = (p) => `${p.cognome || ''} ${p.nome || ''}`.trim();
 
     const TirocinantiModal = ({ tirocinanti, setTirocinanti, onClose, mostraToast }) => {
@@ -209,13 +234,21 @@
       const [selId, setSelId] = useState(null);
       const [giorno, setGiorno] = useState(null);
       const [formP, setFormP] = useState(null); // {id?, nome, cognome, attivita}
-      const [formPres, setFormPres] = useState({ personaId: '', ore: '2', nota: '' });
+      const [formPres, setFormPres] = useState({ personaId: '', inizio: '18:00', fine: '19:00', nota: '' });
+      const [editPresId, setEditPresId] = useState(null);
+      const [tabElenco, setTabElenco] = useState('corso');
       const [filtroAtt, setFiltroAtt] = useState('');
       const fileRef = useRef(null);
 
       const ordinati = useMemo(() => [...tirocinanti].sort((a, b) => nomeTiro(a).localeCompare(nomeTiro(b), 'it')), [tirocinanti]);
       const visibili = ordinati.filter(p => !filtroAtt || p.attivita === filtroAtt);
       const sel = tirocinanti.find(p => p.id === selId) || null;
+      const completati = visibili.filter(p => ORE_TIROCINIO[p.attivita] && oreFatte(p) >= ORE_TIROCINIO[p.attivita]);
+      const inCorso = visibili.filter(p => !completati.includes(p));
+      const elencoMostrato = tabElenco === 'completati' ? completati : inCorso;
+      const nCompletatiTot = ordinati.filter(p => ORE_TIROCINIO[p.attivita] && oreFatte(p) >= ORE_TIROCINIO[p.attivita]).length;
+      const conflitti = useMemo(() => trovaConflitti(tirocinanti), [tirocinanti]);
+      const ultimaData = (p) => (p.presenze || []).reduce((m, x) => x.data > m ? x.data : m, '');
 
       const perGiorno = useMemo(() => {
         const m = {};
@@ -252,12 +285,33 @@
         setTirocinanti(prev => prev.filter(x => x.id !== p.id));
         if (selId === p.id) setSelId(null);
       };
+      const oreForm = oreDaOrari(formPres.inizio, formPres.fine);
+      const conflittoForm = useMemo(() => {
+        if (!giorno || !oreForm || !formPres.personaId) return false;
+        const prova = tirocinanti.map(p => p.id === formPres.personaId
+          ? { ...p, presenze: [...(p.presenze || []).filter(x => x.id !== editPresId), { id: '__nuovo', data: giorno, inizio: formPres.inizio, fine: formPres.fine }] } : p);
+        return trovaConflitti(prova).has('__nuovo');
+      }, [tirocinanti, giorno, formPres, editPresId, oreForm]);
       const aggiungiPresenza = () => {
-        const ore = parseFloat(String(formPres.ore).replace(',', '.'));
         if (!formPres.personaId) { mostraToast('Scegli il tirocinante.', 'error'); return; }
-        if (!ore || ore <= 0 || ore > 24) { mostraToast('Inserisci un numero di ore valido.', 'error'); return; }
-        setTirocinanti(prev => prev.map(p => p.id === formPres.personaId ? { ...p, presenze: [...(p.presenze || []), { id: 'p' + Date.now() + Math.random().toString(36).slice(2, 5), data: giorno, ore, nota: (formPres.nota || '').trim() }] } : p));
+        if (!oreForm) { mostraToast("L'orario di fine deve essere dopo quello di inizio.", 'error'); return; }
+        const nuova = { data: giorno, inizio: formPres.inizio, fine: formPres.fine, ore: oreForm, nota: (formPres.nota || '').trim() };
+        if (editPresId) {
+          setTirocinanti(prev => prev.map(p => ({ ...p, presenze: (p.presenze || []).filter(x => x.id !== editPresId) })).map(p => p.id === formPres.personaId ? { ...p, presenze: [...p.presenze, { ...nuova, id: editPresId }] } : p));
+          setEditPresId(null);
+        } else {
+          setTirocinanti(prev => prev.map(p => p.id === formPres.personaId ? { ...p, presenze: [...(p.presenze || []), { ...nuova, id: 'p' + Date.now() + Math.random().toString(36).slice(2, 5) }] } : p));
+        }
         setFormPres(f => ({ ...f, nota: '' }));
+      };
+      const modificaPresenza = (p, x) => {
+        setEditPresId(x.id);
+        setFormPres({ personaId: p.id, inizio: x.inizio || '18:00', fine: x.fine || '19:00', nota: x.nota || '' });
+      };
+      const aggiungiAFine = (minuti) => {
+        const a = minDaOra(formPres.inizio); if (a === null) return;
+        const b = Math.min(a + minuti, 23 * 60 + 59);
+        setFormPres(f => ({ ...f, fine: String(Math.floor(b / 60)).padStart(2, '0') + ':' + String(b % 60).padStart(2, '0') }));
       };
       const eliminaPresenza = (pid, xid) => setTirocinanti(prev => prev.map(p => p.id === pid ? { ...p, presenze: (p.presenze || []).filter(x => x.id !== xid) } : p));
 
@@ -285,7 +339,7 @@
       };
 
       const apriGiorno = (g) => {
-        setGiorno(g);
+        setGiorno(g); setEditPresId(null);
         setFormPres(f => ({ ...f, personaId: selId || f.personaId || (ordinati[0] ? ordinati[0].id : '') }));
       };
       const dellGiorno = giorno ? (perGiorno[giorno] || []) : [];
@@ -313,9 +367,13 @@
                     {Object.keys(ORE_TIROCINIO).map(a => <option key={a} value={a}>{a} ({ORE_TIROCINIO[a]} ore)</option>)}
                   </select>
                 </div>
+                <div className="flex border-b border-slate-200 bg-white text-sm font-bold">
+                  <button onClick={() => setTabElenco('corso')} className={`flex-1 py-2 ${tabElenco === 'corso' ? 'text-[#1e3a5f] border-b-2 border-[#1e3a5f]' : 'text-slate-400 hover:text-slate-600'}`}>In corso ({inCorso.length})</button>
+                  <button onClick={() => setTabElenco('completati')} className={`flex-1 py-2 ${tabElenco === 'completati' ? 'text-green-700 border-b-2 border-green-600' : 'text-slate-400 hover:text-slate-600'}`}>Completati ({completati.length})</button>
+                </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                  {visibili.length === 0 && <p className="text-sm text-slate-400 text-center mt-6 px-4">{tirocinanti.length === 0 ? 'Nessun tirocinante. Aggiungine uno con il tasto qui sopra.' : 'Nessun tirocinante per questa attività.'}</p>}
-                  {visibili.map(p => {
+                  {elencoMostrato.length === 0 && <p className="text-sm text-slate-400 text-center mt-6 px-4">{tabElenco === 'completati' ? 'Nessun tirocinio ancora completato.' : (tirocinanti.length === 0 ? 'Nessun tirocinante. Aggiungine uno con il tasto qui sopra.' : (nCompletatiTot && !inCorso.length ? 'Tutti i tirocinanti hanno completato le ore.' : 'Nessun tirocinante per questa attività.'))}</p>}
+                  {elencoMostrato.map(p => {
                     const tot = oreFatte(p), target = ORE_TIROCINIO[p.attivita] || 0;
                     const pct = target ? Math.min(100, Math.round(tot / target * 100)) : 0;
                     const fatto = target && tot >= target;
@@ -335,7 +393,7 @@
                         <div className="mt-2 h-2 bg-slate-200 rounded-full overflow-hidden"><div className={`h-full ${fatto ? 'bg-green-500' : col.barra}`} style={{ width: pct + '%' }}></div></div>
                         <div className="mt-1 flex justify-between text-xs">
                           <span className="font-semibold text-slate-700">{fmtOre(tot)} / {target} ore</span>
-                          {fatto ? <span className="font-bold text-green-600">Completato ✓</span> : <span className="text-slate-500">mancano {fmtOre(target - tot)} h</span>}
+                          {fatto ? <span className="font-bold text-green-600">Completato ✓{ultimaData(p) ? ' ' + ultimaData(p).split('-').reverse().join('/') : ''}</span> : <span className="text-slate-500">mancano {fmtOre(target - tot)} h</span>}
                         </div>
                       </div>
                     );
@@ -364,10 +422,10 @@
                       const isOggi = g === oggiYMD, isSel = g === giorno;
                       return (
                         <div key={i} onClick={() => apriGiorno(g)} className={`min-h-[78px] rounded-md border p-1 cursor-pointer transition-colors ${isSel ? 'border-[#1e3a5f] ring-2 ring-[#1e3a5f]/30 bg-blue-50' : isOggi ? 'border-teal-400 bg-teal-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
-                          <div className={`text-xs font-bold ${isOggi ? 'text-teal-700' : 'text-slate-500'}`}>{parseInt(g.slice(8), 10)}</div>
+                          <div className={`text-xs font-bold flex justify-between ${isOggi ? 'text-teal-700' : 'text-slate-500'}`}><span>{parseInt(g.slice(8), 10)}</span>{voci.some(v => conflitti.has(v.x.id)) && <span className="text-red-600" title="Più di 2 persone nello stesso orario">⚠</span>}</div>
                           <div className="space-y-0.5 mt-0.5">
                             {voci.slice(0, 3).map(({ p, x }) => (
-                              <div key={x.id} className={`text-[10px] leading-tight px-1 py-0.5 rounded border truncate ${(COLORI_TIROCINIO[p.attivita] || COLORI_TIROCINIO['Istruttore']).chip}`} title={`${nomeTiro(p)} · ${fmtOre(x.ore)} h`}>{p.cognome} {(p.nome || '').charAt(0)}. · {fmtOre(x.ore)}h</div>
+                              <div key={x.id} className={`text-[10px] leading-tight px-1 py-0.5 rounded border truncate ${conflitti.has(x.id) ? 'bg-red-100 text-red-800 border-red-400 font-bold' : (COLORI_TIROCINIO[p.attivita] || COLORI_TIROCINIO['Istruttore']).chip}`} title={`${nomeTiro(p)} · ${x.inizio ? x.inizio + '–' + x.fine + ' · ' : ''}${fmtOre(x.ore)} h${conflitti.has(x.id) ? ' · ATTENZIONE: più di 2 persone insieme' : ''}`}>{conflitti.has(x.id) ? '⚠ ' : ''}{p.cognome} {(p.nome || '').charAt(0)}. · {x.inizio ? x.inizio + '–' + x.fine : fmtOre(x.ore) + 'h'}</div>
                             ))}
                             {voci.length > 3 && <div className="text-[10px] text-slate-500 font-semibold">+{voci.length - 3} altri</div>}
                           </div>
@@ -384,28 +442,43 @@
                       <button onClick={() => setGiorno(null)} className="p-1 text-slate-400 hover:text-slate-700"><XIcon size={16}/></button>
                     </div>
                     {tirocinanti.length === 0 ? <p className="text-sm text-slate-500">Aggiungi prima almeno un tirocinante dall'elenco a sinistra.</p> : (
-                      <div className="flex flex-wrap items-end gap-2 mb-2">
-                        <div className="flex-1 min-w-[180px]">
-                          <label className="block text-xs font-semibold text-slate-500 mb-0.5">Tirocinante</label>
-                          <select value={formPres.personaId} onChange={e => setFormPres(f => ({ ...f, personaId: e.target.value }))} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white">
-                            {ordinati.map(p => <option key={p.id} value={p.id}>{nomeTiro(p)} — {p.attivita}</option>)}
-                          </select>
+                      <div className="mb-2">
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="flex-1 min-w-[180px]">
+                            <label className="block text-xs font-semibold text-slate-500 mb-0.5">Tirocinante</label>
+                            <select value={formPres.personaId} onChange={e => setFormPres(f => ({ ...f, personaId: e.target.value }))} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white">
+                              {ordinati.map(p => <option key={p.id} value={p.id}>{nomeTiro(p)} — {p.attivita}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-0.5">Inizio</label>
+                            <input type="time" step="900" value={formPres.inizio} onChange={e => setFormPres(f => ({ ...f, inizio: e.target.value }))} className="px-2 py-1.5 border border-slate-300 rounded-md text-sm" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-500 mb-0.5">Fine</label>
+                            <input type="time" step="900" value={formPres.fine} onChange={e => setFormPres(f => ({ ...f, fine: e.target.value }))} className="px-2 py-1.5 border border-slate-300 rounded-md text-sm" />
+                          </div>
+                          <div className="px-2 py-1.5 text-sm font-bold text-[#1e3a5f] bg-white border border-slate-200 rounded-md min-w-[64px] text-center" title="Ore calcolate in automatico">{oreForm ? fmtOre(oreForm) + ' h' : '— h'}</div>
+                          <div className="flex-1 min-w-[140px]">
+                            <label className="block text-xs font-semibold text-slate-500 mb-0.5">Nota (facoltativa)</label>
+                            <input type="text" value={formPres.nota} onChange={e => setFormPres(f => ({ ...f, nota: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') aggiungiPresenza(); }} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm" placeholder="es. corso adulti" />
+                          </div>
+                          <button onClick={aggiungiPresenza} className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold">{editPresId ? 'Salva modifica' : 'Aggiungi'}</button>
+                          {editPresId && <button onClick={() => setEditPresId(null)} className="px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>}
                         </div>
-                        <div className="w-24">
-                          <label className="block text-xs font-semibold text-slate-500 mb-0.5">Ore</label>
-                          <input type="number" min="0.5" max="24" step="0.5" value={formPres.ore} onChange={e => setFormPres(f => ({ ...f, ore: e.target.value }))} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm" />
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-xs">
+                          <span className="text-slate-500 font-semibold">Durata rapida:</span>
+                          {[[60, '1 h'], [90, '1,5 h'], [120, '2 h'], [180, '3 h']].map(([m, l]) => (
+                            <button key={m} onClick={() => aggiungiAFine(m)} className="px-2 py-0.5 bg-white border border-slate-300 hover:border-[#1e3a5f] rounded-full font-semibold text-slate-700">{l}</button>
+                          ))}
+                          {conflittoForm && <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 border border-red-300 rounded-md font-bold">⚠ In questo orario ci sarebbero più di {MAX_CONTEMPORANEI} persone</span>}
                         </div>
-                        <div className="flex-1 min-w-[140px]">
-                          <label className="block text-xs font-semibold text-slate-500 mb-0.5">Nota (facoltativa)</label>
-                          <input type="text" value={formPres.nota} onChange={e => setFormPres(f => ({ ...f, nota: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') aggiungiPresenza(); }} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm" placeholder="es. corso adulti 20:00" />
-                        </div>
-                        <button onClick={aggiungiPresenza} className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold">Aggiungi</button>
                       </div>
                     )}
                     {tirocinanti.filter(p => !selId || p.id === selId).flatMap(p => (p.presenze || []).filter(x => x.data === giorno).map(x => ({ p, x }))).map(({ p, x }) => (
                       <div key={x.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-md px-2.5 py-1.5 mb-1 text-sm">
-                        <span><b>{nomeTiro(p)}</b> <span className="text-slate-500">· {p.attivita}</span> · <b>{fmtOre(x.ore)} h</b>{x.nota ? <span className="text-slate-500"> · {x.nota}</span> : null}</span>
-                        <button onClick={() => eliminaPresenza(p.id, x.id)} className="text-slate-400 hover:text-red-600 p-1" title="Elimina"><XIcon size={14}/></button>
+                        <span>{conflitti.has(x.id) && <span className="text-red-600 font-bold mr-1" title="Più di 2 persone nello stesso orario">⚠</span>}<b>{nomeTiro(p)}</b> <span className="text-slate-500">· {p.attivita}</span> · {x.inizio ? <b>{x.inizio}–{x.fine}</b> : null} <b>{x.inizio ? '(' + fmtOre(x.ore) + ' h)' : fmtOre(x.ore) + ' h'}</b>{x.nota ? <span className="text-slate-500"> · {x.nota}</span> : null}</span>
+                        <span className="flex items-center"><button onClick={() => modificaPresenza(p, x)} className="text-slate-400 hover:text-blue-600 p-1" title="Modifica"><EditIcon size={14}/></button><button onClick={() => eliminaPresenza(p.id, x.id)} className="text-slate-400 hover:text-red-600 p-1" title="Elimina"><XIcon size={14}/></button></span>
                       </div>
                     ))}
                     {dellGiorno.length === 0 && <p className="text-xs text-slate-400">Nessuna presenza registrata in questo giorno.</p>}
