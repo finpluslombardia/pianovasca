@@ -234,8 +234,8 @@
       const [selId, setSelId] = useState(null);
       const [giorno, setGiorno] = useState(null);
       const [formP, setFormP] = useState(null); // {id?, nome, cognome, attivita}
-      const [formPres, setFormPres] = useState({ personaId: '', inizio: '18:00', fine: '19:00', nota: '' });
-      const [editPresId, setEditPresId] = useState(null);
+      const [formTurno, setFormTurno] = useState(null); // {id?, data, personaIds, inizio, fine, nota}
+      const [ultimiOrari, setUltimiOrari] = useState({ inizio: '18:00', fine: '19:00' });
       const [tabElenco, setTabElenco] = useState('corso');
       const [filtroAtt, setFiltroAtt] = useState('');
       const fileRef = useRef(null);
@@ -285,34 +285,55 @@
         setTirocinanti(prev => prev.filter(x => x.id !== p.id));
         if (selId === p.id) setSelId(null);
       };
-      const oreForm = oreDaOrari(formPres.inizio, formPres.fine);
-      const conflittoForm = useMemo(() => {
-        if (!giorno || !oreForm || !formPres.personaId) return false;
-        const prova = tirocinanti.map(p => p.id === formPres.personaId
-          ? { ...p, presenze: [...(p.presenze || []).filter(x => x.id !== editPresId), { id: '__nuovo', data: giorno, inizio: formPres.inizio, fine: formPres.fine }] } : p);
-        return trovaConflitti(prova).has('__nuovo');
-      }, [tirocinanti, giorno, formPres, editPresId, oreForm]);
-      const aggiungiPresenza = () => {
-        if (!formPres.personaId) { mostraToast('Scegli il tirocinante.', 'error'); return; }
-        if (!oreForm) { mostraToast("L'orario di fine deve essere dopo quello di inizio.", 'error'); return; }
-        const nuova = { data: giorno, inizio: formPres.inizio, fine: formPres.fine, ore: oreForm, nota: (formPres.nota || '').trim() };
-        if (editPresId) {
-          setTirocinanti(prev => prev.map(p => ({ ...p, presenze: (p.presenze || []).filter(x => x.id !== editPresId) })).map(p => p.id === formPres.personaId ? { ...p, presenze: [...p.presenze, { ...nuova, id: editPresId }] } : p));
-          setEditPresId(null);
-        } else {
-          setTirocinanti(prev => prev.map(p => p.id === formPres.personaId ? { ...p, presenze: [...(p.presenze || []), { ...nuova, id: 'p' + Date.now() + Math.random().toString(36).slice(2, 5) }] } : p));
-        }
-        setFormPres(f => ({ ...f, nota: '' }));
+      const apriTurno = (data, presenza, persona) => {
+        if (presenza) setFormTurno({ id: presenza.id, data: presenza.data, personaIds: [persona.id], inizio: presenza.inizio || ultimiOrari.inizio, fine: presenza.fine || ultimiOrari.fine, nota: presenza.nota || '' });
+        else setFormTurno({ data: data || giorno || oggiYMD, personaIds: selId && tirocinanti.some(p => p.id === selId) ? [selId] : [], inizio: ultimiOrari.inizio, fine: ultimiOrari.fine, nota: '' });
       };
-      const modificaPresenza = (p, x) => {
-        setEditPresId(x.id);
-        setFormPres({ personaId: p.id, inizio: x.inizio || '18:00', fine: x.fine || '19:00', nota: x.nota || '' });
+      const oreForm = formTurno ? oreDaOrari(formTurno.inizio, formTurno.fine) : 0;
+      // chi è già impegnato (turno sovrapposto) nella stessa data/orario
+      const occupati = useMemo(() => {
+        const set = new Set();
+        if (!formTurno || !oreForm) return set;
+        const a = minDaOra(formTurno.inizio), b = minDaOra(formTurno.fine);
+        tirocinanti.forEach(p => (p.presenze || []).forEach(x => {
+          if (x.id === formTurno.id || x.data !== formTurno.data) return;
+          const xa = minDaOra(x.inizio), xb = minDaOra(x.fine);
+          if (xa !== null && xb !== null && xa < b && a < xb) set.add(p.id);
+        }));
+        return set;
+      }, [tirocinanti, formTurno, oreForm]);
+      const personeSelezionabili = formTurno && formTurno.id ? ordinati.filter(p => formTurno.personaIds.includes(p.id)) : ordinati.filter(p => !(ORE_TIROCINIO[p.attivita] && oreFatte(p) >= ORE_TIROCINIO[p.attivita]));
+      const conflittoForm = useMemo(() => {
+        if (!formTurno || !oreForm || !formTurno.personaIds.length) return false;
+        const prova = tirocinanti.map(p => {
+          const base = (p.presenze || []).filter(x => x.id !== formTurno.id);
+          return formTurno.personaIds.includes(p.id) ? { ...p, presenze: [...base, { id: '__n' + p.id, data: formTurno.data, inizio: formTurno.inizio, fine: formTurno.fine }] } : { ...p, presenze: base };
+        });
+        const c = trovaConflitti(prova);
+        return formTurno.personaIds.some(id => c.has('__n' + id));
+      }, [tirocinanti, formTurno, oreForm]);
+      const salvaTurno = () => {
+        if (!formTurno.data) { mostraToast('Scegli la data.', 'error'); return; }
+        if (!formTurno.personaIds.length) { mostraToast('Seleziona almeno un tirocinante.', 'error'); return; }
+        if (!oreForm) { mostraToast("L'orario di fine deve essere dopo quello di inizio.", 'error'); return; }
+        const base = { data: formTurno.data, inizio: formTurno.inizio, fine: formTurno.fine, ore: oreForm, nota: (formTurno.nota || '').trim() };
+        if (formTurno.id) {
+          setTirocinanti(prev => prev.map(p => p.id === formTurno.personaIds[0] ? { ...p, presenze: (p.presenze || []).map(x => x.id === formTurno.id ? { ...base, id: x.id } : x) } : p));
+        } else {
+          setTirocinanti(prev => prev.map(p => formTurno.personaIds.includes(p.id) ? { ...p, presenze: [...(p.presenze || []), { ...base, id: 'p' + Date.now() + Math.random().toString(36).slice(2, 5) }] } : p));
+        }
+        setUltimiOrari({ inizio: formTurno.inizio, fine: formTurno.fine });
+        setGiorno(formTurno.data);
+        const [y, m] = formTurno.data.split('-').map(Number); setMese(new Date(y, m - 1, 1));
+        mostraToast(formTurno.id ? 'Turno aggiornato.' : `Turno aggiunto (${formTurno.personaIds.length} ${formTurno.personaIds.length === 1 ? 'persona' : 'persone'}, ${fmtOre(oreForm)} h ciascuna).`);
+        setFormTurno(null);
       };
       const aggiungiAFine = (minuti) => {
-        const a = minDaOra(formPres.inizio); if (a === null) return;
+        const a = minDaOra(formTurno.inizio); if (a === null) return;
         const b = Math.min(a + minuti, 23 * 60 + 59);
-        setFormPres(f => ({ ...f, fine: String(Math.floor(b / 60)).padStart(2, '0') + ':' + String(b % 60).padStart(2, '0') }));
+        setFormTurno(f => ({ ...f, fine: String(Math.floor(b / 60)).padStart(2, '0') + ':' + String(b % 60).padStart(2, '0') }));
       };
+      const togglePersonaTurno = (id) => setFormTurno(f => ({ ...f, personaIds: f.personaIds.includes(id) ? f.personaIds.filter(x => x !== id) : [...f.personaIds, id] }));
       const eliminaPresenza = (pid, xid) => setTirocinanti(prev => prev.map(p => p.id === pid ? { ...p, presenze: (p.presenze || []).filter(x => x.id !== xid) } : p));
 
       const scarica = () => {
@@ -338,10 +359,7 @@
         r.readAsText(f);
       };
 
-      const apriGiorno = (g) => {
-        setGiorno(g); setEditPresId(null);
-        setFormPres(f => ({ ...f, personaId: selId || f.personaId || (ordinati[0] ? ordinati[0].id : '') }));
-      };
+      const apriGiorno = (g) => { setGiorno(g); };
       const dellGiorno = giorno ? (perGiorno[giorno] || []) : [];
       const fmtGiornoLungo = (g) => { const d = new Date(g + 'T00:00:00'); return d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); };
 
@@ -409,7 +427,7 @@
                     <button onClick={() => setMese(new Date(anno, mm + 1, 1))} className="p-1.5 rounded-md hover:bg-slate-100"><ChevronRightIcon size={18}/></button>
                     <button onClick={() => { const d = new Date(); setMese(new Date(d.getFullYear(), d.getMonth(), 1)); }} className="ml-1 px-2.5 py-1 text-xs font-semibold border border-slate-300 rounded-md hover:bg-slate-100">Oggi</button>
                   </div>
-                  <div className="text-sm text-slate-500">{sel ? <span>Mostro solo <b className="text-slate-800">{nomeTiro(sel)}</b> · <button className="underline" onClick={() => setSelId(null)}>mostra tutti</button></span> : 'Clicca un giorno per registrare le ore'}</div>
+                  <div className="flex items-center gap-3 text-sm text-slate-500">{sel && <span>Solo <b className="text-slate-800">{nomeTiro(sel)}</b> · <button className="underline" onClick={() => setSelId(null)}>mostra tutti</button></span>}<button onClick={() => apriTurno(giorno)} disabled={tirocinanti.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white rounded-md text-sm font-bold"><PlusIcon size={14}/> Aggiungi turno</button></div>
                 </div>
                 <div className="flex-1 overflow-auto p-3">
                   <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-500 mb-1">
@@ -439,46 +457,15 @@
                   <div className="border-t border-slate-200 bg-slate-50 p-3 max-h-[42%] overflow-y-auto">
                     <div className="flex items-center justify-between mb-2">
                       <div className="font-bold text-slate-800 capitalize">{fmtGiornoLungo(giorno)}</div>
-                      <button onClick={() => setGiorno(null)} className="p-1 text-slate-400 hover:text-slate-700"><XIcon size={16}/></button>
-                    </div>
-                    {tirocinanti.length === 0 ? <p className="text-sm text-slate-500">Aggiungi prima almeno un tirocinante dall'elenco a sinistra.</p> : (
-                      <div className="mb-2">
-                        <div className="flex flex-wrap items-end gap-2">
-                          <div className="flex-1 min-w-[180px]">
-                            <label className="block text-xs font-semibold text-slate-500 mb-0.5">Tirocinante</label>
-                            <select value={formPres.personaId} onChange={e => setFormPres(f => ({ ...f, personaId: e.target.value }))} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white">
-                              {ordinati.map(p => <option key={p.id} value={p.id}>{nomeTiro(p)} — {p.attivita}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-0.5">Inizio</label>
-                            <input type="time" step="900" value={formPres.inizio} onChange={e => setFormPres(f => ({ ...f, inizio: e.target.value }))} className="px-2 py-1.5 border border-slate-300 rounded-md text-sm" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-0.5">Fine</label>
-                            <input type="time" step="900" value={formPres.fine} onChange={e => setFormPres(f => ({ ...f, fine: e.target.value }))} className="px-2 py-1.5 border border-slate-300 rounded-md text-sm" />
-                          </div>
-                          <div className="px-2 py-1.5 text-sm font-bold text-[#1e3a5f] bg-white border border-slate-200 rounded-md min-w-[64px] text-center" title="Ore calcolate in automatico">{oreForm ? fmtOre(oreForm) + ' h' : '— h'}</div>
-                          <div className="flex-1 min-w-[140px]">
-                            <label className="block text-xs font-semibold text-slate-500 mb-0.5">Nota (facoltativa)</label>
-                            <input type="text" value={formPres.nota} onChange={e => setFormPres(f => ({ ...f, nota: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') aggiungiPresenza(); }} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm" placeholder="es. corso adulti" />
-                          </div>
-                          <button onClick={aggiungiPresenza} className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold">{editPresId ? 'Salva modifica' : 'Aggiungi'}</button>
-                          {editPresId && <button onClick={() => setEditPresId(null)} className="px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-xs">
-                          <span className="text-slate-500 font-semibold">Durata rapida:</span>
-                          {[[60, '1 h'], [90, '1,5 h'], [120, '2 h'], [180, '3 h']].map(([m, l]) => (
-                            <button key={m} onClick={() => aggiungiAFine(m)} className="px-2 py-0.5 bg-white border border-slate-300 hover:border-[#1e3a5f] rounded-full font-semibold text-slate-700">{l}</button>
-                          ))}
-                          {conflittoForm && <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 border border-red-300 rounded-md font-bold">⚠ In questo orario ci sarebbero più di {MAX_CONTEMPORANEI} persone</span>}
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => apriTurno(giorno)} disabled={tirocinanti.length === 0} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-700 disabled:opacity-40 text-white rounded-md text-sm font-bold"><PlusIcon size={14}/> Aggiungi turno</button>
+                        <button onClick={() => setGiorno(null)} className="p-1 text-slate-400 hover:text-slate-700"><XIcon size={16}/></button>
                       </div>
-                    )}
+                    </div>
                     {tirocinanti.filter(p => !selId || p.id === selId).flatMap(p => (p.presenze || []).filter(x => x.data === giorno).map(x => ({ p, x }))).map(({ p, x }) => (
                       <div key={x.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-md px-2.5 py-1.5 mb-1 text-sm">
                         <span>{conflitti.has(x.id) && <span className="text-red-600 font-bold mr-1" title="Più di 2 persone nello stesso orario">⚠</span>}<b>{nomeTiro(p)}</b> <span className="text-slate-500">· {p.attivita}</span> · {x.inizio ? <b>{x.inizio}–{x.fine}</b> : null} <b>{x.inizio ? '(' + fmtOre(x.ore) + ' h)' : fmtOre(x.ore) + ' h'}</b>{x.nota ? <span className="text-slate-500"> · {x.nota}</span> : null}</span>
-                        <span className="flex items-center"><button onClick={() => modificaPresenza(p, x)} className="text-slate-400 hover:text-blue-600 p-1" title="Modifica"><EditIcon size={14}/></button><button onClick={() => eliminaPresenza(p.id, x.id)} className="text-slate-400 hover:text-red-600 p-1" title="Elimina"><XIcon size={14}/></button></span>
+                        <span className="flex items-center"><button onClick={() => apriTurno(giorno, x, p)} className="text-slate-400 hover:text-blue-600 p-1" title="Modifica"><EditIcon size={14}/></button><button onClick={() => eliminaPresenza(p.id, x.id)} className="text-slate-400 hover:text-red-600 p-1" title="Elimina"><XIcon size={14}/></button></span>
                       </div>
                     ))}
                     {dellGiorno.length === 0 && <p className="text-xs text-slate-400">Nessuna presenza registrata in questo giorno.</p>}
@@ -486,6 +473,68 @@
                 )}
               </div>
             </div>
+            {/* FORM TURNO */}
+            {formTurno && (
+              <div className="fixed inset-0 z-[60] bg-slate-900/40 flex items-center justify-center p-4" onClick={() => setFormTurno(null)}>
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                  <div className="px-5 py-3 bg-[#1e3a5f] text-white font-bold flex justify-between items-center">{formTurno.id ? 'Modifica turno' : 'Aggiungi turno'}<button onClick={() => setFormTurno(null)}><XIcon size={18}/></button></div>
+                  <div className="p-5 space-y-4 overflow-y-auto">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Data</label>
+                        <input type="date" value={formTurno.data} onChange={e => setFormTurno({ ...formTurno, data: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Inizio</label>
+                        <input type="time" step="900" value={formTurno.inizio} onChange={e => setFormTurno({ ...formTurno, inizio: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1">Fine</label>
+                        <input type="time" step="900" value={formTurno.fine} onChange={e => setFormTurno({ ...formTurno, fine: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm" />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                      <span className="text-slate-500 font-semibold">Durata rapida:</span>
+                      {[[60, '1 h'], [90, '1,5 h'], [120, '2 h'], [180, '3 h']].map(([m, l]) => (
+                        <button key={m} onClick={() => aggiungiAFine(m)} className="px-2.5 py-1 bg-white border border-slate-300 hover:border-[#1e3a5f] rounded-full font-semibold text-slate-700">{l}</button>
+                      ))}
+                      <span className="ml-auto px-3 py-1 rounded-md bg-blue-50 text-[#1e3a5f] font-bold text-sm">{oreForm ? `${fmtOre(oreForm)} ore` : 'Orario non valido'}</span>
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-500">{formTurno.id ? 'Tirocinante' : 'Tirocinanti disponibili'} {!formTurno.id && <span className="font-normal">(puoi sceglierne più di uno)</span>}</label>
+                        {!formTurno.id && personeSelezionabili.length > 0 && <button className="text-xs underline text-slate-500" onClick={() => setFormTurno(f => ({ ...f, personaIds: f.personaIds.length ? [] : personeSelezionabili.filter(p => !occupati.has(p.id)).map(p => p.id) }))}>{formTurno.personaIds.length ? 'Deseleziona' : 'Seleziona tutti'}</button>}
+                      </div>
+                      <div className="border border-slate-200 rounded-md max-h-52 overflow-y-auto divide-y divide-slate-100">
+                        {personeSelezionabili.length === 0 && <p className="p-3 text-sm text-slate-400">Nessun tirocinante disponibile: aggiungine uno o controlla i completati.</p>}
+                        {personeSelezionabili.map(p => {
+                          const occ = occupati.has(p.id) && !formTurno.id;
+                          const on = formTurno.personaIds.includes(p.id);
+                          const col = COLORI_TIROCINIO[p.attivita] || COLORI_TIROCINIO['Istruttore'];
+                          return (
+                            <label key={p.id} className={`flex items-center gap-2.5 px-3 py-2 text-sm ${occ ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'} ${on ? 'bg-blue-50' : ''}`}>
+                              <input type="checkbox" checked={on} disabled={occ || !!formTurno.id} onChange={() => togglePersonaTurno(p.id)} className="w-4 h-4" />
+                              <span className="font-semibold text-slate-800">{nomeTiro(p)}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[11px] font-semibold ${col.badge}`}>{p.attivita}</span>
+                              <span className="ml-auto text-xs text-slate-500">{occ ? 'già in turno a quell\'ora' : `${fmtOre(oreFatte(p))}/${ORE_TIROCINIO[p.attivita]} h`}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Nota (facoltativa)</label>
+                      <input type="text" value={formTurno.nota} onChange={e => setFormTurno({ ...formTurno, nota: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" placeholder="es. corso adulti" />
+                    </div>
+                    {conflittoForm && <div className="px-3 py-2 bg-red-50 border border-red-300 text-red-700 rounded-md text-sm font-bold">⚠ In questo orario ci sarebbero più di {MAX_CONTEMPORANEI} tirocinanti insieme. Puoi salvare comunque, ma il turno sarà segnalato.</div>}
+                  </div>
+                  <div className="px-5 py-3 bg-slate-50 border-t flex justify-end gap-2">
+                    <button onClick={() => setFormTurno(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>
+                    <button onClick={salvaTurno} className="px-4 py-2 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md">Salva turno</button>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* FORM TIROCINANTE */}
             {formP && (
               <div className="fixed inset-0 z-[60] bg-slate-900/40 flex items-center justify-center p-4" onClick={() => setFormP(null)}>
