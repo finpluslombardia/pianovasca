@@ -155,10 +155,11 @@
     const idStagione = (n) => String(n).replace(/[\/\s.]/g, '_');
     const N_BLOCCHI_ARCHIVIO = 12;
     const hashBlocco = (str) => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h % N_BLOCCHI_ARCHIVIO; };
-    const statoToDocs = ({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa }) => {
+    const statoToDocs = ({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, tirocinanti }) => {
       const docs = {};
       docs['v2_meta'] = { formato: 'v2', stagioni: stagioni || [], stagionePredefinita: stagionePredefinita || '' };
       docs['v2_attesa'] = { listaAttesa: listaAttesa || [] };
+      docs['v2_tirocinanti'] = { tirocinanti: tirocinanti || [] };
       const blocchiArc = {};
       Object.keys(archivioSoci || {}).forEach(k => { const b = hashBlocco(k); (blocchiArc[b] = blocchiArc[b] || {})[k] = archivioSoci[k]; });
       Object.keys(blocchiArc).forEach(b => { docs['v2_arc_' + String(b).padStart(2, '0')] = { archivioSoci: blocchiArc[b] }; });
@@ -179,13 +180,266 @@
       (meta.stagioni || []).forEach(st => { tuttiPiani[st] = {}; });
       const archivioSoci = {};
       let listaAttesa = [];
+      let tirocinanti = [];
       Object.keys(m).forEach(id => {
         const d = m[id] || {};
         if (id.startsWith('v2_piano__')) { const n = d.stagione; if (n !== undefined) { tuttiPiani[n] = tuttiPiani[n] || {}; Object.assign(tuttiPiani[n], d.celle || {}); } }
         else if (id.startsWith('v2_arc_')) Object.assign(archivioSoci, d.archivioSoci || {});
         else if (id === 'v2_attesa') listaAttesa = d.listaAttesa || [];
+        else if (id === 'v2_tirocinanti') tirocinanti = d.tirocinanti || [];
       });
-      return { tuttiPiani, stagioni: (meta.stagioni && meta.stagioni.length) ? meta.stagioni : Object.keys(tuttiPiani), stagionePredefinita: meta.stagionePredefinita || '', archivioSoci, listaAttesa, updatedAt: meta.updatedAt || null };
+      return { tuttiPiani, stagioni: (meta.stagioni && meta.stagioni.length) ? meta.stagioni : Object.keys(tuttiPiani), stagionePredefinita: meta.stagionePredefinita || '', archivioSoci, listaAttesa, tirocinanti, updatedAt: meta.updatedAt || null };
+    };
+
+    // --- CALENDARIO TIROCINANTI (dati in un documento cloud separato: v2_tirocinanti) ---
+    const ORE_TIROCINIO = { 'Assistente bagnanti': 30, 'Istruttore': 70, 'Aiuto Allenatore': 50 };
+    const COLORI_TIROCINIO = {
+      'Assistente bagnanti': { chip: 'bg-sky-100 text-sky-800 border-sky-200', barra: 'bg-sky-500', badge: 'bg-sky-100 text-sky-800' },
+      'Istruttore': { chip: 'bg-emerald-100 text-emerald-800 border-emerald-200', barra: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-800' },
+      'Aiuto Allenatore': { chip: 'bg-amber-100 text-amber-800 border-amber-200', barra: 'bg-amber-500', badge: 'bg-amber-100 text-amber-800' },
+    };
+    const fmtOre = (n) => String(Math.round((Number(n) || 0) * 100) / 100).replace('.', ',');
+    const MESI_TIRO = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+    const oreFatte = (p) => (p.presenze || []).reduce((t, x) => t + (Number(x.ore) || 0), 0);
+    const nomeTiro = (p) => `${p.cognome || ''} ${p.nome || ''}`.trim();
+
+    const TirocinantiModal = ({ tirocinanti, setTirocinanti, onClose, mostraToast }) => {
+      const oggiYMD = toYMD(new Date());
+      const [mese, setMese] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+      const [selId, setSelId] = useState(null);
+      const [giorno, setGiorno] = useState(null);
+      const [formP, setFormP] = useState(null); // {id?, nome, cognome, attivita}
+      const [formPres, setFormPres] = useState({ personaId: '', ore: '2', nota: '' });
+      const [filtroAtt, setFiltroAtt] = useState('');
+      const fileRef = useRef(null);
+
+      const ordinati = useMemo(() => [...tirocinanti].sort((a, b) => nomeTiro(a).localeCompare(nomeTiro(b), 'it')), [tirocinanti]);
+      const visibili = ordinati.filter(p => !filtroAtt || p.attivita === filtroAtt);
+      const sel = tirocinanti.find(p => p.id === selId) || null;
+
+      const perGiorno = useMemo(() => {
+        const m = {};
+        tirocinanti.forEach(p => {
+          if (selId && p.id !== selId) return;
+          if (filtroAtt && !selId && p.attivita !== filtroAtt) return;
+          (p.presenze || []).forEach(x => { (m[x.data] = m[x.data] || []).push({ p, x }); });
+        });
+        return m;
+      }, [tirocinanti, selId, filtroAtt]);
+
+      const anno = mese.getFullYear(), mm = mese.getMonth();
+      const offset = (new Date(anno, mm, 1).getDay() + 6) % 7;
+      const nGiorni = new Date(anno, mm + 1, 0).getDate();
+      const celle = [];
+      for (let i = 0; i < offset; i++) celle.push(null);
+      for (let d = 1; d <= nGiorni; d++) celle.push(toYMD(new Date(anno, mm, d)));
+      while (celle.length % 7 !== 0) celle.push(null);
+
+      const salvaPersona = () => {
+        const nome = (formP.nome || '').trim(), cognome = (formP.cognome || '').trim();
+        if (!nome || !cognome) { mostraToast('Inserisci nome e cognome.', 'error'); return; }
+        const cap = (t) => t.replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+        if (formP.id) setTirocinanti(prev => prev.map(p => p.id === formP.id ? { ...p, nome: cap(nome), cognome: cap(cognome), attivita: formP.attivita } : p));
+        else {
+          const id = 't' + Date.now() + Math.random().toString(36).slice(2, 6);
+          setTirocinanti(prev => [...prev, { id, nome: cap(nome), cognome: cap(cognome), attivita: formP.attivita, presenze: [] }]);
+          setSelId(id);
+        }
+        setFormP(null);
+      };
+      const eliminaPersona = (p) => {
+        if (!window.confirm(`Eliminare ${nomeTiro(p)} e tutte le sue ${(p.presenze || []).length} presenze?`)) return;
+        setTirocinanti(prev => prev.filter(x => x.id !== p.id));
+        if (selId === p.id) setSelId(null);
+      };
+      const aggiungiPresenza = () => {
+        const ore = parseFloat(String(formPres.ore).replace(',', '.'));
+        if (!formPres.personaId) { mostraToast('Scegli il tirocinante.', 'error'); return; }
+        if (!ore || ore <= 0 || ore > 24) { mostraToast('Inserisci un numero di ore valido.', 'error'); return; }
+        setTirocinanti(prev => prev.map(p => p.id === formPres.personaId ? { ...p, presenze: [...(p.presenze || []), { id: 'p' + Date.now() + Math.random().toString(36).slice(2, 5), data: giorno, ore, nota: (formPres.nota || '').trim() }] } : p));
+        setFormPres(f => ({ ...f, nota: '' }));
+      };
+      const eliminaPresenza = (pid, xid) => setTirocinanti(prev => prev.map(p => p.id === pid ? { ...p, presenze: (p.presenze || []).filter(x => x.id !== xid) } : p));
+
+      const scarica = () => {
+        const dati = JSON.stringify({ formato: 'pianovasca-tirocinanti-v1', esportatoIl: new Date().toISOString(), tirocinanti }, null, 2);
+        const url = URL.createObjectURL(new Blob([dati], { type: 'application/json' }));
+        const a = document.createElement('a'); a.href = url; a.download = `tirocinanti_${toYMD(new Date())}.json`; a.click();
+        URL.revokeObjectURL(url);
+        mostraToast(`File tirocinanti scaricato (${tirocinanti.length} persone).`);
+      };
+      const carica = (e) => {
+        const f = e.target.files && e.target.files[0]; e.target.value = '';
+        if (!f) return;
+        const r = new FileReader();
+        r.onload = (ev) => {
+          try {
+            const d = JSON.parse(ev.target.result);
+            if (!d || !Array.isArray(d.tirocinanti)) { alert('Questo file non è un backup dei tirocinanti.'); return; }
+            if (!window.confirm(`Il file contiene ${d.tirocinanti.length} tirocinanti. Sostituisco l'elenco attuale (${tirocinanti.length})?`)) return;
+            setTirocinanti(d.tirocinanti); setSelId(null);
+            mostraToast('Tirocinanti ripristinati dal file.');
+          } catch (err) { alert('File non leggibile.'); }
+        };
+        r.readAsText(f);
+      };
+
+      const apriGiorno = (g) => {
+        setGiorno(g);
+        setFormPres(f => ({ ...f, personaId: selId || f.personaId || (ordinati[0] ? ordinati[0].id : '') }));
+      };
+      const dellGiorno = giorno ? (perGiorno[giorno] || []) : [];
+      const fmtGiornoLungo = (g) => { const d = new Date(g + 'T00:00:00'); return d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }); };
+
+      return (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-5 py-3 bg-[#1e3a5f] text-white">
+              <h3 className="font-bold text-xl flex items-center gap-2"><CalendarIcon size={24}/> Calendario tirocinanti</h3>
+              <div className="flex items-center gap-2">
+                <button onClick={scarica} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-md text-sm font-semibold" title="Scarica un file separato con solo i tirocinanti"><DownloadIcon size={15}/> Scarica file</button>
+                <button onClick={() => fileRef.current && fileRef.current.click()} className="px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-md text-sm font-semibold" title="Ripristina i tirocinanti da un file scaricato">Carica file</button>
+                <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={carica} />
+                <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors ml-1"><XIcon size={20}/></button>
+              </div>
+            </div>
+            <div className="flex-1 flex min-h-0">
+              {/* ELENCO TIROCINANTI */}
+              <div className="w-80 shrink-0 border-r border-slate-200 flex flex-col bg-slate-50">
+                <div className="p-3 border-b border-slate-200 space-y-2">
+                  <button onClick={() => setFormP({ nome: '', cognome: '', attivita: 'Assistente bagnanti' })} className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold"><PlusIcon size={16}/> Nuovo tirocinante</button>
+                  <select value={filtroAtt} onChange={e => setFiltroAtt(e.target.value)} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white">
+                    <option value="">Tutte le attività</option>
+                    {Object.keys(ORE_TIROCINIO).map(a => <option key={a} value={a}>{a} ({ORE_TIROCINIO[a]} ore)</option>)}
+                  </select>
+                </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {visibili.length === 0 && <p className="text-sm text-slate-400 text-center mt-6 px-4">{tirocinanti.length === 0 ? 'Nessun tirocinante. Aggiungine uno con il tasto qui sopra.' : 'Nessun tirocinante per questa attività.'}</p>}
+                  {visibili.map(p => {
+                    const tot = oreFatte(p), target = ORE_TIROCINIO[p.attivita] || 0;
+                    const pct = target ? Math.min(100, Math.round(tot / target * 100)) : 0;
+                    const fatto = target && tot >= target;
+                    const col = COLORI_TIROCINIO[p.attivita] || COLORI_TIROCINIO['Istruttore'];
+                    return (
+                      <div key={p.id} onClick={() => setSelId(selId === p.id ? null : p.id)} className={`rounded-lg border p-2.5 cursor-pointer transition-colors ${selId === p.id ? 'border-[#1e3a5f] bg-white ring-2 ring-[#1e3a5f]/30' : 'border-slate-200 bg-white hover:border-slate-400'}`}>
+                        <div className="flex items-start justify-between gap-1">
+                          <div className="min-w-0">
+                            <div className="font-bold text-sm text-slate-800 truncate">{nomeTiro(p)}</div>
+                            <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[11px] font-semibold ${col.badge}`}>{p.attivita}</span>
+                          </div>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button onClick={e => { e.stopPropagation(); setFormP({ id: p.id, nome: p.nome, cognome: p.cognome, attivita: p.attivita }); }} className="p-1 text-slate-400 hover:text-blue-600" title="Modifica"><EditIcon size={14}/></button>
+                            <button onClick={e => { e.stopPropagation(); eliminaPersona(p); }} className="p-1 text-slate-400 hover:text-red-600" title="Elimina"><XIcon size={14}/></button>
+                          </div>
+                        </div>
+                        <div className="mt-2 h-2 bg-slate-200 rounded-full overflow-hidden"><div className={`h-full ${fatto ? 'bg-green-500' : col.barra}`} style={{ width: pct + '%' }}></div></div>
+                        <div className="mt-1 flex justify-between text-xs">
+                          <span className="font-semibold text-slate-700">{fmtOre(tot)} / {target} ore</span>
+                          {fatto ? <span className="font-bold text-green-600">Completato ✓</span> : <span className="text-slate-500">mancano {fmtOre(target - tot)} h</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              {/* CALENDARIO */}
+              <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setMese(new Date(anno, mm - 1, 1))} className="p-1.5 rounded-md hover:bg-slate-100"><ChevronLeftIcon size={18}/></button>
+                    <div className="font-bold text-lg text-slate-800 w-44 text-center">{MESI_TIRO[mm]} {anno}</div>
+                    <button onClick={() => setMese(new Date(anno, mm + 1, 1))} className="p-1.5 rounded-md hover:bg-slate-100"><ChevronRightIcon size={18}/></button>
+                    <button onClick={() => { const d = new Date(); setMese(new Date(d.getFullYear(), d.getMonth(), 1)); }} className="ml-1 px-2.5 py-1 text-xs font-semibold border border-slate-300 rounded-md hover:bg-slate-100">Oggi</button>
+                  </div>
+                  <div className="text-sm text-slate-500">{sel ? <span>Mostro solo <b className="text-slate-800">{nomeTiro(sel)}</b> · <button className="underline" onClick={() => setSelId(null)}>mostra tutti</button></span> : 'Clicca un giorno per registrare le ore'}</div>
+                </div>
+                <div className="flex-1 overflow-auto p-3">
+                  <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-500 mb-1">
+                    {['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].map(g => <div key={g}>{g}</div>)}
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {celle.map((g, i) => {
+                      if (!g) return <div key={i} className="min-h-[78px] rounded-md bg-slate-50/50"></div>;
+                      const voci = perGiorno[g] || [];
+                      const isOggi = g === oggiYMD, isSel = g === giorno;
+                      return (
+                        <div key={i} onClick={() => apriGiorno(g)} className={`min-h-[78px] rounded-md border p-1 cursor-pointer transition-colors ${isSel ? 'border-[#1e3a5f] ring-2 ring-[#1e3a5f]/30 bg-blue-50' : isOggi ? 'border-teal-400 bg-teal-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                          <div className={`text-xs font-bold ${isOggi ? 'text-teal-700' : 'text-slate-500'}`}>{parseInt(g.slice(8), 10)}</div>
+                          <div className="space-y-0.5 mt-0.5">
+                            {voci.slice(0, 3).map(({ p, x }) => (
+                              <div key={x.id} className={`text-[10px] leading-tight px-1 py-0.5 rounded border truncate ${(COLORI_TIROCINIO[p.attivita] || COLORI_TIROCINIO['Istruttore']).chip}`} title={`${nomeTiro(p)} · ${fmtOre(x.ore)} h`}>{p.cognome} {(p.nome || '').charAt(0)}. · {fmtOre(x.ore)}h</div>
+                            ))}
+                            {voci.length > 3 && <div className="text-[10px] text-slate-500 font-semibold">+{voci.length - 3} altri</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* PANNELLO GIORNO */}
+                {giorno && (
+                  <div className="border-t border-slate-200 bg-slate-50 p-3 max-h-[42%] overflow-y-auto">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-bold text-slate-800 capitalize">{fmtGiornoLungo(giorno)}</div>
+                      <button onClick={() => setGiorno(null)} className="p-1 text-slate-400 hover:text-slate-700"><XIcon size={16}/></button>
+                    </div>
+                    {tirocinanti.length === 0 ? <p className="text-sm text-slate-500">Aggiungi prima almeno un tirocinante dall'elenco a sinistra.</p> : (
+                      <div className="flex flex-wrap items-end gap-2 mb-2">
+                        <div className="flex-1 min-w-[180px]">
+                          <label className="block text-xs font-semibold text-slate-500 mb-0.5">Tirocinante</label>
+                          <select value={formPres.personaId} onChange={e => setFormPres(f => ({ ...f, personaId: e.target.value }))} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white">
+                            {ordinati.map(p => <option key={p.id} value={p.id}>{nomeTiro(p)} — {p.attivita}</option>)}
+                          </select>
+                        </div>
+                        <div className="w-24">
+                          <label className="block text-xs font-semibold text-slate-500 mb-0.5">Ore</label>
+                          <input type="number" min="0.5" max="24" step="0.5" value={formPres.ore} onChange={e => setFormPres(f => ({ ...f, ore: e.target.value }))} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm" />
+                        </div>
+                        <div className="flex-1 min-w-[140px]">
+                          <label className="block text-xs font-semibold text-slate-500 mb-0.5">Nota (facoltativa)</label>
+                          <input type="text" value={formPres.nota} onChange={e => setFormPres(f => ({ ...f, nota: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') aggiungiPresenza(); }} className="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm" placeholder="es. corso adulti 20:00" />
+                        </div>
+                        <button onClick={aggiungiPresenza} className="px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold">Aggiungi</button>
+                      </div>
+                    )}
+                    {tirocinanti.filter(p => !selId || p.id === selId).flatMap(p => (p.presenze || []).filter(x => x.data === giorno).map(x => ({ p, x }))).map(({ p, x }) => (
+                      <div key={x.id} className="flex items-center justify-between bg-white border border-slate-200 rounded-md px-2.5 py-1.5 mb-1 text-sm">
+                        <span><b>{nomeTiro(p)}</b> <span className="text-slate-500">· {p.attivita}</span> · <b>{fmtOre(x.ore)} h</b>{x.nota ? <span className="text-slate-500"> · {x.nota}</span> : null}</span>
+                        <button onClick={() => eliminaPresenza(p.id, x.id)} className="text-slate-400 hover:text-red-600 p-1" title="Elimina"><XIcon size={14}/></button>
+                      </div>
+                    ))}
+                    {dellGiorno.length === 0 && <p className="text-xs text-slate-400">Nessuna presenza registrata in questo giorno.</p>}
+                  </div>
+                )}
+              </div>
+            </div>
+            {/* FORM TIROCINANTE */}
+            {formP && (
+              <div className="fixed inset-0 z-[60] bg-slate-900/40 flex items-center justify-center p-4" onClick={() => setFormP(null)}>
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className="px-5 py-3 bg-[#1e3a5f] text-white font-bold flex justify-between items-center">{formP.id ? 'Modifica tirocinante' : 'Nuovo tirocinante'}<button onClick={() => setFormP(null)}><XIcon size={18}/></button></div>
+                  <div className="p-5 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Nome</label><input autoFocus type="text" value={formP.nome} onChange={e => setFormP({ ...formP, nome: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" /></div>
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Cognome</label><input type="text" value={formP.cognome} onChange={e => setFormP({ ...formP, cognome: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') salvaPersona(); }} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" /></div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Attività</label>
+                      <select value={formP.attivita} onChange={e => setFormP({ ...formP, attivita: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white">
+                        {Object.keys(ORE_TIROCINIO).map(a => <option key={a} value={a}>{a} — {ORE_TIROCINIO[a]} ore</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="px-5 py-3 bg-slate-50 border-t flex justify-end gap-2">
+                    <button onClick={() => setFormP(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>
+                    <button onClick={salvaPersona} className="px-4 py-2 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md">Salva</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
     };
 
     const costruisciArchivioDaPiani = (tuttiPianiObj) => {
@@ -606,6 +860,8 @@
       // --- STATI LISTA D'ATTESA (contatti da ricontattare, indipendente dal piano vasca) ---
       const [listaAttesa, setListaAttesa] = useState([]);
       const [isListaAttesaOpen, setIsListaAttesaOpen] = useState(false);
+      const [tirocinanti, setTirocinanti] = useState([]);
+      const [isTirocinantiOpen, setIsTirocinantiOpen] = useState(false);
       const [editandoContattoAttesaId, setEditandoContattoAttesaId] = useState(null);
       const [isFormAttesaOpen, setIsFormAttesaOpen] = useState(false);
       const [dettaglioContattoAttesa, setDettaglioContattoAttesa] = useState(null);
@@ -663,7 +919,7 @@
 
       // --- BLOCCO SCORRIMENTO SFONDO ---
       useEffect(() => {
-          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen || isDisponibilitaOpen || !!iscrittiPeriodo || isIscrittiGiornoOpen;
+          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen || isDisponibilitaOpen || !!iscrittiPeriodo || isIscrittiGiornoOpen || isTirocinantiOpen;
           if (isAnyModalOpen) {
               document.body.style.overflow = 'hidden';
           } else {
@@ -672,7 +928,7 @@
           return () => {
               document.body.style.overflow = '';
           };
-      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen, isListaAttesaOpen, isFormAttesaOpen, dettaglioContattoAttesa, isInseritiOggiOpen]);
+      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen, isListaAttesaOpen, isFormAttesaOpen, dettaglioContattoAttesa, isInseritiOggiOpen, isTirocinantiOpen]);
 
       const partecipantiAttiviModal = useMemo(() => {
           return editModal ? (editModal.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)) : [];
@@ -756,6 +1012,7 @@
           const archivioCaricato = archivioVuoto ? costruisciArchivioDaPiani(st.tuttiPiani) : st.archivioSoci;
           setArchivioSoci(archivioCaricato);
           setListaAttesa(st.listaAttesa || []);
+          setTirocinanti(st.tirocinanti || []);
           let defaultSeason = st.stagionePredefinita;
           if (st.stagioni && st.stagioni.length > 0) {
             setStagioni(st.stagioni);
@@ -769,7 +1026,7 @@
             });
           }
           // Se l'archivio era vuoto e lo abbiamo ricostruito dai corsi, lo lasciamo "da salvare".
-          lastSavedPiano.current = daMigrazione ? 'MIGRAZIONE' : JSON.stringify({ t: st.tuttiPiani, s: st.stagioni, def: defaultSeason, arch: archivioVuoto ? (st.archivioSoci || {}) : archivioCaricato, la: st.listaAttesa || [] });
+          lastSavedPiano.current = daMigrazione ? 'MIGRAZIONE' : JSON.stringify({ t: st.tuttiPiani, s: st.stagioni, def: defaultSeason, arch: archivioVuoto ? (st.archivioSoci || {}) : archivioCaricato, la: st.listaAttesa || [], ti: st.tirocinanti || [] });
           ultimiConteggi.current = contaDati(st.tuttiPiani, archivioCaricato);
         };
 
@@ -853,7 +1110,7 @@
       };
 
       // --- FUNZIONE DI SALVATAGGIO CLOUD (a blocchi) ---
-      const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare, stagionePredef, archivioDaSalvare, listaAttesaDaSalvare) => {
+      const salvaInCloud = async (pianiDaSalvare, stagioniDaSalvare, stagionePredef, archivioDaSalvare, listaAttesaDaSalvare, tirocinantiDaSalvare) => {
         if (!user || !firebaseInstances) {
             setStatoSalvataggio('error');
             setTimeout(() => setStatoSalvataggio('idle'), 4000);
@@ -891,7 +1148,7 @@
                     const limiteOra = new Date(oraBk); limiteOra.setHours(13, 0, 0, 0);
                     if (oraBk < limiteOra) limiteOra.setDate(limiteOra.getDate() - 1);
                     const chiaveGiorno = toYMD(limiteOra);
-                    const docsPrec = statoToDocs({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [] });
+                    const docsPrec = statoToDocs({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], tirocinanti: prec.ti || [] });
                     const scriviBackup = async (slot) => {
                         const ids = Object.keys(docsPrec);
                         const ops = ids.map(id => [`bk2_${slot}__${id}`, JSON.parse(JSON.stringify(docsPrec[id]))]);
@@ -916,7 +1173,7 @@
 
             // Costruiamo i blocchi nuovi e confrontiamoli con quelli già sul cloud: si scrive solo ciò che è cambiato.
             const adessoISO = new Date().toISOString();
-            const docsNuovi = statoToDocs({ tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, archivioSoci: archivioDaSalvare, listaAttesa: listaAttesaDaSalvare });
+            const docsNuovi = statoToDocs({ tuttiPiani: pianiDaSalvare, stagioni: stagioniDaSalvare, stagionePredefinita: stagionePredef, archivioSoci: archivioDaSalvare, listaAttesa: listaAttesaDaSalvare, tirocinanti: tirocinantiDaSalvare });
             docsNuovi['v2_meta'].updatedAt = adessoISO;
             const strNuovi = {};
             Object.keys(docsNuovi).forEach(id => {
@@ -944,7 +1201,7 @@
             lastSavedDocs.current = strNuovi;
             updatedAtNoto.current = adessoISO; updatedAtServer.current = adessoISO;
             ultimiConteggi.current = nuoviC;
-            const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef, arch: archivioDaSalvare, la: listaAttesaDaSalvare });
+            const statoAppenaSalvato = JSON.stringify({ t: pianiDaSalvare, s: stagioniDaSalvare, def: stagionePredef, arch: archivioDaSalvare, la: listaAttesaDaSalvare, ti: tirocinantiDaSalvare });
             lastSavedPiano.current = statoAppenaSalvato;
             // Abbassiamo il flag "modifiche in sospeso" solo se, durante il salvataggio (che è
             // asincrono), l'utente non ha nel frattempo fatto altre modifiche.
@@ -958,7 +1215,7 @@
             // L'errore resta visibile (indicatore in basso a destra) e il salvataggio viene
             // ritentato in automatico dopo 10 secondi, con gli stessi dati.
             setStatoSalvataggio('error');
-            setTimeout(() => salvaInCloud(pianiDaSalvare, stagioniDaSalvare, stagionePredef, archivioDaSalvare, listaAttesaDaSalvare), 10000);
+            setTimeout(() => salvaInCloud(pianiDaSalvare, stagioniDaSalvare, stagionePredef, archivioDaSalvare, listaAttesaDaSalvare, tirocinantiDaSalvare), 10000);
         }
       };
 
@@ -972,15 +1229,15 @@
         // i dati reali appena letti da Firestore — e il salvataggio automatico, sbloccato subito
         // dopo, finiva per scrivere lo stato ancora vuoto sopra ai dati reali, cancellandoli.
         if (!user || !firebaseInstances || !isDataLoaded) return;
-        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita, arch: archivioSoci, la: listaAttesa });
+        const currentStateStr = JSON.stringify({ t: tuttiPiani, s: stagioni, def: stagionePredefinita, arch: archivioSoci, la: listaAttesa, ti: tirocinanti });
         if (currentStateStr === lastSavedPiano.current) return; 
         // Registriamo lo stato locale più recente e segnaliamo che c'è una modifica da salvare:
         // questo impedisce all'onSnapshot di sovrascriverla nel frattempo (vedi BUGFIX sopra).
         ultimoStatoLocaleVisto.current = currentStateStr;
         hasModificheLocaliInSospeso.current = true;
-        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa), 1500);
+        const timer = setTimeout(() => salvaInCloud(tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, tirocinanti), 1500);
         return () => clearTimeout(timer);
-      }, [tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, user, firebaseInstances, isDataLoaded]);
+      }, [tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, tirocinanti, user, firebaseInstances, isDataLoaded]);
 
       // --- NORMALIZZAZIONE DATI: nomi con iniziali maiuscole ed email in minuscolo (anche per i dati già presenti) ---
       useEffect(() => {
@@ -3037,7 +3294,7 @@
           });
           if (slot === null) slot = piuVecchio || 'x0';
           const arc = archivioCompleto(archivioSoci, tuttiPiani);
-          const docsAtt = statoToDocs({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arc, listaAttesa });
+          const docsAtt = statoToDocs({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arc, listaAttesa, tirocinanti });
           const ids = Object.keys(docsAtt);
           const cc = contaDati(tuttiPiani, arc);
           const ops = ids.map(id => [`bk2_${slot}__${id}`, JSON.parse(JSON.stringify(docsAtt[id]))]);
@@ -3064,7 +3321,7 @@
             snaps.forEach((sn, i) => { if (sn.exists()) mappa[b0.docIds[i]] = sn.data(); });
             if (!mappa['v2_meta']) { alert("Questo backup risulta incompleto: non lo ripristino."); return; }
             const st = stateFromDocs(mappa);
-            b = { ...b0, tuttiPiani: st.tuttiPiani, stagioni: st.stagioni, stagionePredefinita: st.stagionePredefinita, archivioSoci: st.archivioSoci, listaAttesa: st.listaAttesa };
+            b = { ...b0, tuttiPiani: st.tuttiPiani, stagioni: st.stagioni, stagionePredefinita: st.stagionePredefinita, archivioSoci: st.archivioSoci, listaAttesa: st.listaAttesa, tirocinanti: mappa['v2_tirocinanti'] ? st.tirocinanti : undefined };
           } catch (err) { console.error(err); alert("Non sono riuscito a leggere questo backup."); return; }
         }
         setTuttiPiani(b.tuttiPiani || {});
@@ -3072,6 +3329,7 @@
         if (b.stagionePredefinita) setStagionePredefinita(b.stagionePredefinita);
         setArchivioSoci(archivioCompleto(b.archivioSoci, b.tuttiPiani));
         setListaAttesa(b.listaAttesa || []);
+        if (b.tirocinanti) setTirocinanti(b.tirocinanti);
         // la versione ripristinata è "nuova" rispetto al cloud: azzeriamo i freni per questo salvataggio
         ultimiConteggi.current = null; updatedAtNoto.current = updatedAtServer.current;
         setIsBackupModalOpen(false);
@@ -3080,7 +3338,7 @@
 
       const esportaDati = () => {
         const arcCompleto = archivioCompleto(archivioSoci, tuttiPiani);
-        const dataStr = JSON.stringify({ formato: 'pianovasca-backup-v2', esportatoIl: new Date().toISOString(), conteggi: contaDati(tuttiPiani, arcCompleto), tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arcCompleto, listaAttesa, attivita: ATTIVITA_DI_BASE }, null, 2);
+        const dataStr = JSON.stringify({ formato: 'pianovasca-backup-v2', esportatoIl: new Date().toISOString(), conteggi: contaDati(tuttiPiani, arcCompleto), tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arcCompleto, listaAttesa, tirocinanti, attivita: ATTIVITA_DI_BASE }, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -3253,6 +3511,7 @@
               setStagioni(dati.stagioni || Object.keys(dati.tuttiPiani));
               setArchivioSoci(archivioCompleto(dati.archivioSoci, dati.tuttiPiani));
               if (dati.listaAttesa) setListaAttesa(dati.listaAttesa);
+              if (dati.tirocinanti) setTirocinanti(dati.tirocinanti);
               if (dati.stagionePredefinita) setStagionePredefinita(dati.stagionePredefinita);
               if (dati.stagioni && dati.stagioni.length > 0) setStagioneSelezionata(dati.stagioni[0]);
             } else if (dati.piano) {
@@ -4384,6 +4643,8 @@
               </div>
             </div>
           )}
+
+          {isTirocinantiOpen && <TirocinantiModal tirocinanti={tirocinanti} setTirocinanti={setTirocinanti} onClose={() => setIsTirocinantiOpen(false)} mostraToast={mostraToast} />}
 
           {/* --- MODALE LISTA D'ATTESA (contatti da ricontattare) --- */}
           {isListaAttesaOpen && (
@@ -6083,8 +6344,9 @@
 
               </div>
               <div className="flex items-center gap-2">
-                    <button onClick={() => { setRicercaIscrittiPeriodo(''); setIscrittiPeriodo('primo'); setIsIscrittiGiornoOpen(false); }} className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] hover:bg-[#2a4d7c] text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Elenco iscritti per periodo o per giorno"><UsersIcon size={16} /> Iscritti per periodo</button>
+                    <button onClick={() => { setRicercaIscrittiPeriodo(''); setIscrittiPeriodo('primo'); setIsIscrittiGiornoOpen(false); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Elenco iscritti per periodo o per giorno"><UsersIcon size={16} /> Iscritti per periodo</button>
                     <button onClick={() => { setCatDispEspansa(null); setIsDisponibilitaOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] hover:bg-[#2a4d7c] text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Posti liberi per ogni categoria di corso"><UsersIcon size={16} /> Disponibilità corsi</button>
+                    <button onClick={() => setIsTirocinantiOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Calendario e ore dei tirocinanti"><CalendarIcon size={16} /> Tirocinanti</button>
               </div>
               <div className="flex items-center gap-2">
                     <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci"><LogOutIcon size={16} /> Esci</button>
