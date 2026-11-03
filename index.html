@@ -155,11 +155,12 @@
     const idStagione = (n) => String(n).replace(/[\/\s.]/g, '_');
     const N_BLOCCHI_ARCHIVIO = 12;
     const hashBlocco = (str) => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h % N_BLOCCHI_ARCHIVIO; };
-    const statoToDocs = ({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, tirocinanti }) => {
+    const statoToDocs = ({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, tirocinanti, chiusure }) => {
       const docs = {};
       docs['v2_meta'] = { formato: 'v2', stagioni: stagioni || [], stagionePredefinita: stagionePredefinita || '' };
       docs['v2_attesa'] = { listaAttesa: listaAttesa || [] };
       docs['v2_tirocinanti'] = { tirocinanti: tirocinanti || [] };
+      docs['v2_chiusure'] = { chiusure: chiusure || [] };
       const blocchiArc = {};
       Object.keys(archivioSoci || {}).forEach(k => { const b = hashBlocco(k); (blocchiArc[b] = blocchiArc[b] || {})[k] = archivioSoci[k]; });
       Object.keys(blocchiArc).forEach(b => { docs['v2_arc_' + String(b).padStart(2, '0')] = { archivioSoci: blocchiArc[b] }; });
@@ -181,14 +182,16 @@
       const archivioSoci = {};
       let listaAttesa = [];
       let tirocinanti = [];
+      let chiusure = [];
       Object.keys(m).forEach(id => {
         const d = m[id] || {};
         if (id.startsWith('v2_piano__')) { const n = d.stagione; if (n !== undefined) { tuttiPiani[n] = tuttiPiani[n] || {}; Object.assign(tuttiPiani[n], d.celle || {}); } }
         else if (id.startsWith('v2_arc_')) Object.assign(archivioSoci, d.archivioSoci || {});
         else if (id === 'v2_attesa') listaAttesa = d.listaAttesa || [];
         else if (id === 'v2_tirocinanti') tirocinanti = d.tirocinanti || [];
+        else if (id === 'v2_chiusure') chiusure = d.chiusure || [];
       });
-      return { tuttiPiani, stagioni: (meta.stagioni && meta.stagioni.length) ? meta.stagioni : Object.keys(tuttiPiani), stagionePredefinita: meta.stagionePredefinita || '', archivioSoci, listaAttesa, tirocinanti, updatedAt: meta.updatedAt || null };
+      return { tuttiPiani, stagioni: (meta.stagioni && meta.stagioni.length) ? meta.stagioni : Object.keys(tuttiPiani), stagionePredefinita: meta.stagionePredefinita || '', archivioSoci, listaAttesa, tirocinanti, chiusure, updatedAt: meta.updatedAt || null };
     };
 
     // --- CALENDARIO TIROCINANTI (dati in un documento cloud separato: v2_tirocinanti) ---
@@ -535,6 +538,238 @@
                   <div className="px-5 py-3 bg-slate-50 border-t flex justify-end gap-2">
                     <button onClick={() => setFormP(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>
                     <button onClick={salvaPersona} className="px-4 py-2 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md">Salva</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // --- CHIUSURE DELLA VASCA E AVVISI AGLI ISCRITTI (documento cloud dedicato: chiusure_v1) ---
+    const attivoInData = (p, ymd) => {
+      let lista = [];
+      if (p.iscrizioni && p.iscrizioni.length > 0) lista = p.iscrizioni.filter(i => i.inizio || i.fine);
+      else if (p.scadIscrizione) lista = [{ inizio: '', fine: p.scadIscrizione }];
+      if (lista.length === 0) return true;
+      return lista.some(i => (!i.inizio || i.inizio <= ymd) && (!i.fine || i.fine >= ymd));
+    };
+    const MOTIVI_CHIUSURA = ['Festività', 'Manutenzione', 'Lavori', 'Evento / gara'];
+    const TEMPLATE_CHIUSURA = "Ciao {nome}, ti informiamo che {lezioni} {verbo} per {motivo}.\n\nCi scusiamo per il disagio e ti aspettiamo alla prossima lezione! 🏊\nCentro Federale Lampugnano";
+    const fmtCorta = (ymd) => { const [, m, d] = String(ymd).split('-'); return `${d}/${m}`; };
+    const VASCHE_CHIUSURA = { tutte: 'Tutte le vasche', interna: 'Vasca interna', esterna: 'Vasca esterna' };
+    const BanIcon = (p) => <Icon {...p}><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></Icon>;
+
+    // Hook generico: tiene sincronizzato con un documento cloud tutto suo un elenco (lettura live + salvataggio con attesa).
+    const useDocDedicato = (docId, valore, setValore, user, fi, mostraToast) => {
+      const [caricato, setCaricato] = useState(false);
+      const [retry, setRetry] = useState(0);
+      const ultimoSalvato = useRef(null);
+      const inAttesa = useRef(false);
+      const valoreRef = useRef(valore); valoreRef.current = valore;
+      useEffect(() => {
+        if (!user || !fi) return;
+        const { db, appId, doc, onSnapshot } = fi;
+        const ref = doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', docId);
+        const unsub = onSnapshot(ref, (snap) => {
+          if (snap.metadata.hasPendingWrites) return;
+          if (snap.exists()) {
+            const lista = snap.data().dati || [];
+            if (!inAttesa.current) { ultimoSalvato.current = JSON.stringify(lista); setValore(lista); }
+          } else if (!inAttesa.current) { ultimoSalvato.current = JSON.stringify([]); }
+          setCaricato(true);
+        }, (err) => { console.error('Errore lettura ' + docId + ':', err); });
+        return () => unsub();
+      }, [user, fi]);
+      useEffect(() => {
+        if (!caricato || !user || !fi) return;
+        const str = JSON.stringify(valore);
+        if (str === ultimoSalvato.current) return;
+        inAttesa.current = true;
+        const timer = setTimeout(async () => {
+          try {
+            const { db, appId, doc, setDoc } = fi;
+            await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'datiPianoVasca', docId), { dati: JSON.parse(str), updatedAt: new Date().toISOString() });
+            ultimoSalvato.current = str;
+            if (JSON.stringify(valoreRef.current) === str) inAttesa.current = false;
+          } catch (err) { console.error('Salvataggio ' + docId + ' non riuscito:', err); mostraToast('Salvataggio non riuscito: riprovo.', 'error'); setRetry(n => n + 1); }
+        }, 700);
+        return () => clearTimeout(timer);
+      }, [valore, caricato, retry, user, fi]);
+      return { inAttesa };
+    };
+
+    const ChiusureModal = ({ chiusure, setChiusure, corsiColpiti, numeroPerWhatsapp, soloNomeProprio, mostraToast, iniziale, onClose }) => {
+      const oggiYMD = toYMD(new Date());
+      const [vista, setVista] = useState(iniziale && iniziale.id ? 'avvisi' : 'elenco');
+      const [selId, setSelId] = useState(iniziale && iniziale.id ? iniziale.id : null);
+      const [formC, setFormC] = useState(null);
+      const [soloDaAvvisare, setSoloDaAvvisare] = useState(false);
+      const ordinate = useMemo(() => [...chiusure].sort((a, b) => a.dal.localeCompare(b.dal)), [chiusure]);
+      const prossime = ordinate.filter(c => c.al >= oggiYMD), passate = ordinate.filter(c => c.al < oggiYMD).reverse();
+      const colpite = useMemo(() => { const m = {}; chiusure.forEach(c => { m[c.id] = corsiColpiti(c); }); return m; }, [chiusure, corsiColpiti]);
+      const sel = chiusure.find(c => c.id === selId) || null;
+
+      const salvaChiusura = () => {
+        if (!formC.dal) { mostraToast('Indica la data di inizio.', 'error'); return; }
+        const al = formC.al || formC.dal;
+        if (al < formC.dal) { mostraToast('La data di fine è prima di quella di inizio.', 'error'); return; }
+        const dati = { dal: formC.dal, al, vasca: formC.vasca, motivo: (formC.motivo || '').trim() };
+        if (formC.id) setChiusure(prev => prev.map(c => c.id === formC.id ? { ...c, ...dati } : c));
+        else { const id = 'c' + Date.now() + Math.random().toString(36).slice(2, 5); setChiusure(prev => [...prev, { id, ...dati, avvisati: {} }]); }
+        setFormC(null);
+      };
+      const eliminaChiusura = (c) => {
+        if (!window.confirm(`Eliminare la chiusura dal ${formatDate(c.dal)} al ${formatDate(c.al)}?`)) return;
+        setChiusure(prev => prev.filter(x => x.id !== c.id));
+        if (selId === c.id) { setSelId(null); setVista('elenco'); }
+      };
+      const motivoTesto = (c) => (c.motivo || '').trim() ? c.motivo.trim().toLowerCase() : 'la chiusura della vasca';
+      const costruisciMessaggio = (c, persona) => {
+        const tpl = c.messaggio || TEMPLATE_CHIUSURA;
+        const plur = persona.lezioni.length > 1;
+        const unisci = (v) => v.length <= 1 ? (v[0] || '') : v.slice(0, -1).join(', ') + ' e ' + v[v.length - 1];
+        const perCorso = {};
+        persona.lezioni.forEach(l => { (perCorso[l.nomeCorso] = perCorso[l.nomeCorso] || []).push(`${GIORNI[l.giorno].toLowerCase()} ${fmtCorta(l.ymd)} alle ${l.ora}`); });
+        const elenco = Object.keys(perCorso).map(nc => `${nc} di ${unisci(perCorso[nc])}`).join('; ');
+        return tpl.split('{nome}').join(soloNomeProprio(persona.nome)).split('{lezioni}').join(`${plur ? 'le lezioni' : 'la lezione'} di ${elenco}`).split('{verbo}').join(plur ? 'non si terranno' : 'non si terrà').split('{motivo}').join(motivoTesto(c));
+      };
+      const segna = (c, key, valore) => setChiusure(prev => prev.map(x => x.id === c.id ? { ...x, avvisati: { ...(x.avvisati || {}), [key]: valore } } : x));
+      const cambiaMessaggio = (c, testo) => setChiusure(prev => prev.map(x => x.id === c.id ? { ...x, messaggio: testo } : x));
+      const copia = (testo) => { try { navigator.clipboard.writeText(testo); mostraToast('Messaggio copiato.'); } catch (e) { mostraToast('Copia non riuscita.', 'error'); } };
+
+      const intestazione = (c) => (
+        <div className="min-w-0">
+          <div className="font-bold text-slate-800">{c.al === c.dal ? formatDate(c.dal) : `Dal ${formatDate(c.dal)} al ${formatDate(c.al)}`}</div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs">
+            <span className="px-1.5 py-0.5 rounded font-semibold bg-slate-100 text-slate-600 border border-slate-200">{VASCHE_CHIUSURA[c.vasca]}</span>
+            {c.motivo ? <span className="font-semibold text-amber-700">{c.motivo}</span> : <span className="text-slate-400">nessun motivo indicato</span>}
+          </div>
+        </div>
+      );
+
+      return (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-5 py-3 bg-[#1e3a5f] text-white">
+              <h3 className="font-bold text-xl flex items-center gap-2"><BanIcon size={24}/> {vista === 'avvisi' && sel ? 'Avvisa gli iscritti' : 'Chiusure della vasca'}</h3>
+              <div className="flex items-center gap-2">
+                {vista === 'avvisi' && <button onClick={() => setVista('elenco')} className="px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-md text-sm font-semibold">← Tutte le chiusure</button>}
+                <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors ml-1"><XIcon size={22}/></button>
+              </div>
+            </div>
+
+            {vista === 'elenco' && (
+              <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+                <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200">
+                  <p className="text-sm text-slate-500">Registra festività, manutenzioni o lavori: il sito calcola chi va avvisato e prepara il messaggio.</p>
+                  <button onClick={() => setFormC({ dal: oggiYMD, al: '', vasca: 'tutte', motivo: '' })} className="flex items-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold shrink-0"><PlusIcon size={16}/> Nuova chiusura</button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                  {chiusure.length === 0 && <div className="p-8 text-center text-slate-400">Nessuna chiusura registrata.</div>}
+                  {[['Prossime e in corso', prossime, false], ['Passate', passate, true]].map(([titolo, lista, passata]) => lista.length > 0 && (
+                    <div key={titolo}>
+                      <div className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">{titolo}</div>
+                      <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                        {lista.map(c => {
+                          const k = colpite[c.id] || { lezioni: [], persone: [] };
+                          const avvisate = k.persone.filter(p => (c.avvisati || {})[p.key]).length;
+                          const tutte = k.persone.length > 0 && avvisate === k.persone.length;
+                          return (
+                            <div key={c.id} className={`px-4 py-3 flex items-center gap-4 ${passata ? 'opacity-60' : ''}`}>
+                              <div className="flex-1 min-w-0">{intestazione(c)}</div>
+                              <div className="text-sm text-slate-600 text-right shrink-0">
+                                <div><b>{k.lezioni.length}</b> {k.lezioni.length === 1 ? 'lezione coinvolta' : 'lezioni coinvolte'}</div>
+                                <div className={tutte ? 'text-green-600 font-bold' : ''}>{k.persone.length === 0 ? 'nessuno da avvisare' : tutte ? 'Tutti avvisati ✓' : `${avvisate}/${k.persone.length} persone avvisate`}</div>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {k.persone.length > 0 && <button onClick={() => { setSelId(c.id); setVista('avvisi'); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-bold"><WhatsAppIcon size={15}/> Avvisa iscritti</button>}
+                                <button onClick={() => setFormC({ id: c.id, dal: c.dal, al: c.al === c.dal ? '' : c.al, vasca: c.vasca, motivo: c.motivo || '' })} className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600" title="Modifica"><EditIcon size={15}/></button>
+                                <button onClick={() => eliminaChiusura(c)} className="p-1.5 rounded-md bg-red-50 hover:bg-red-100 text-red-600" title="Elimina"><XIcon size={15}/></button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {vista === 'avvisi' && sel && (() => {
+              const k = colpite[sel.id] || { lezioni: [], persone: [] };
+              const avvisate = k.persone.filter(p => (sel.avvisati || {})[p.key]).length;
+              const mostrate = k.persone.filter(p => !soloDaAvvisare || !(sel.avvisati || {})[p.key]);
+              const esempio = k.persone[0] ? costruisciMessaggio(sel, k.persone[0]) : '';
+              return (
+                <div className="flex-1 flex min-h-0">
+                  <div className="w-96 shrink-0 border-r border-slate-200 bg-slate-50 p-4 flex flex-col gap-3 overflow-y-auto">
+                    <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5">{intestazione(sel)}</div>
+                    <div className="text-sm text-slate-600"><b>{k.lezioni.length}</b> lezioni coinvolte · <b>{k.persone.length}</b> persone</div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Testo del messaggio</label>
+                      <textarea value={sel.messaggio || TEMPLATE_CHIUSURA} onChange={e => cambiaMessaggio(sel, e.target.value)} rows={8} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white" />
+                      <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-slate-500 items-center">Inserisci:
+                        {['{nome}', '{lezioni}', '{verbo}', '{motivo}'].map(t => <button key={t} onClick={() => cambiaMessaggio(sel, (sel.messaggio || TEMPLATE_CHIUSURA) + t)} className="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono">{t}</button>)}
+                        {sel.messaggio && <button onClick={() => cambiaMessaggio(sel, '')} className="ml-auto underline">Ripristina testo</button>}
+                      </div>
+                    </div>
+                    {esempio && <div><div className="text-xs font-semibold text-slate-500 mb-1">Anteprima ({k.persone[0].nome})</div><div className="text-sm whitespace-pre-wrap bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-slate-700">{esempio}</div></div>}
+                  </div>
+                  <div className="flex-1 flex flex-col min-w-0 bg-white">
+                    <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200">
+                      <div className="font-bold text-slate-800">Avvisati {avvisate} su {k.persone.length}</div>
+                      <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer"><input type="checkbox" checked={soloDaAvvisare} onChange={e => setSoloDaAvvisare(e.target.checked)} className="w-4 h-4"/> Mostra solo da avvisare</label>
+                    </div>
+                    <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                      {mostrate.length === 0 && <div className="p-8 text-center text-slate-400">{k.persone.length === 0 ? 'Nessun iscritto coinvolto da questa chiusura.' : 'Tutti avvisati ✓'}</div>}
+                      {mostrate.map(p => {
+                        const fatto = !!(sel.avvisati || {})[p.key];
+                        const num = numeroPerWhatsapp(p.telefono);
+                        const testo = costruisciMessaggio(sel, p);
+                        return (
+                          <div key={p.key} className={`px-5 py-3 flex items-center gap-3 ${fatto ? 'bg-slate-50' : ''}`}>
+                            <button onClick={() => segna(sel, p.key, !fatto)} title={fatto ? 'Avvisato: clicca per togliere la spunta' : 'Spunta quando hai avvisato'} className={`shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center ${fatto ? 'bg-green-500 border-green-500' : 'border-slate-300 hover:border-slate-400'}`}>{fatto && <CheckIcon size={14} className="text-white"/>}</button>
+                            <div className="min-w-0 flex-1">
+                              <div className={`font-semibold text-sm ${fatto ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{p.nome}</div>
+                              <div className="mt-1 flex flex-wrap gap-1.5">{p.lezioni.map((l, i) => <span key={i} className="px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold">{GIORNI[l.giorno].substring(0, 3)} {fmtCorta(l.ymd)} {l.ora} · {l.nomeCorso}</span>)}</div>
+                            </div>
+                            {num
+                              ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" onClick={() => segna(sel, p.key, true)} title="Invia il messaggio su WhatsApp (segna anche come avvisato)" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="shrink-0 p-2 rounded-md hover:brightness-95"><WhatsAppIcon size={18}/></a>
+                              : <button onClick={() => copia(testo)} title="Numero mancante: copia il messaggio" className="shrink-0 p-2 rounded-md text-slate-500 bg-slate-100 hover:bg-slate-200"><CopyIcon size={18}/></button>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {formC && (
+              <div className="fixed inset-0 z-[60] bg-slate-900/40 flex items-center justify-center p-4" onClick={() => setFormC(null)}>
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className="px-5 py-3 bg-[#1e3a5f] text-white font-bold flex justify-between items-center">{formC.id ? 'Modifica chiusura' : 'Nuova chiusura'}<button onClick={() => setFormC(null)}><XIcon size={18}/></button></div>
+                  <div className="p-5 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Dal</label><input type="date" value={formC.dal} onChange={e => setFormC({ ...formC, dal: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm"/></div>
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Al <span className="font-normal">(vuoto = un giorno)</span></label><input type="date" value={formC.al} min={formC.dal} onChange={e => setFormC({ ...formC, al: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm"/></div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Quale vasca</label>
+                      <div className="flex gap-2">{Object.keys(VASCHE_CHIUSURA).map(v => <button key={v} onClick={() => setFormC({ ...formC, vasca: v })} className={`flex-1 py-2 rounded-md text-sm font-bold border ${formC.vasca === v ? 'bg-[#1e3a5f] text-white border-[#1e3a5f]' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{VASCHE_CHIUSURA[v]}</button>)}</div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Motivo</label>
+                      <input type="text" value={formC.motivo} onChange={e => setFormC({ ...formC, motivo: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') salvaChiusura(); }} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" placeholder="es. festività" />
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">{MOTIVI_CHIUSURA.map(m => <button key={m} onClick={() => setFormC({ ...formC, motivo: m })} className="px-2.5 py-1 text-xs font-semibold bg-white border border-slate-300 hover:border-[#1e3a5f] rounded-full text-slate-600">{m}</button>)}</div>
+                    </div>
+                  </div>
+                  <div className="px-5 py-3 bg-slate-50 border-t flex justify-end gap-2">
+                    <button onClick={() => setFormC(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>
+                    <button onClick={salvaChiusura} className="px-4 py-2 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md">Salva</button>
                   </div>
                 </div>
               </div>
@@ -1019,6 +1254,10 @@
       const [isListaAttesaOpen, setIsListaAttesaOpen] = useState(false);
       const [tirocinanti, setTirocinanti] = useState([]);
       const [isTirocinantiOpen, setIsTirocinantiOpen] = useState(false);
+      const [chiusure, setChiusure] = useState([]);
+      const [isChiusureOpen, setIsChiusureOpen] = useState(false);
+      const [chiusuraDaAprire, setChiusuraDaAprire] = useState(null);
+      const chiusureRef = useRef([]); chiusureRef.current = chiusure;
       const [editandoContattoAttesaId, setEditandoContattoAttesaId] = useState(null);
       const [isFormAttesaOpen, setIsFormAttesaOpen] = useState(false);
       const [dettaglioContattoAttesa, setDettaglioContattoAttesa] = useState(null);
@@ -1096,7 +1335,7 @@
 
       // --- BLOCCO SCORRIMENTO SFONDO ---
       useEffect(() => {
-          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen || isDisponibilitaOpen || !!iscrittiPeriodo || isIscrittiGiornoOpen || isTirocinantiOpen;
+          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen || isDisponibilitaOpen || !!iscrittiPeriodo || isIscrittiGiornoOpen || isTirocinantiOpen || isChiusureOpen;
           if (isAnyModalOpen) {
               document.body.style.overflow = 'hidden';
           } else {
@@ -1105,7 +1344,7 @@
           return () => {
               document.body.style.overflow = '';
           };
-      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen, isListaAttesaOpen, isFormAttesaOpen, dettaglioContattoAttesa, isInseritiOggiOpen, isTirocinantiOpen]);
+      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen, isListaAttesaOpen, isFormAttesaOpen, dettaglioContattoAttesa, isInseritiOggiOpen, isTirocinantiOpen, isChiusureOpen]);
 
       const partecipantiAttiviModal = useMemo(() => {
           return editModal ? (editModal.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)) : [];
@@ -1324,7 +1563,7 @@
                     const limiteOra = new Date(oraBk); limiteOra.setHours(13, 0, 0, 0);
                     if (oraBk < limiteOra) limiteOra.setDate(limiteOra.getDate() - 1);
                     const chiaveGiorno = toYMD(limiteOra);
-                    const docsPrec = statoToDocs({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], tirocinanti: tirocinantiRef.current });
+                    const docsPrec = statoToDocs({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], tirocinanti: tirocinantiRef.current, chiusure: chiusureRef.current });
                     const scriviBackup = async (slot) => {
                         const ids = Object.keys(docsPrec);
                         const ops = ids.map(id => [`bk2_${slot}__${id}`, JSON.parse(JSON.stringify(docsPrec[id]))]);
@@ -1354,6 +1593,7 @@
             // I tirocinanti NON stanno nel gruppo v2_: hanno un documento tutto loro (vedi sotto), così
             // nessuna altra versione/scheda della pagina può cancellarli per sbaglio.
             delete docsNuovi['v2_tirocinanti'];
+            delete docsNuovi['v2_chiusure'];
             docsNuovi['v2_meta'].updatedAt = adessoISO;
             const strNuovi = {};
             Object.keys(docsNuovi).forEach(id => {
@@ -1470,6 +1710,9 @@
         return () => clearTimeout(timer);
       }, [tirocinanti, tiLoaded, tiRetry, user, firebaseInstances]);
 
+      // --- CHIUSURE: documento cloud dedicato 'chiusure_v1' ---
+      const chiusureSync = useDocDedicato('chiusure_v1', chiusure, setChiusure, user, firebaseInstances, mostraToast);
+
       // --- NORMALIZZAZIONE DATI: nomi con iniziali maiuscole ed email in minuscolo (anche per i dati già presenti) ---
       useEffect(() => {
         if (!isDataLoaded) return;
@@ -1488,7 +1731,7 @@
       // in tempo a salvarsi. Il browser mostrerà un avviso nativo in quel caso.
       useEffect(() => {
         const handleBeforeUnload = (e) => {
-          if (hasModificheLocaliInSospeso.current || tiPending.current) {
+          if (hasModificheLocaliInSospeso.current || tiPending.current || chiusureSync.inAttesa.current) {
             e.preventDefault();
             e.returnValue = '';
             return '';
@@ -2274,6 +2517,43 @@
           lista.sort((x, y) => x.nome.localeCompare(y.nome));
           return lista;
       }, [tuttiCorsiSelect, attivita, archivioSoci]);
+
+      // --- CHIUSURE: lezioni e persone coinvolte da una chiusura della vasca ---
+      const corsiColpiti = useCallback((ch) => {
+          const lezioni = [];
+          const persone = new Map();
+          const ini = new Date(ch.dal + 'T12:00:00'), fine = new Date((ch.al || ch.dal) + 'T12:00:00');
+          for (let d = new Date(ini), n = 0; d <= fine && n < 400; d.setDate(d.getDate() + 1), n++) {
+              const ymd = toYMD(d);
+              const wd = (d.getDay() + 6) % 7;
+              tuttiCorsiSelect.forEach(c => {
+                  if (c.giorno !== wd) return;
+                  if (ch.vasca !== 'tutte' && c.vasca !== ch.vasca) return;
+                  if (c.data.dataInizio && c.data.dataInizio > ymd) return;
+                  if (c.data.dataFine && c.data.dataFine < ymd) return;
+                  const infoAtt = attivita.find(a => a.id === c.data.id);
+                  const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
+                  const nomeCorso = nomeLiv ? `${infoAtt?.name} - ${nomeLiv}` : (infoAtt?.name || 'Corso');
+                  const lez = { ymd, giorno: wd, ora: c.oraInizio, vasca: c.vasca, nomeCorso };
+                  lezioni.push(lez);
+                  (c.data.partecipanti || []).forEach(p => {
+                      if (!p || !p.nome || !attivoInData(p, ymd)) return;
+                      const key = p.nome.toLowerCase().trim();
+                      let voce = persone.get(key);
+                      if (!voce) { const arc = archivioSoci[key] || {}; voce = { key, nome: p.nome, telefono: arc.telefono || p.telefono || '', lezioni: [] }; persone.set(key, voce); }
+                      if (!voce.lezioni.some(x => x.ymd === ymd && x.ora === lez.ora && x.nomeCorso === nomeCorso)) voce.lezioni.push(lez);
+                  });
+              });
+          }
+          const lista = Array.from(persone.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+          lista.forEach(v => v.lezioni.sort((a, b) => a.ymd.localeCompare(b.ymd) || a.ora.localeCompare(b.ora)));
+          return { lezioni, persone: lista };
+      }, [tuttiCorsiSelect, attivita, archivioSoci]);
+      // Chiusure che toccano la settimana visualizzata (per l'avviso sopra la griglia)
+      const chiusureSettimana = useMemo(() => {
+          const ini = toYMD(inizioSettimana), fin = toYMD(new Date(new Date(inizioSettimana).getTime() + 6 * 86400000));
+          return chiusure.filter(c => c.al >= ini && c.dal <= fin && (c.vasca === 'tutte' || c.vasca === vascaSelezionata)).sort((a, b) => a.dal.localeCompare(b.dal));
+      }, [chiusure, inizioSettimana, vascaSelezionata]);
 
       const messaggioSpostamento = (v) => {
           const dest = v.a.map(x => `${x.nomeCorso} il ${GIORNI[x.giorno]} alle ore ${x.oraInizio}${x.periodo ? `, nel periodo ${x.periodo}` : ''}`).join('; ');
@@ -3536,7 +3816,7 @@
           });
           if (slot === null) slot = piuVecchio || 'x0';
           const arc = archivioCompleto(archivioSoci, tuttiPiani);
-          const docsAtt = statoToDocs({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arc, listaAttesa, tirocinanti });
+          const docsAtt = statoToDocs({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arc, listaAttesa, tirocinanti, chiusure });
           const ids = Object.keys(docsAtt);
           const cc = contaDati(tuttiPiani, arc);
           const ops = ids.map(id => [`bk2_${slot}__${id}`, JSON.parse(JSON.stringify(docsAtt[id]))]);
@@ -3564,7 +3844,7 @@
             snaps.forEach((sn, i) => { if (sn.exists()) mappa[b0.docIds[i]] = sn.data(); });
             if (!mappa['v2_meta']) { alert("Questo backup risulta incompleto: non lo ripristino."); return; }
             const st = stateFromDocs(mappa);
-            b = { ...b0, tuttiPiani: st.tuttiPiani, stagioni: st.stagioni, stagionePredefinita: st.stagionePredefinita, archivioSoci: st.archivioSoci, listaAttesa: st.listaAttesa, tirocinanti: mappa['v2_tirocinanti'] ? st.tirocinanti : undefined };
+            b = { ...b0, tuttiPiani: st.tuttiPiani, stagioni: st.stagioni, stagionePredefinita: st.stagionePredefinita, archivioSoci: st.archivioSoci, listaAttesa: st.listaAttesa, tirocinanti: mappa['v2_tirocinanti'] ? st.tirocinanti : undefined, chiusure: mappa['v2_chiusure'] ? st.chiusure : undefined };
           } catch (err) { console.error(err); alert("Non sono riuscito a leggere questo backup."); return; }
         }
         setTuttiPiani(b.tuttiPiani || {});
@@ -3573,6 +3853,7 @@
         setArchivioSoci(archivioCompleto(b.archivioSoci, b.tuttiPiani));
         setListaAttesa(b.listaAttesa || []);
         if (b.tirocinanti) setTirocinanti(b.tirocinanti);
+        if (b.chiusure) setChiusure(b.chiusure);
         // la versione ripristinata è "nuova" rispetto al cloud: azzeriamo i freni per questo salvataggio
         ultimiConteggi.current = null; updatedAtNoto.current = updatedAtServer.current;
         setIsBackupModalOpen(false);
@@ -3581,7 +3862,7 @@
 
       const esportaDati = () => {
         const arcCompleto = archivioCompleto(archivioSoci, tuttiPiani);
-        const dataStr = JSON.stringify({ formato: 'pianovasca-backup-v2', esportatoIl: new Date().toISOString(), conteggi: contaDati(tuttiPiani, arcCompleto), tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arcCompleto, listaAttesa, tirocinanti, attivita: ATTIVITA_DI_BASE }, null, 2);
+        const dataStr = JSON.stringify({ formato: 'pianovasca-backup-v2', esportatoIl: new Date().toISOString(), conteggi: contaDati(tuttiPiani, arcCompleto), tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arcCompleto, listaAttesa, tirocinanti, chiusure, attivita: ATTIVITA_DI_BASE }, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -3755,6 +4036,7 @@
               setArchivioSoci(archivioCompleto(dati.archivioSoci, dati.tuttiPiani));
               if (dati.listaAttesa) setListaAttesa(dati.listaAttesa);
               if (dati.tirocinanti) setTirocinanti(dati.tirocinanti);
+              if (dati.chiusure) setChiusure(dati.chiusure);
               if (dati.stagionePredefinita) setStagionePredefinita(dati.stagionePredefinita);
               if (dati.stagioni && dati.stagioni.length > 0) setStagioneSelezionata(dati.stagioni[0]);
             } else if (dati.piano) {
@@ -4918,6 +5200,7 @@
             </div>
           )}
 
+          {isChiusureOpen && <ChiusureModal chiusure={chiusure} setChiusure={setChiusure} corsiColpiti={corsiColpiti} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} iniziale={chiusuraDaAprire ? { id: chiusuraDaAprire } : null} onClose={() => { setIsChiusureOpen(false); setChiusuraDaAprire(null); }} />}
           {isTirocinantiOpen && <TirocinantiModal tirocinanti={tirocinanti} setTirocinanti={setTirocinanti} onClose={() => setIsTirocinantiOpen(false)} mostraToast={mostraToast} />}
 
           {/* --- MODALE LISTA D'ATTESA (contatti da ricontattare) --- */}
@@ -6560,6 +6843,17 @@
           {/* FINE WRAPPER STICKY */}
 
           <main ref={mainScrollRef} onScroll={sincronizzaScrollOrizzontale} className="flex-1 w-full mx-auto p-4 md:p-6 pt-4 md:pt-6 flex flex-col gap-6 overflow-auto">
+            {chiusureSettimana.length > 0 && (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex flex-col gap-2">
+                {chiusureSettimana.map(c => (
+                  <div key={c.id} className="flex items-center gap-3 flex-wrap">
+                    <BanIcon size={18} className="text-amber-700 shrink-0"/>
+                    <div className="text-sm text-amber-900 flex-1 min-w-0"><b>{c.vasca === 'tutte' ? 'Chiusura della struttura' : `Vasca ${c.vasca} chiusa`}</b> {c.al === c.dal ? `il ${formatDate(c.dal)}` : `dal ${formatDate(c.dal)} al ${formatDate(c.al)}`}{c.motivo ? ` · ${c.motivo}` : ''}</div>
+                    <button onClick={() => { setChiusuraDaAprire(c.id); setIsChiusureOpen(true); }} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-bold">Avvisa iscritti</button>
+                  </div>
+                ))}
+              </div>
+            )}
             {/* TABELLA UNICA - Esportata intera in un singolo foglio PDF */}
             <div id="griglia-piano-vasca" className="bg-transparent relative w-full">
               {giornoSelezionato === 7 ? (
@@ -6640,6 +6934,7 @@
                     <button onClick={() => { setRicercaIscrittiPeriodo(''); setIscrittiPeriodo('primo'); setIsIscrittiGiornoOpen(false); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Elenco iscritti per periodo o per giorno"><UsersIcon size={16} /> Iscritti per periodo</button>
                     <button onClick={() => { setCatDispEspansa(null); setIsDisponibilitaOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] hover:bg-[#2a4d7c] text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Posti liberi per ogni categoria di corso"><UsersIcon size={16} /> Disponibilità corsi</button>
                     <button onClick={() => setIsTirocinantiOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Calendario e ore dei tirocinanti"><CalendarIcon size={16} /> Tirocinanti</button>
+                    <button onClick={() => { setChiusuraDaAprire(null); setIsChiusureOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Chiusure della vasca e avvisi agli iscritti"><BanIcon size={16} /> Chiusure</button>
               </div>
             </div>
 
