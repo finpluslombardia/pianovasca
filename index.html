@@ -2680,6 +2680,15 @@
       // Compila il testo del messaggio di conferma iscrizione, raggruppando per corso+orario
       // e unendo i giorni (utile se la persona è stata iscritta oggi a più giorni/corsi insieme),
       // includendo il periodo di iscrizione e un saluto finale.
+      // "Cognome Nome" (come sono salvati) -> "Nome Cognome", gestendo cognomi e nomi composti.
+      const nomePoiCognome = (nomeCompleto) => {
+          const parti = String(nomeCompleto || '').trim().split(/\s+/).filter(Boolean);
+          if (parti.length <= 1) return parti[0] || '';
+          const nome = soloNomeProprio(nomeCompleto);
+          const nNome = nome.split(/\s+/).filter(Boolean).length;
+          const cognome = parti.slice(0, parti.length - nNome).join(' ');
+          return cognome ? `${nome} ${cognome}` : nome;
+      };
       const generaMessaggioOggi = (persona) => {
           const gruppi = [];
           persona.corsi.forEach(c => {
@@ -2699,7 +2708,7 @@
           const corsiTesto = frasiCorsi.length > 1
               ? frasiCorsi.slice(0, -1).join('; ') + '; e ' + frasiCorsi[frasiCorsi.length - 1]
               : (frasiCorsi[0] || '');
-          return `Ciao ${persona.nome}, grazie per esserti iscritto/a oggi presso il Centro Federale Lampugnano.\nTi confermiamo la tua iscrizione al corso ${corsiTesto}.\n\nA presto in vasca! 🏊\nCentro Federale Lampugnano`;
+          return `Ciao ${nomePoiCognome(persona.nome)}, grazie per esserti iscritto/a oggi presso il Centro Federale Lampugnano.\nTi confermiamo la tua iscrizione al corso ${corsiTesto}.\n\nA presto in vasca! 🏊\nCentro Federale Lampugnano`;
       };
 
       const copiaMessaggioOggi = (testo) => {
