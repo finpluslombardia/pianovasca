@@ -558,7 +558,7 @@
     const MOTIVI_CHIUSURA = ['Festività', 'Vacanze', 'Manutenzione', 'Lavori', 'Evento / gara'];
     const TEMPLATE_CHIUSURA = "Ciao {nome}, ti informiamo che {lezioni} {verbo} per {motivo}.\n\nCi scusiamo per il disagio e ti aspettiamo alla prossima lezione! 🏊\nCentro Federale Lampugnano";
     // Chiusure già previste dal calendario della scuola nuoto (festività, vacanze): messaggio senza scuse.
-    const TEMPLATE_CALENDARIO = "Ciao {nome}, ti ricordiamo che {lezioni} {verbo} per {motivo}, come previsto dal calendario della scuola nuoto.\n\nTi aspettiamo alla prossima lezione! 🏊\nCentro Federale Lampugnano";
+    const TEMPLATE_CALENDARIO = "Ciao {nome}, ti ricordiamo che {lezioni} {verbo} per {motivo}, così come previsto dal calendario della scuola nuoto.\n\nTi aspettiamo alla prossima lezione! 🏊\nCentro Federale Lampugnano";
     const chiusuraDaCalendario = (motivo) => /festiv|festa|ponte|vacanz|natale|pasqua|calendario/i.test(motivo || '');
     const templateChiusura = (c) => c.messaggio || (chiusuraDaCalendario(c.motivo) ? TEMPLATE_CALENDARIO : TEMPLATE_CHIUSURA);
     const fmtCorta = (ymd) => { const [, m, d] = String(ymd).split('-'); return `${d}/${m}`; };
