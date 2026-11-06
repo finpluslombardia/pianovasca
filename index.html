@@ -816,13 +816,13 @@
       const lblLiv = (v) => etichettaLivelloSocio(v, attivita) || '—';
       return (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4" onClick={onClose}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 bg-indigo-600 text-white flex justify-between items-center">
               <h3 className="font-bold text-lg">Passaggio di livello</h3>
               <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
             </div>
-            <div className="p-5 overflow-y-auto flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
+            <div className="p-5 flex-1 min-h-0 flex flex-col gap-4">
+              <div className="flex flex-col gap-2 shrink-0">
                 <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="modoLiv" checked={modo === 'successivo'} onChange={() => setModo('successivo')} /> <b>Livello successivo</b> <span className="text-slate-400">(ognuno sale di un gradino{att ? ` in "${att.name}"` : ''})</span></label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer flex-wrap"><input type="radio" name="modoLiv" checked={modo === 'specifico'} onChange={() => setModo('specifico')} /> <b>Livello a scelta</b>
                   <select value={target} onChange={e => { setTarget(e.target.value); setModo('specifico'); }} className="px-2 py-1 border border-slate-300 rounded-md text-sm bg-white">
@@ -835,15 +835,15 @@
                   </select>
                 </label>
               </div>
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <div className="bg-slate-100 px-3 py-2 flex items-center justify-between text-xs font-bold text-slate-600 uppercase tracking-wide">
+              <div className="border border-slate-200 rounded-xl overflow-hidden flex-1 min-h-0 flex flex-col">
+                <div className="bg-slate-100 px-3 py-2 shrink-0 flex items-center justify-between text-xs font-bold text-slate-600 uppercase tracking-wide">
                   <span>Iscritti attivi</span>
                   <span className="flex gap-3 normal-case tracking-normal">
                     <button type="button" className="text-indigo-600 hover:underline" onClick={() => setScelti(new Set(persone.map(x => x.idx)))}>Tutti</button>
                     <button type="button" className="text-slate-500 hover:underline" onClick={() => setScelti(new Set())}>Nessuno</button>
                   </span>
                 </div>
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 flex-1 min-h-0 overflow-y-auto">
                   {righe.length === 0 && <div className="p-4 text-center text-sm text-slate-400 italic">Nessun iscritto attivo.</div>}
                   {righe.map(({ pers, nuovo }) => (
                     <label key={pers.idx} className={`flex items-center gap-3 px-3 py-2 ${nuovo === null ? 'opacity-50' : 'cursor-pointer hover:bg-slate-50'}`}>
@@ -856,7 +856,7 @@
                   ))}
                 </div>
               </div>
-              <p className="text-xs text-slate-400">Cambia solo il <b>Livello attuale</b> delle persone, non il corso in cui sono iscritte. Le modifiche restano in bozza nella finestra del corso: per renderle definitive premi <b>Salva Tutto</b> (con Annulla le scarti).</p>
+              <p className="text-xs text-slate-400 shrink-0">Cambia solo il <b>Livello attuale</b> delle persone, non il corso in cui sono iscritte. Le modifiche restano in bozza nella finestra del corso: per renderle definitive premi <b>Salva Tutto</b> (con Annulla le scarti).</p>
             </div>
             <div className="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50">
               <button onClick={onClose} className="px-4 py-2 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition-colors">Annulla</button>
@@ -897,7 +897,7 @@
       const copia = async (str, ok) => { try { await navigator.clipboard.writeText(str); mostraToast(ok, 'success'); } catch (e) { mostraToast('Copia non riuscita.', 'error'); } };
       return (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4" onClick={onClose}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 bg-emerald-600 text-white flex justify-between items-center">
               <div className="min-w-0">
                 <h3 className="font-bold text-lg flex items-center gap-2"><MessageCircleIcon size={20}/> Scrivi a tutto il corso</h3>
@@ -905,8 +905,8 @@
               </div>
               <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
             </div>
-            <div className="p-5 overflow-y-auto flex flex-col gap-4">
-              <div>
+            <div className="p-5 flex-1 min-h-0 flex flex-col gap-4">
+              <div className="shrink-0">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Tipo di messaggio</div>
                 <div className="flex flex-wrap gap-2">
                   {TEMPLATE_MSG_CORSO.map(t => (
@@ -914,7 +914,7 @@
                   ))}
                 </div>
               </div>
-              <div>
+              <div className="shrink-0">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Testo (puoi modificarlo)</div>
                   <div className="text-[11px] text-slate-400">Segnaposto: <b>{'{nome}'}</b> <b>{'{corso}'}</b> <b>{'{quando}'}</b></div>
@@ -922,15 +922,15 @@
                 <textarea value={testo} onChange={e => setTesto(e.target.value)} rows={7} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
                 {daCompletare && <div className="mt-1 text-xs font-semibold text-amber-600">Completa i punti "…" prima di inviare.</div>}
               </div>
-              <div>
-                <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex items-center justify-between mb-2 gap-2 flex-wrap shrink-0">
                   <div className="text-sm font-bold text-slate-700">Iscritti: <span className={nAvvisati === persone.length && persone.length > 0 ? 'text-emerald-600' : ''}>{nAvvisati}/{persone.length} avvisati</span></div>
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" checked={soloDaAvvisare} onChange={e => setSoloDaAvvisare(e.target.checked)} /> Mostra solo da avvisare</label>
                     {nAvvisati > 0 && <button type="button" onClick={() => { if (window.confirm('Togliere la spunta a tutti?')) salva({}); }} className="text-xs font-bold text-slate-500 hover:underline">Azzera spunte</button>}
                   </div>
                 </div>
-                <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+                <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 flex-1 min-h-0 overflow-y-auto">
                   {visibili.length === 0 && <div className="p-4 text-center text-sm text-slate-400 italic">{persone.length === 0 ? 'Nessun iscritto attivo in questa settimana.' : 'Tutti avvisati. 🎉'}</div>}
                   {visibili.map(pers => {
                     const num = numeroPerWhatsapp(pers.telefono);
@@ -949,7 +949,7 @@
                     );
                   })}
                 </div>
-                <p className="mt-2 text-xs text-slate-400">Il tasto <b>Invia</b> apre WhatsApp con il messaggio già pronto per quella persona e la segna come avvisata. Le spunte restano salvate su questo computer per questo corso e questo testo.</p>
+                <p className="mt-2 text-xs text-slate-400 shrink-0">Il tasto <b>Invia</b> apre WhatsApp con il messaggio già pronto per quella persona e la segna come avvisata. Le spunte restano salvate su questo computer per questo corso e questo testo.</p>
               </div>
             </div>
             <div className="px-5 py-3 border-t border-slate-200 flex justify-between items-center bg-slate-50">
@@ -6699,11 +6699,7 @@
                               {/* SEZIONE ATTIVI */}
                               <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 sticky top-0 z-10 flex justify-between items-center">
                                 <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Attivi in questa settimana</span>
-                                <div className="flex items-center gap-2">
-                                  <button type="button" onClick={() => setMsgCorso(true)} disabled={attivi.length === 0} title="Prepara un messaggio WhatsApp per tutti gli iscritti attivi del corso" className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-md text-xs font-bold normal-case tracking-normal transition-colors"><MessageCircleIcon size={13}/> Scrivi al corso</button>
-                                  <button type="button" onClick={() => setPassaLivello(true)} disabled={attivi.length === 0} title="Fai salire di livello gli iscritti del corso" className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-md text-xs font-bold normal-case tracking-normal transition-colors"><span className="text-[13px] leading-none">↑</span> Passaggio di livello</button>
-                                  <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">{attivi.length}</span>
-                                </div>
+                                <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">{attivi.length}</span>
                               </div>
                               <div className="overflow-x-auto w-full">
                                 <table className="w-full text-left text-sm whitespace-nowrap min-w-[820px]">
@@ -6768,7 +6764,11 @@
                   {editModal.tab === 'dettagli' ? (
                     <button type="button" onClick={eliminaCorsoModal} className="px-4 py-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-bold transition-colors flex items-center gap-2"><Trash2Icon size={18} /> <span className="hidden sm:inline">Elimina Corso</span></button>
                   ) : (
-                    <button type="button" onClick={stampaRegistro} disabled={partecipantiAttiviModal.length === 0} className={`px-5 py-2.5 rounded-lg font-bold transition-colors flex items-center gap-2 ${partecipantiAttiviModal.length > 0 ? 'text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm' : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed'}`}><PrinterIcon size={18} /> Stampa Registro</button>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={stampaRegistro} disabled={partecipantiAttiviModal.length === 0} className={`px-5 py-2.5 rounded-lg font-bold transition-colors flex items-center gap-2 ${partecipantiAttiviModal.length > 0 ? 'text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm' : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed'}`}><PrinterIcon size={18} /> Stampa Registro</button>
+                      <button type="button" onClick={() => setMsgCorso(true)} disabled={partecipantiAttiviModal.length === 0} title="Prepara un messaggio WhatsApp per tutti gli iscritti attivi del corso" className="px-5 py-2.5 rounded-lg font-bold transition-colors flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"><MessageCircleIcon size={18}/> Scrivi al corso</button>
+                      <button type="button" onClick={() => setPassaLivello(true)} disabled={partecipantiAttiviModal.length === 0} title="Fai salire di livello gli iscritti del corso" className="px-5 py-2.5 rounded-lg font-bold transition-colors flex items-center gap-2 text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"><span className="text-lg leading-none">↑</span> Passaggio di livello</button>
+                    </div>
                   )}
                   
                   <div className="flex gap-3">
