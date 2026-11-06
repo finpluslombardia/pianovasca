@@ -783,6 +783,90 @@
       );
     };
 
+    // --- PASSAGGIO DI LIVELLO IN BLOCCO (agisce sul "Livello attuale" degli iscritti del corso aperto) ---
+    const PassaggioLivelloModal = ({ persone, attivitaId, attivita, onApplica, onClose }) => {
+      const att = (attivita || []).find(a => a.id === attivitaId);
+      const livelliAtt = (att && att.levels) || [];
+      const [modo, setModo] = useState('successivo'); // 'successivo' | 'specifico'
+      const [target, setTarget] = useState('');
+      const [scelti, setScelti] = useState(() => new Set(persone.map(x => x.idx)));
+      // Nuovo valore del campo livello per una persona, oppure null se non cambia.
+      const nuovoLivello = (pers) => {
+        const arr = livelliSocioArray(pers.livello);
+        if (modo === 'successivo') {
+          let cambiato = false;
+          const out = arr.map(v => {
+            const [aid, lv] = v.split(':');
+            if (aid !== attivitaId) return v;
+            const i = livelliAtt.findIndex(l => l.val === lv);
+            if (i >= 0 && i < livelliAtt.length - 1) { cambiato = true; return aid + ':' + livelliAtt[i + 1].val; }
+            return v;
+          });
+          return cambiato ? out.join(',') : null;
+        }
+        if (!target) return null;
+        const [taid] = target.split(':');
+        const resto = arr.filter(v => v.split(':')[0] !== taid);
+        const out = [...resto, target].join(',');
+        return out === arr.join(',') ? null : out;
+      };
+      const righe = persone.map(pers => ({ pers, nuovo: nuovoLivello(pers) }));
+      const applicabili = righe.filter(r => r.nuovo !== null && scelti.has(r.pers.idx));
+      const toggle = (idx) => setScelti(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n; });
+      const lblLiv = (v) => etichettaLivelloSocio(v, attivita) || '—';
+      return (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4" onClick={onClose}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 bg-indigo-600 text-white flex justify-between items-center">
+              <h3 className="font-bold text-lg">Passaggio di livello</h3>
+              <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+            </div>
+            <div className="p-5 overflow-y-auto flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="modoLiv" checked={modo === 'successivo'} onChange={() => setModo('successivo')} /> <b>Livello successivo</b> <span className="text-slate-400">(ognuno sale di un gradino{att ? ` in "${att.name}"` : ''})</span></label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer flex-wrap"><input type="radio" name="modoLiv" checked={modo === 'specifico'} onChange={() => setModo('specifico')} /> <b>Livello a scelta</b>
+                  <select value={target} onChange={e => { setTarget(e.target.value); setModo('specifico'); }} className="px-2 py-1 border border-slate-300 rounded-md text-sm bg-white">
+                    <option value="">Scegli…</option>
+                    {(attivita || []).filter(a => a.levels && a.levels.length > 0).map(a => (
+                      <optgroup key={a.id} label={a.name}>
+                        {a.levels.map(l => <option key={a.id + l.val} value={a.id + ':' + l.val}>{l.noNumero ? l.name : `Liv. ${l.val} - ${l.name}`}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <div className="bg-slate-100 px-3 py-2 flex items-center justify-between text-xs font-bold text-slate-600 uppercase tracking-wide">
+                  <span>Iscritti attivi</span>
+                  <span className="flex gap-3 normal-case tracking-normal">
+                    <button type="button" className="text-indigo-600 hover:underline" onClick={() => setScelti(new Set(persone.map(x => x.idx)))}>Tutti</button>
+                    <button type="button" className="text-slate-500 hover:underline" onClick={() => setScelti(new Set())}>Nessuno</button>
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {righe.length === 0 && <div className="p-4 text-center text-sm text-slate-400 italic">Nessun iscritto attivo.</div>}
+                  {righe.map(({ pers, nuovo }) => (
+                    <label key={pers.idx} className={`flex items-center gap-3 px-3 py-2 ${nuovo === null ? 'opacity-50' : 'cursor-pointer hover:bg-slate-50'}`}>
+                      <input type="checkbox" disabled={nuovo === null} checked={nuovo !== null && scelti.has(pers.idx)} onChange={() => toggle(pers.idx)} className="w-4 h-4 shrink-0" />
+                      <span className="text-sm font-semibold text-slate-800 flex-1 min-w-0 truncate">{pers.nome}</span>
+                      <span className="text-xs text-slate-500 w-40 truncate text-right">{lblLiv(pers.livello)}</span>
+                      <span className="text-slate-300">→</span>
+                      <span className={`text-xs w-40 truncate font-bold ${nuovo === null ? 'text-slate-400' : 'text-indigo-700'}`}>{nuovo === null ? (modo === 'specifico' && !target ? 'scegli un livello' : 'invariato') : lblLiv(nuovo)}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-slate-400">Cambia solo il <b>Livello attuale</b> delle persone, non il corso in cui sono iscritte. Le modifiche restano in bozza nella finestra del corso: per renderle definitive premi <b>Salva Tutto</b> (con Annulla le scarti).</p>
+            </div>
+            <div className="px-5 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50">
+              <button onClick={onClose} className="px-4 py-2 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition-colors">Annulla</button>
+              <button disabled={applicabili.length === 0} onClick={() => onApplica(new Map(applicabili.map(r => [r.pers.idx, r.nuovo])))} className="px-4 py-2 rounded-lg font-bold bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white transition-colors">Applica a {applicabili.length} {applicabili.length === 1 ? 'persona' : 'persone'}</button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     // --- MESSAGGIO A TUTTO UN CORSO (WhatsApp uno per uno, con spunta di chi è già stato avvisato) ---
     const TEMPLATE_MSG_CORSO = [
       { nome: 'Libero', testo: "Ciao {nome}, ti scriviamo per il corso di {corso} ({quando}).\n\n\n\nCentro Federale Lampugnano" },
@@ -1305,6 +1389,7 @@
       // --- STATO NUOVO PARTECIPANTE ---
       const [nuovoPartecipante, setNuovoPartecipante] = useState({ nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
       const [editingPartecipanteIndex, setEditingPartecipanteIndex] = useState(null);
+      const [passaLivello, setPassaLivello] = useState(false); // finestra "Passaggio di livello" sul corso aperto
       const [msgCorso, setMsgCorso] = useState(false); // finestra "Scrivi a tutto il corso" (sul corso aperto in editModal)
       const [schedaSocio, setSchedaSocio] = useState(null); // partecipante di cui mostrare la scheda anagrafica
       const [showAddForm, setShowAddForm] = useState(false);
@@ -5354,6 +5439,17 @@
             </div>
           )}
 
+          {editModal && passaLivello && (() => {
+            const persone = editModal.partecipanti.map((p, idx) => ({ p, idx })).filter(x => x.p && x.p.nome && isAttivoInSettimana(x.p, inizioSettimana)).map(({ p, idx }) => {
+              const arc = archivioSoci[p.nome.toLowerCase().trim()] || {};
+              return { idx, nome: p.nome, livello: p.livelloSocio !== undefined ? p.livelloSocio : (arc.livelloSocio || '') };
+            }).sort((a, b) => a.nome.localeCompare(b.nome));
+            return <PassaggioLivelloModal persone={persone} attivitaId={editModal.attivitaId} attivita={attivita} onClose={() => setPassaLivello(false)} onApplica={(mappa) => {
+              setEditModal(prev => ({ ...prev, partecipanti: prev.partecipanti.map((p, i) => mappa.has(i) ? { ...p, livelloSocio: mappa.get(i) } : p) }));
+              setPassaLivello(false);
+              mostraToast(`Livello aggiornato per ${mappa.size} ${mappa.size === 1 ? 'persona' : 'persone'}: premi "Salva Tutto" per confermare.`, 'success');
+            }} />;
+          })()}
           {editModal && msgCorso && (() => {
             const infoC = attivita.find(a => a.id === editModal.attivitaId);
             const nomeLivC = infoC?.isFreeTextLevel ? editModal.livello : infoC?.levels?.find(l => l.val === editModal.livello)?.name;
@@ -6605,6 +6701,7 @@
                                 <span className="font-bold text-slate-700 text-sm uppercase tracking-wider">Attivi in questa settimana</span>
                                 <div className="flex items-center gap-2">
                                   <button type="button" onClick={() => setMsgCorso(true)} disabled={attivi.length === 0} title="Prepara un messaggio WhatsApp per tutti gli iscritti attivi del corso" className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-md text-xs font-bold normal-case tracking-normal transition-colors"><MessageCircleIcon size={13}/> Scrivi al corso</button>
+                                  <button type="button" onClick={() => setPassaLivello(true)} disabled={attivi.length === 0} title="Fai salire di livello gli iscritti del corso" className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-500 hover:bg-indigo-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-md text-xs font-bold normal-case tracking-normal transition-colors"><span className="text-[13px] leading-none">↑</span> Passaggio di livello</button>
                                   <span className="bg-blue-200 text-blue-800 text-xs font-bold px-2 py-0.5 rounded-full">{attivi.length}</span>
                                 </div>
                               </div>
