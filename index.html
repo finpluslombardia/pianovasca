@@ -231,7 +231,7 @@
     };
     const nomeTiro = (p) => `${p.cognome || ''} ${p.nome || ''}`.trim();
 
-    const TirocinantiModal = ({ tirocinanti, setTirocinanti, onClose, mostraToast }) => {
+    const TirocinantiModal = ({ tirocinanti, setTirocinanti, onClose, mostraToast, numeroPerWhatsapp }) => {
       const oggiYMD = toYMD(new Date());
       const [mese, setMese] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
       const [selId, setSelId] = useState(null);
@@ -274,10 +274,10 @@
         const nome = (formP.nome || '').trim(), cognome = (formP.cognome || '').trim();
         if (!nome || !cognome) { mostraToast('Inserisci nome e cognome.', 'error'); return; }
         const cap = (t) => t.replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
-        if (formP.id) setTirocinanti(prev => prev.map(p => p.id === formP.id ? { ...p, nome: cap(nome), cognome: cap(cognome), attivita: formP.attivita } : p));
+        if (formP.id) setTirocinanti(prev => prev.map(p => p.id === formP.id ? { ...p, nome: cap(nome), cognome: cap(cognome), attivita: formP.attivita, telefono: (formP.telefono || '').trim() } : p));
         else {
           const id = 't' + Date.now() + Math.random().toString(36).slice(2, 6);
-          setTirocinanti(prev => [...prev, { id, nome: cap(nome), cognome: cap(cognome), attivita: formP.attivita, presenze: [] }]);
+          setTirocinanti(prev => [...prev, { id, nome: cap(nome), cognome: cap(cognome), attivita: formP.attivita, telefono: (formP.telefono || '').trim(), presenze: [] }]);
           setSelId(id);
         }
         setFormP(null);
@@ -417,15 +417,15 @@
                       {Object.keys(ORE_TIROCINIO).map(a => <option key={a} value={a}>{a} ({ORE_TIROCINIO[a]} ore)</option>)}
                     </select>
                   </div>
-                  <button onClick={() => setFormP({ nome: '', cognome: '', attivita: 'Assistente bagnanti' })} className="flex items-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold"><PlusIcon size={16}/> Nuovo tirocinante</button>
+                  <button onClick={() => setFormP({ nome: '', cognome: '', attivita: 'Assistente bagnanti', telefono: '' })} className="flex items-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold"><PlusIcon size={16}/> Nuovo tirocinante</button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-5">
                   {elencoMostrato.length === 0 ? (
                     <div className="p-8 text-center text-slate-400">{tabElenco === 'completati' ? 'Nessun tirocinio ancora completato.' : (tirocinanti.length === 0 ? 'Nessun tirocinante. Aggiungine uno con il tasto in alto a destra.' : (nCompletatiTot && !inCorso.length ? 'Tutti i tirocinanti hanno completato le ore.' : 'Nessun tirocinante per questa attività.'))}</div>
                   ) : (
                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                      <div className="grid grid-cols-[1.6fr_1.2fr_2fr_1fr_auto] gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-sm font-semibold text-slate-600">
-                        <div>Cognome e Nome</div><div>Attività</div><div>Ore svolte</div><div>Ultimo turno</div><div className="w-28 text-right">Azioni</div>
+                      <div className="grid grid-cols-[1.6fr_1.2fr_1.3fr_2fr_1fr_auto] gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-sm font-semibold text-slate-600">
+                        <div>Cognome e Nome</div><div>Attività</div><div>Telefono</div><div>Ore svolte</div><div>Ultimo turno</div><div className="w-36 text-right">Azioni</div>
                       </div>
                       {elencoMostrato.map(p => {
                         const tot = oreFatte(p), target = ORE_TIROCINIO[p.attivita] || 0;
@@ -434,17 +434,21 @@
                         const col = COLORI_TIROCINIO[p.attivita] || COLORI_TIROCINIO['Istruttore'];
                         const ult = ultimaData(p);
                         return (
-                          <div key={p.id} className="grid grid-cols-[1.6fr_1.2fr_2fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                          <div key={p.id} className="grid grid-cols-[1.6fr_1.2fr_1.3fr_2fr_1fr_auto] gap-3 px-4 py-3 items-center border-b border-slate-100 last:border-0 hover:bg-slate-50">
                             <div className="font-bold text-slate-800 truncate">{nomeTiro(p)}</div>
                             <div><span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${col.badge}`}>{p.attivita}</span></div>
+                            <div className="text-sm text-slate-600 truncate">{p.telefono || <span className="text-slate-300">—</span>}</div>
                             <div>
                               <div className="h-2 bg-slate-200 rounded-full overflow-hidden"><div className={`h-full ${fatto ? 'bg-green-500' : col.barra}`} style={{ width: pct + '%' }}></div></div>
                               <div className="mt-1 flex justify-between text-xs"><span className="font-semibold text-slate-700">{fmtOre(tot)} / {target} ore</span>{fatto ? <span className="font-bold text-green-600">Completato ✓</span> : <span className="text-slate-500">mancano {fmtOre(target - tot)} h</span>}</div>
                             </div>
                             <div className="text-sm text-slate-600">{ult ? ult.split('-').reverse().join('/') : '—'}</div>
-                            <div className="w-28 flex items-center justify-end gap-1">
+                            <div className="w-36 flex items-center justify-end gap-1">
+                              {(() => { const num = numeroPerWhatsapp(p.telefono); return num
+                                ? <a href={`https://wa.me/${num}`} target="_blank" rel="noopener noreferrer" title="Apri chat WhatsApp" className="text-[#25D366] hover:text-[#1ebe57] p-1.5 bg-green-50 hover:bg-green-100 rounded-md"><WhatsAppIcon size={15}/></a>
+                                : <span title="Numero di telefono mancante: aggiungilo con Modifica" className="text-slate-300 p-1.5 bg-slate-100 rounded-md cursor-not-allowed"><WhatsAppIcon size={15}/></span>; })()}
                               <button onClick={() => { setSelId(p.id); setVista('calendario'); }} className="p-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600" title="Vedi i turni nel calendario"><CalendarIcon size={15}/></button>
-                              <button onClick={() => setFormP({ id: p.id, nome: p.nome, cognome: p.cognome, attivita: p.attivita })} className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600" title="Modifica anagrafica"><EditIcon size={15}/></button>
+                              <button onClick={() => setFormP({ id: p.id, nome: p.nome, cognome: p.cognome, attivita: p.attivita, telefono: p.telefono || '' })} className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600" title="Modifica anagrafica"><EditIcon size={15}/></button>
                               <button onClick={() => eliminaPersona(p)} className="p-1.5 rounded-md bg-red-50 hover:bg-red-100 text-red-600" title="Elimina"><XIcon size={15}/></button>
                             </div>
                           </div>
@@ -533,6 +537,10 @@
                       <select value={formP.attivita} onChange={e => setFormP({ ...formP, attivita: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white">
                         {Object.keys(ORE_TIROCINIO).map(a => <option key={a} value={a}>{a} — {ORE_TIROCINIO[a]} ore</option>)}
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Telefono (per WhatsApp)</label>
+                      <input type="tel" value={formP.telefono || ''} onChange={e => setFormP({ ...formP, telefono: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') salvaPersona(); }} placeholder="es. 333 1234567" className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" />
                     </div>
                   </div>
                   <div className="px-5 py-3 bg-slate-50 border-t flex justify-end gap-2">
@@ -5462,7 +5470,7 @@
             return <MessaggioCorsoModal titolo={nomeC} quando={`${GIORNI[editModal.giorno]} ${editModal.oraInizio}`} persone={persone} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} onClose={() => setMsgCorso(false)} />;
           })()}
           {isChiusureOpen && <ChiusureModal chiusure={chiusure} setChiusure={setChiusure} corsiColpiti={corsiColpiti} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} iniziale={chiusuraDaAprire ? { id: chiusuraDaAprire } : null} onClose={() => { setIsChiusureOpen(false); setChiusuraDaAprire(null); }} />}
-          {isTirocinantiOpen && <TirocinantiModal tirocinanti={tirocinanti} setTirocinanti={setTirocinanti} onClose={() => setIsTirocinantiOpen(false)} mostraToast={mostraToast} />}
+          {isTirocinantiOpen && <TirocinantiModal tirocinanti={tirocinanti} setTirocinanti={setTirocinanti} onClose={() => setIsTirocinantiOpen(false)} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} />}
 
           {/* --- MODALE LISTA D'ATTESA (contatti da ricontattare) --- */}
           {isListaAttesaOpen && (
