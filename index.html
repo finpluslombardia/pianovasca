@@ -2602,7 +2602,7 @@
       };
       const messaggioRinnovo = (r) => {
           const sec = intervalliDisp.secondo;
-          return `Ciao ${soloNomeProprio(r.nome)}! 👋\nIl tuo periodo di iscrizione ai corsi del Centro Federale Lampugnano termina il ${formatDate(intervalliDisp.primo.fine)}.\nVuoi rinnovare per il secondo periodo (${formatDate(sec.inizio)} - ${formatDate(sec.fine)})? Scrivici e ti riserviamo il posto 🏊\nGrazie!`;
+          return `Ciao ${soloNomeProprio(r.nome)}! 👋\nIl tuo periodo di iscrizione ai corsi del Centro Federale Lampugnano termina il ${formatDate(intervalliDisp.primo.fine)}.\nVuoi rinnovare per il secondo periodo (${formatDate(sec.inizio)} - ${formatDate(sec.fine)})?\n\nDal 09/12 aprono le iscrizioni con precedenza fino al 06/01/2027. Per confermare il posto ti aspettiamo in segreteria 🏊\nGrazie!`;
       };
       const renderRigaRinnovo = (r) => {
           const num = numeroPerWhatsapp(r.telefono);
