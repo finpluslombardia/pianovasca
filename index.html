@@ -900,9 +900,7 @@
         .replace(/\{corso\}/g, titolo)
         .replace(/\{quando\}/g, quando);
       const daCompletare = testo.includes('…');
-      // --- INVIO PER EMAIL (Gmail, copia nascosta, a gruppi) ---
-      const [account, setAccount] = useState(() => { try { const v = localStorage.getItem('pv_gmail_account'); return v !== null ? v : 'info.cflampugnano@gmail.com'; } catch (e) { return 'info.cflampugnano@gmail.com'; } });
-      const salvaAccount = (v) => { setAccount(v); try { localStorage.setItem('pv_gmail_account', v); } catch (e) {} };
+      // --- INVIO PER EMAIL (Brevo) ---
       const emailValida = (e) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(e || '').trim());
       const senzaEmail = persone.filter(x => !emailValida(x.email));
       // un indirizzo solo anche se condiviso da più persone (es. fratelli): ricordiamo tutte le persone che copre
@@ -915,21 +913,7 @@
         });
         return Array.from(m.values());
       })();
-      const testoEmail = testo.replace(/Ciao \{nome\}/g, 'Ciao a tutti').replace(/\{nome\}/g, '').replace(/\{corso\}/g, titolo).replace(/\{quando\}/g, quando);
       const oggettoEmail = 'Centro Federale Lampugnano - ' + titolo;
-      const urlGmail = (lista) => 'https://mail.google.com/mail/?view=cm&fs=1' + (account.trim() ? '&authuser=' + encodeURIComponent(account.trim()) : '')
-        + '&bcc=' + encodeURIComponent(lista.map(x => x.email).join(',')) + '&su=' + encodeURIComponent(oggettoEmail) + '&body=' + encodeURIComponent(testoEmail);
-      // gruppi: al massimo 40 destinatari e un link che resti entro 8000 caratteri
-      const gruppiEmail = (() => {
-        const out = []; let cur = [];
-        destinatari.forEach(d => {
-          const prova = [...cur, d];
-          if (cur.length > 0 && (prova.length > 40 || urlGmail(prova).length > 8000)) { out.push(cur); cur = [d]; } else cur = prova;
-        });
-        if (cur.length) out.push(cur);
-        return out;
-      })();
-      const testoTroppoLungo = destinatari.length > 0 && urlGmail([destinatari[0]]).length > 8000;
       // --- INVIO CON BREVO (una email per persona, con il nome) ---
       const [mostraBrevo, setMostraBrevo] = useState(false);
       const [invio, setInvio] = useState({ attivo: false, fatti: 0, tot: 0, errori: [], fine: false });
@@ -981,7 +965,6 @@
         setInvio({ attivo: false, fatti, tot: daInviare.length, errori, fine: true });
         mostraToast(errori.length ? `Inviate ${fatti} email su ${daInviare.length}: ${errori.length} non riuscite.` : `Inviate ${fatti} email.`, errori.length ? 'error' : 'success');
       };
-      const segnaMolti = (keys) => { const n = { ...avvisati }; keys.forEach(k => { n[k] = true; }); salva(n); };
       const nAvvisati = persone.filter(x => avvisati[x.key]).length;
       const visibili = persone.filter(x => !soloDaAvvisare || !avvisati[x.key]);
       const copia = async (str, ok) => { try { await navigator.clipboard.writeText(str); mostraToast(ok, 'success'); } catch (e) { mostraToast('Copia non riuscita.', 'error'); } };
@@ -1013,32 +996,12 @@
                 {daCompletare && <div className="mt-1 text-xs font-semibold text-amber-600">Completa i punti "…" prima di inviare.</div>}
               </div>
               <div className="shrink-0 border border-emerald-200 bg-emerald-50 rounded-xl p-3">
-                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                  <div className="text-sm font-bold text-emerald-800">Invia per email a tutto il corso (copia nascosta)</div>
-                  <label className="flex items-center gap-1.5 text-xs text-slate-600">Account Gmail da usare (opz.)
-                    <input type="email" value={account} onChange={e => salvaAccount(e.target.value)} placeholder="info.cflampugnano@gmail.com" className="w-52 px-2 py-1 border border-slate-300 rounded-md text-xs bg-white" />
-                  </label>
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="text-sm font-bold text-emerald-800">Invia per email a tutto il corso <span className="font-normal text-emerald-700">(una email per persona, con il nome, tramite Brevo)</span></div>
+                  <button type="button" onClick={() => setMostraBrevo(v => !v)} className="text-xs font-bold text-emerald-700 hover:underline">{mostraBrevo ? 'Nascondi impostazioni' : (cfg.apiKey ? 'Impostazioni' : 'Configura')}</button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {gruppiEmail.map((g, i) => {
-                    const keys = g.flatMap(d => d.keys);
-                    const fatto = keys.every(k => avvisati[k]);
-                    return (
-                      <a key={i} href={urlGmail(g)} target="_blank" rel="noopener noreferrer" onClick={() => segnaMolti(keys)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${fatto ? 'bg-white border border-emerald-300 text-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}>
-                        {fatto ? '✓' : '✉'} Apri Gmail{gruppiEmail.length > 1 ? ` · gruppo ${i + 1} di ${gruppiEmail.length}` : ''} ({g.length} {g.length === 1 ? 'destinatario' : 'destinatari'})
-                      </a>
-                    );
-                  })}
-                  {gruppiEmail.length === 0 && <span className="text-sm text-slate-500 italic">Nessun indirizzo email tra gli iscritti attivi.</span>}
-                </div>
-                {testoTroppoLungo && <div className="mt-2 text-xs font-semibold text-amber-700">Il testo è molto lungo: il link di Gmail potrebbe non aprirsi. Accorcialo.</div>}
                 {senzaEmail.length > 0 && <div className="mt-2 text-xs text-amber-700"><b>Senza email ({senzaEmail.length}):</b> {senzaEmail.map(x => x.nome).join(', ')}. Per loro usa il WhatsApp singolo qui sotto.</div>}
-                <div className="mt-1 text-xs text-slate-500">Nell'email "Ciao {'{nome}'}" diventa "Ciao a tutti". Gli indirizzi restano in copia nascosta. Apre una finestra di Gmail già compilata: controlla e premi Invia.</div>
-                <div className="mt-3 pt-3 border-t border-emerald-200">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="text-sm font-bold text-emerald-800">Oppure invia con Brevo <span className="font-normal text-emerald-700">(una email per persona, con il nome)</span></div>
-                    <button type="button" onClick={() => setMostraBrevo(v => !v)} className="text-xs font-bold text-emerald-700 hover:underline">{mostraBrevo ? 'Nascondi impostazioni' : (cfg.apiKey ? 'Impostazioni' : 'Configura')}</button>
-                  </div>
+                <div className="mt-1">
                   {mostraBrevo && (
                     <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
                       <label className="text-xs text-slate-600">Chiave API di Brevo<input type="password" autoComplete="off" value={cfg.apiKey || ''} onChange={e => setBrevoCfg({ ...cfg, apiKey: e.target.value })} placeholder="incolla qui la chiave (non verrà mostrata)" className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
