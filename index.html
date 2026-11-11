@@ -900,6 +900,37 @@
         .replace(/\{corso\}/g, titolo)
         .replace(/\{quando\}/g, quando);
       const daCompletare = testo.includes('…');
+      // --- INVIO PER EMAIL (Gmail, copia nascosta, a gruppi) ---
+      const [account, setAccount] = useState(() => { try { return localStorage.getItem('pv_gmail_account') || ''; } catch (e) { return ''; } });
+      const salvaAccount = (v) => { setAccount(v); try { localStorage.setItem('pv_gmail_account', v); } catch (e) {} };
+      const emailValida = (e) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(e || '').trim());
+      const senzaEmail = persone.filter(x => !emailValida(x.email));
+      // un indirizzo solo anche se condiviso da più persone (es. fratelli): ricordiamo tutte le persone che copre
+      const destinatari = (() => {
+        const m = new Map();
+        persone.filter(x => emailValida(x.email)).forEach(x => {
+          const e = x.email.trim().toLowerCase();
+          if (!m.has(e)) m.set(e, { email: e, keys: [] });
+          m.get(e).keys.push(x.key);
+        });
+        return Array.from(m.values());
+      })();
+      const testoEmail = testo.replace(/Ciao \{nome\}/g, 'Ciao a tutti').replace(/\{nome\}/g, '').replace(/\{corso\}/g, titolo).replace(/\{quando\}/g, quando);
+      const oggettoEmail = 'Centro Federale Lampugnano - ' + titolo;
+      const urlGmail = (lista) => 'https://mail.google.com/mail/?view=cm&fs=1' + (account.trim() ? '&authuser=' + encodeURIComponent(account.trim()) : '')
+        + '&bcc=' + encodeURIComponent(lista.map(x => x.email).join(',')) + '&su=' + encodeURIComponent(oggettoEmail) + '&body=' + encodeURIComponent(testoEmail);
+      // gruppi: al massimo 40 destinatari e un link che resti entro circa 2000 caratteri
+      const gruppiEmail = (() => {
+        const out = []; let cur = [];
+        destinatari.forEach(d => {
+          const prova = [...cur, d];
+          if (cur.length > 0 && (prova.length > 40 || urlGmail(prova).length > 2000)) { out.push(cur); cur = [d]; } else cur = prova;
+        });
+        if (cur.length) out.push(cur);
+        return out;
+      })();
+      const testoTroppoLungo = destinatari.length > 0 && urlGmail([destinatari[0]]).length > 2000;
+      const segnaMolti = (keys) => { const n = { ...avvisati }; keys.forEach(k => { n[k] = true; }); salva(n); };
       const nAvvisati = persone.filter(x => avvisati[x.key]).length;
       const visibili = persone.filter(x => !soloDaAvvisare || !avvisati[x.key]);
       const copia = async (str, ok) => { try { await navigator.clipboard.writeText(str); mostraToast(ok, 'success'); } catch (e) { mostraToast('Copia non riuscita.', 'error'); } };
@@ -927,12 +958,35 @@
                   <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Testo (puoi modificarlo)</div>
                   <div className="text-[11px] text-slate-400">Segnaposto: <b>{'{nome}'}</b> <b>{'{corso}'}</b> <b>{'{quando}'}</b></div>
                 </div>
-                <textarea value={testo} onChange={e => setTesto(e.target.value)} rows={7} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
+                <textarea value={testo} onChange={e => setTesto(e.target.value)} rows={5} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none" />
                 {daCompletare && <div className="mt-1 text-xs font-semibold text-amber-600">Completa i punti "…" prima di inviare.</div>}
+              </div>
+              <div className="shrink-0 border border-emerald-200 bg-emerald-50 rounded-xl p-3">
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+                  <div className="text-sm font-bold text-emerald-800">Invia per email a tutto il corso (copia nascosta)</div>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-600">Account Gmail da usare (opz.)
+                    <input type="email" value={account} onChange={e => salvaAccount(e.target.value)} placeholder="centro@gmail.com" className="w-52 px-2 py-1 border border-slate-300 rounded-md text-xs bg-white" />
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {gruppiEmail.map((g, i) => {
+                    const keys = g.flatMap(d => d.keys);
+                    const fatto = keys.every(k => avvisati[k]);
+                    return (
+                      <a key={i} href={urlGmail(g)} target="_blank" rel="noopener noreferrer" onClick={() => segnaMolti(keys)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold transition-colors ${fatto ? 'bg-white border border-emerald-300 text-emerald-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}>
+                        {fatto ? '✓' : '✉'} Apri Gmail{gruppiEmail.length > 1 ? ` · gruppo ${i + 1} di ${gruppiEmail.length}` : ''} ({g.length} {g.length === 1 ? 'destinatario' : 'destinatari'})
+                      </a>
+                    );
+                  })}
+                  {gruppiEmail.length === 0 && <span className="text-sm text-slate-500 italic">Nessun indirizzo email tra gli iscritti attivi.</span>}
+                </div>
+                {testoTroppoLungo && <div className="mt-2 text-xs font-semibold text-amber-700">Il testo è molto lungo: il link di Gmail potrebbe non aprirsi. Accorcialo.</div>}
+                {senzaEmail.length > 0 && <div className="mt-2 text-xs text-amber-700"><b>Senza email ({senzaEmail.length}):</b> {senzaEmail.map(x => x.nome).join(', ')}. Per loro usa il WhatsApp singolo qui sotto.</div>}
+                <div className="mt-1 text-xs text-slate-500">Nell'email "Ciao {'{nome}'}" diventa "Ciao a tutti". Gli indirizzi restano in copia nascosta. Apre una finestra di Gmail già compilata: controlla e premi Invia.</div>
               </div>
               <div className="flex-1 min-h-0 flex flex-col">
                 <div className="flex items-center justify-between mb-2 gap-2 flex-wrap shrink-0">
-                  <div className="text-sm font-bold text-slate-700">Iscritti: <span className={nAvvisati === persone.length && persone.length > 0 ? 'text-emerald-600' : ''}>{nAvvisati}/{persone.length} avvisati</span></div>
+                  <div className="text-sm font-bold text-slate-700">WhatsApp singolo · Iscritti: <span className={nAvvisati === persone.length && persone.length > 0 ? 'text-emerald-600' : ''}>{nAvvisati}/{persone.length} avvisati</span></div>
                   <div className="flex items-center gap-3">
                     <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer"><input type="checkbox" checked={soloDaAvvisare} onChange={e => setSoloDaAvvisare(e.target.checked)} /> Mostra solo da avvisare</label>
                     {nAvvisati > 0 && <button type="button" onClick={() => { if (window.confirm('Togliere la spunta a tutti?')) salva({}); }} className="text-xs font-bold text-slate-500 hover:underline">Azzera spunte</button>}
@@ -948,7 +1002,7 @@
                         <input type="checkbox" checked={fatto} onChange={e => segna(pers.key, e.target.checked)} title="Segna come avvisato" className="w-4 h-4 shrink-0" />
                         <div className="min-w-0 flex-1">
                           <div className={`text-sm font-semibold truncate ${fatto ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{pers.nome}</div>
-                          <div className="text-xs text-slate-400">{pers.telefono || 'Telefono mancante'}</div>
+                          <div className="text-xs text-slate-400">{pers.telefono || 'Telefono mancante'}{pers.email ? ` · ${pers.email}` : ''}</div>
                         </div>
                         {num
                           ? <a href={`whatsapp://send?phone=${num}&text=${encodeURIComponent(testoPer(pers))}`} onClick={() => segna(pers.key, true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors"><WhatsAppIcon size={14}/> {fatto ? 'Reinvia' : 'Invia'}</a>
@@ -5510,7 +5564,7 @@
             const persone = editModal.partecipanti.filter(p => p && p.nome && isAttivoInSettimana(p, inizioSettimana)).map(p => {
               const key = p.nome.toLowerCase().trim();
               const arc = archivioSoci[key] || {};
-              return { key, nome: p.nome, telefono: arc.telefono || p.telefono || '' };
+              return { key, nome: p.nome, telefono: arc.telefono || p.telefono || '', email: arc.email || p.email || '' };
             }).sort((a, b) => a.nome.localeCompare(b.nome));
             return <MessaggioCorsoModal titolo={nomeC} quando={`${GIORNI[editModal.giorno]} ${editModal.oraInizio}`} persone={persone} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} onClose={() => setMsgCorso(false)} />;
           })()}
