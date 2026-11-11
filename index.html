@@ -901,7 +901,7 @@
         .replace(/\{quando\}/g, quando);
       const daCompletare = testo.includes('…');
       // --- INVIO PER EMAIL (Gmail, copia nascosta, a gruppi) ---
-      const [account, setAccount] = useState(() => { try { return localStorage.getItem('pv_gmail_account') || ''; } catch (e) { return ''; } });
+      const [account, setAccount] = useState(() => { try { const v = localStorage.getItem('pv_gmail_account'); return v !== null ? v : 'info.cflampugnano@gmail.com'; } catch (e) { return 'info.cflampugnano@gmail.com'; } });
       const salvaAccount = (v) => { setAccount(v); try { localStorage.setItem('pv_gmail_account', v); } catch (e) {} };
       const emailValida = (e) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(e || '').trim());
       const senzaEmail = persone.filter(x => !emailValida(x.email));
@@ -919,17 +919,17 @@
       const oggettoEmail = 'Centro Federale Lampugnano - ' + titolo;
       const urlGmail = (lista) => 'https://mail.google.com/mail/?view=cm&fs=1' + (account.trim() ? '&authuser=' + encodeURIComponent(account.trim()) : '')
         + '&bcc=' + encodeURIComponent(lista.map(x => x.email).join(',')) + '&su=' + encodeURIComponent(oggettoEmail) + '&body=' + encodeURIComponent(testoEmail);
-      // gruppi: al massimo 40 destinatari e un link che resti entro circa 2000 caratteri
+      // gruppi: al massimo 40 destinatari e un link che resti entro 8000 caratteri
       const gruppiEmail = (() => {
         const out = []; let cur = [];
         destinatari.forEach(d => {
           const prova = [...cur, d];
-          if (cur.length > 0 && (prova.length > 40 || urlGmail(prova).length > 2000)) { out.push(cur); cur = [d]; } else cur = prova;
+          if (cur.length > 0 && (prova.length > 40 || urlGmail(prova).length > 8000)) { out.push(cur); cur = [d]; } else cur = prova;
         });
         if (cur.length) out.push(cur);
         return out;
       })();
-      const testoTroppoLungo = destinatari.length > 0 && urlGmail([destinatari[0]]).length > 2000;
+      const testoTroppoLungo = destinatari.length > 0 && urlGmail([destinatari[0]]).length > 8000;
       const segnaMolti = (keys) => { const n = { ...avvisati }; keys.forEach(k => { n[k] = true; }); salva(n); };
       const nAvvisati = persone.filter(x => avvisati[x.key]).length;
       const visibili = persone.filter(x => !soloDaAvvisare || !avvisati[x.key]);
@@ -965,7 +965,7 @@
                 <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
                   <div className="text-sm font-bold text-emerald-800">Invia per email a tutto il corso (copia nascosta)</div>
                   <label className="flex items-center gap-1.5 text-xs text-slate-600">Account Gmail da usare (opz.)
-                    <input type="email" value={account} onChange={e => salvaAccount(e.target.value)} placeholder="centro@gmail.com" className="w-52 px-2 py-1 border border-slate-300 rounded-md text-xs bg-white" />
+                    <input type="email" value={account} onChange={e => salvaAccount(e.target.value)} placeholder="info.cflampugnano@gmail.com" className="w-52 px-2 py-1 border border-slate-300 rounded-md text-xs bg-white" />
                   </label>
                 </div>
                 <div className="flex flex-wrap gap-2">
