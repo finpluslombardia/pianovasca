@@ -445,7 +445,7 @@
                             <div className="text-sm text-slate-600">{ult ? ult.split('-').reverse().join('/') : '—'}</div>
                             <div className="w-36 flex items-center justify-end gap-1">
                               {(() => { const num = numeroPerWhatsapp(p.telefono); return num
-                                ? <a href={`https://wa.me/${num}`} target="_blank" rel="noopener noreferrer" title="Apri chat WhatsApp" className="text-[#25D366] hover:text-[#1ebe57] p-1.5 bg-green-50 hover:bg-green-100 rounded-md"><WhatsAppIcon size={15}/></a>
+                                ? <a href={`whatsapp://send?phone=${num}`} title="Apri chat WhatsApp" className="text-[#25D366] hover:text-[#1ebe57] p-1.5 bg-green-50 hover:bg-green-100 rounded-md"><WhatsAppIcon size={15}/></a>
                                 : <span title="Numero di telefono mancante: aggiungilo con Modifica" className="text-slate-300 p-1.5 bg-slate-100 rounded-md cursor-not-allowed"><WhatsAppIcon size={15}/></span>; })()}
                               <button onClick={() => { setSelId(p.id); setVista('calendario'); }} className="p-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600" title="Vedi i turni nel calendario"><CalendarIcon size={15}/></button>
                               <button onClick={() => setFormP({ id: p.id, nome: p.nome, cognome: p.cognome, attivita: p.attivita, telefono: p.telefono || '' })} className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600" title="Modifica anagrafica"><EditIcon size={15}/></button>
@@ -749,7 +749,7 @@
                               <div className="mt-1 flex flex-wrap gap-1.5">{p.lezioni.map((l, i) => <span key={i} className="px-2 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold">{GIORNI[l.giorno].substring(0, 3)} {fmtCorta(l.ymd)} {l.ora} · {l.nomeCorso}</span>)}</div>
                             </div>
                             {num
-                              ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" onClick={() => segna(sel, p.key, true)} title="Invia il messaggio su WhatsApp (segna anche come avvisato)" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="shrink-0 p-2 rounded-md hover:brightness-95"><WhatsAppIcon size={18}/></a>
+                              ? <a href={`whatsapp://send?phone=${num}&text=${encodeURIComponent(testo)}`} onClick={() => segna(sel, p.key, true)} title="Invia il messaggio su WhatsApp (segna anche come avvisato)" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="shrink-0 p-2 rounded-md hover:brightness-95"><WhatsAppIcon size={18}/></a>
                               : <button onClick={() => copia(testo)} title="Numero mancante: copia il messaggio" className="shrink-0 p-2 rounded-md text-slate-500 bg-slate-100 hover:bg-slate-200"><CopyIcon size={18}/></button>}
                           </div>
                         );
@@ -951,7 +951,7 @@
                           <div className="text-xs text-slate-400">{pers.telefono || 'Telefono mancante'}</div>
                         </div>
                         {num
-                          ? <a href={`https://wa.me/${num}?text=${encodeURIComponent(testoPer(pers))}`} target="_blank" rel="noopener noreferrer" onClick={() => segna(pers.key, true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors"><WhatsAppIcon size={14}/> {fatto ? 'Reinvia' : 'Invia'}</a>
+                          ? <a href={`whatsapp://send?phone=${num}&text=${encodeURIComponent(testoPer(pers))}`} onClick={() => segna(pers.key, true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-xs font-bold transition-colors"><WhatsAppIcon size={14}/> {fatto ? 'Reinvia' : 'Invia'}</a>
                           : <button type="button" onClick={() => copia(testoPer(pers), 'Messaggio copiato.')} title="Numero mancante: copia il messaggio" className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"><CopyIcon size={14}/> Copia</button>}
                       </div>
                     );
@@ -2025,6 +2025,7 @@
                   const isInizioValido = !cell.dataInizio || cell.dataInizio <= dataGiornoYMD;
                   const isFineValida = !cell.dataFine || cell.dataFine >= dataGiornoYMD;
                   if (!isInizioValido || !isFineValida) return; // Salta se il corso non è attivo oggi
+                  if (Array.isArray(cell.dateEscluse) && cell.dateEscluse.includes(dataGiornoYMD)) return; // settimana saltata (eliminato solo per quella data)
 
                   const durata = cell.durata || 45; 
                   
@@ -2541,7 +2542,7 @@
           const persone = new Set();
           const corsi = tuttiCorsiSelect
               .filter(c => c.giorno === giornoIscritti)
-              .filter(c => (!c.data.dataInizio || c.data.dataInizio <= ymd) && (!c.data.dataFine || c.data.dataFine >= ymd))
+              .filter(c => (!c.data.dataInizio || c.data.dataInizio <= ymd) && (!c.data.dataFine || c.data.dataFine >= ymd) && !(Array.isArray(c.data.dateEscluse) && c.data.dateEscluse.includes(ymd)))
               .map(c => {
                   const info = attivita.find(a => a.id === c.data.id);
                   const att = (c.data.partecipanti || []).filter(pp => isAttivoInSettimana(pp, inizioSettimana));
@@ -2617,7 +2618,7 @@
                   </div>
                   <span className={`shrink-0 text-[11px] font-bold uppercase px-2 py-1 rounded-full ${r.rinnovato ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{r.rinnovato ? 'Già rinnovato' : 'Da rinnovare'}</span>
                   {num
-                      ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(messaggioRinnovo(r))}`} target="_blank" rel="noopener noreferrer" title="Proponi il rinnovo su WhatsApp" className="shrink-0 p-2 rounded-md text-[#25D366] hover:text-[#1ebe57] bg-green-50 hover:bg-green-100"><WhatsAppIcon size={18}/></a>
+                      ? <a href={`whatsapp://send?phone=${num}&text=${encodeURIComponent(messaggioRinnovo(r))}`} title="Proponi il rinnovo su WhatsApp" className="shrink-0 p-2 rounded-md text-[#25D366] hover:text-[#1ebe57] bg-green-50 hover:bg-green-100"><WhatsAppIcon size={18}/></a>
                       : <span title="Numero di telefono mancante" className="shrink-0 p-2 rounded-md text-slate-300 bg-slate-100 cursor-not-allowed"><WhatsAppIcon size={18}/></span>}
               </li>
           );
@@ -2723,6 +2724,7 @@
                   if (ch.vasca !== 'tutte' && c.vasca !== ch.vasca) return;
                   if (c.data.dataInizio && c.data.dataInizio > ymd) return;
                   if (c.data.dataFine && c.data.dataFine < ymd) return;
+                  if (Array.isArray(c.data.dateEscluse) && c.data.dateEscluse.includes(ymd)) return;
                   const infoAtt = attivita.find(a => a.id === c.data.id);
                   const nomeLiv = infoAtt?.isFreeTextLevel ? c.data.livello : infoAtt?.levels?.find(l => l.val === c.data.livello)?.name;
                   const nomeCorso = nomeLiv ? `${infoAtt?.name} - ${nomeLiv}` : (infoAtt?.name || 'Corso');
@@ -2845,7 +2847,7 @@
           const testo = scaduto
               ? `Ciao ${u.nome}, ti scriviamo dal Centro Federale Lampugnano.\nIl tuo certificato medico risulta scaduto il ${formatDate(u.scadCertificato)}.\nTi chiediamo di farci avere il certificato aggiornato appena possibile: puoi inviarcelo scansionato direttamente in questa chat oppure consegnarne una copia presso la segreteria.\nTi ricordiamo che senza certificato medico valido non è in alcun modo possibile partecipare al corso.\nRestiamo a disposizione per qualsiasi necessità o chiarimento.\n\nGrazie e a presto!\nCentro Federale Lampugnano`
               : `Ciao ${u.nome}, ti scriviamo dal Centro Federale Lampugnano.\nIl tuo certificato medico scadrà il ${formatDate(u.scadCertificato)}.\nTi chiediamo di farci avere il certificato aggiornato prima della scadenza: puoi inviarcelo scansionato direttamente in questa chat oppure consegnarne una copia presso la segreteria.\nTi ricordiamo che senza certificato medico valido non è in alcun modo possibile partecipare al corso.\nRestiamo a disposizione per qualsiasi necessità o chiarimento.\n\nGrazie e a presto!\nCentro Federale Lampugnano`;
-          return <a href={`https://wa.me/${num}?text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" title="Invia messaggio WhatsApp" className={`${base} bg-emerald-500 hover:bg-emerald-600 text-white`}><WhatsAppIcon size={16}/></a>;
+          return <a href={`whatsapp://send?phone=${num}&text=${encodeURIComponent(testo)}`} title="Invia messaggio WhatsApp" className={`${base} bg-emerald-500 hover:bg-emerald-600 text-white`}><WhatsAppIcon size={16}/></a>;
       };
 
       // Spunta "messaggio certificato inviato". Memorizziamo nell'archivio soci la DATA DI SCADENZA
@@ -3442,6 +3444,8 @@
               livello: c.data.livello || '',
               dataInizio: c.data.dataInizio || '',
               dataFine: c.data.dataFine || '',
+              dateEscluse: [...(c.data.dateEscluse || [])],
+              dataOccorrenza: toYMD(new Date(inizioSettimana.getTime() + c.giorno * 24 * 60 * 60 * 1000)),
               infoAttivita: info,
               partecipanti: partecipantiOrdinati,
               socioEvidenziato: nomeSocio ? nomeSocio.toLowerCase().trim() : null,
@@ -3578,6 +3582,8 @@
           livello: corso.data.livello || '',
           dataInizio: corso.data.dataInizio || '',
           dataFine: corso.data.dataFine || '',
+          dateEscluse: [...(corso.data.dateEscluse || [])],
+          dataOccorrenza: toYMD(new Date(inizioSettimana.getTime() + giornoOriginale * 24 * 60 * 60 * 1000)),
           infoAttivita: info,
           partecipanti: partecipantiOrdinati,
           tab: 'iscritti' // Apre di default la scheda degli iscritti
@@ -3821,6 +3827,7 @@
                   maxUtenti: editModal.maxUtenti ? Number(editModal.maxUtenti) : '',
                   dataInizio: editModal.dataInizio,
                   dataFine: editModal.dataFine,
+                  ...(editModal.dateEscluse && editModal.dateEscluse.length ? { dateEscluse: editModal.dateEscluse } : {}),
                   partecipanti: finalPartecipanti // Usa la lista aggiornata, compreso l'eventuale utente appena digitato
               };
           });
@@ -3834,7 +3841,26 @@
         mostraToast("Modifiche salvate con successo!");
       };
 
+      const [confermaElimina, setConfermaElimina] = useState(false);
+      // Solo per la settimana aperta: il corso resta nel piano ma salta quella data (dateEscluse).
+      const eliminaCorsoSoloSettimana = () => {
+        const ymd = editModal.dataOccorrenza;
+        setTuttiPiani(prevTutti => {
+          const prevSeason = prevTutti[stagioneSelezionata] || {};
+          const nuovoPiano = { ...prevSeason };
+          editModal.corsoOriginale.keys.forEach(k => {
+            if (!nuovoPiano[k]) return;
+            const gia = nuovoPiano[k].dateEscluse || [];
+            nuovoPiano[k] = { ...nuovoPiano[k], dateEscluse: gia.includes(ymd) ? gia : [...gia, ymd].sort() };
+          });
+          return { ...prevTutti, [stagioneSelezionata]: nuovoPiano };
+        });
+        setConfermaElimina(false);
+        setEditModal(null);
+        mostraToast(`Corso tolto solo per il ${formatDate(ymd)}.`, 'success');
+      };
       const eliminaCorsoModal = () => {
+        setConfermaElimina(false);
         setTuttiPiani(prevTutti => {
           const prevSeason = prevTutti[stagioneSelezionata] || {};
           const nuovoPiano = { ...prevSeason };
@@ -4615,7 +4641,7 @@
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-sm text-slate-700">{tel || '-'}</span>
                         {num
-                          ? <a href={`https://wa.me/${num}`} target="_blank" rel="noopener noreferrer" title="Apri chat WhatsApp" className={`${btn} text-[#25D366] hover:text-[#1ebe57] bg-green-50 hover:bg-green-100`}><WhatsAppIcon size={16}/></a>
+                          ? <a href={`whatsapp://send?phone=${num}`} title="Apri chat WhatsApp" className={`${btn} text-[#25D366] hover:text-[#1ebe57] bg-green-50 hover:bg-green-100`}><WhatsAppIcon size={16}/></a>
                           : <span title="Numero di telefono mancante" className={`${btn} text-slate-300 bg-slate-100 cursor-not-allowed`}><WhatsAppIcon size={16}/></span>}
                       </div>
                     </div>
@@ -4839,7 +4865,7 @@
                                         <div key={ci} className="flex items-center justify-between gap-2 text-sm">
                                           <span className="text-slate-700"><b>{c.nome}</b>{c.eta ? ` · ${c.eta} anni` : ''}{extraCorsoAttesa(c) ? <span className="text-amber-800"> · {extraCorsoAttesa(c)}</span> : null}{c.dataCreazione ? <span className="text-slate-400"> · dal {formatDate(c.dataCreazione)}</span> : null}</span>
                                           {num
-                                            ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testoA)}`} target="_blank" rel="noopener noreferrer" title="Avvisa su WhatsApp" className="shrink-0 p-1.5 rounded-md text-[#25D366] bg-white hover:bg-green-100"><WhatsAppIcon size={16}/></a>
+                                            ? <a href={`whatsapp://send?phone=${num}&text=${encodeURIComponent(testoA)}`} title="Avvisa su WhatsApp" className="shrink-0 p-1.5 rounded-md text-[#25D366] bg-white hover:bg-green-100"><WhatsAppIcon size={16}/></a>
                                             : <span title="Numero mancante" className="shrink-0 p-1.5 rounded-md text-slate-300 bg-slate-100"><WhatsAppIcon size={16}/></span>}
                                         </div>
                                       );
@@ -5278,7 +5304,7 @@
                               <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                                 <textarea readOnly value={messaggio} onClick={e => e.target.select()} className="w-full bg-white border border-slate-200 rounded-lg p-3 text-sm text-slate-700 resize-none focus:outline-none" rows={4} />
                                 <div className="flex justify-end gap-2 mt-2">
-                                  <a href={`https://wa.me/${numeroPerWhatsapp(persona.telefono)}?text=${encodeURIComponent(messaggio)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg text-sm font-bold transition-colors"><MessageCircleIcon size={16}/> Apri in WhatsApp{persona.telefono ? '' : ' (scegli contatto)'}</a>
+                                  <a href={`whatsapp://send?phone=${numeroPerWhatsapp(persona.telefono)}&text=${encodeURIComponent(messaggio)}`} className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-lg text-sm font-bold transition-colors"><MessageCircleIcon size={16}/> Apri in WhatsApp{persona.telefono ? '' : ' (scegli contatto)'}</a>
                                   <button onClick={() => copiaMessaggioOggi(messaggio)} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-bold transition-colors"><CopyIcon size={16}/> Copia messaggio</button>
                                 </div>
                               </div>
@@ -5315,7 +5341,7 @@
                                 </div>
                               </div>
                               {num
-                                ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" title="Invia il messaggio di spostamento su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="shrink-0 p-2 rounded-md hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
+                                ? <a href={`whatsapp://send?phone=${num}&text=${encodeURIComponent(testo)}`} title="Invia il messaggio di spostamento su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="shrink-0 p-2 rounded-md hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
                                 : <button onClick={() => copiaMessaggioOggi(testo)} title="Numero mancante: copia il messaggio" className="shrink-0 p-2 rounded-md text-slate-500 bg-slate-100 hover:bg-slate-200"><CopyIcon size={18}/></button>}
                               <button onClick={() => rimuoviSpostamentoOggi(v.nome)} title="Rimuovi da questo elenco" className="shrink-0 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"><XIcon size={16}/></button>
                             </li>
@@ -5348,7 +5374,7 @@
                             <div className="shrink-0 flex items-center gap-3">
                               <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-100 text-red-700">Scaduto {formatDate(u.scadCertificato)}</span>
                               {num
-                                ? <a href={`https://wa.me/${num}`} target="_blank" rel="noopener noreferrer" title="Apri chat WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="p-2 rounded-md hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
+                                ? <a href={`whatsapp://send?phone=${num}`} title="Apri chat WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="p-2 rounded-md hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
                                 : <span title="Numero di telefono mancante" style={{ color: '#cbd5e1', backgroundColor: '#f1f5f9' }} className="p-2 rounded-md cursor-not-allowed"><WhatsAppIcon size={18}/></span>}
                             </div>
                           </li>
@@ -5431,7 +5457,7 @@
                             </div>
                           </div>
                           {num
-                            ? <a href={`https://api.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(testo)}`} target="_blank" rel="noopener noreferrer" title="Invia gli auguri su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="shrink-0 p-2 rounded-md hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
+                            ? <a href={`whatsapp://send?phone=${num}&text=${encodeURIComponent(testo)}`} title="Invia gli auguri su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="shrink-0 p-2 rounded-md hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
                             : <span title="Numero di telefono mancante" style={{ color: '#cbd5e1', backgroundColor: '#f1f5f9' }} className="shrink-0 p-2 rounded-md cursor-not-allowed"><WhatsAppIcon size={18}/></span>}
                         </li>
                       );
@@ -5447,6 +5473,25 @@
             </div>
           )}
 
+          {editModal && confermaElimina && (
+            <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4" onClick={() => setConfermaElimina(false)}>
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="px-5 py-4 bg-red-600 text-white font-bold text-lg flex justify-between items-center">Elimina corso<button onClick={() => setConfermaElimina(false)} className="hover:bg-white/20 p-1 rounded-full"><XIcon size={20}/></button></div>
+                <div className="p-5 flex flex-col gap-3">
+                  <p className="text-sm text-slate-600">Vuoi eliminare il corso di <b>{GIORNI[editModal.giorno]} {editModal.oraInizio}</b> per tutto il periodo in cui è inserito o solo per questa settimana?</p>
+                  <button type="button" onClick={eliminaCorsoSoloSettimana} className="text-left px-4 py-3 rounded-xl border-2 border-amber-300 bg-amber-50 hover:bg-amber-100 transition-colors">
+                    <div className="font-bold text-amber-800">Solo questa settimana</div>
+                    <div className="text-xs text-amber-700">Salta solo {GIORNI[editModal.giorno]} {formatDate(editModal.dataOccorrenza)}. Le altre settimane restano invariate.</div>
+                  </button>
+                  <button type="button" onClick={eliminaCorsoModal} className="text-left px-4 py-3 rounded-xl border-2 border-red-300 bg-red-50 hover:bg-red-100 transition-colors">
+                    <div className="font-bold text-red-700">Tutto il periodo</div>
+                    <div className="text-xs text-red-600">{editModal.dataInizio || editModal.dataFine ? `Dal ${editModal.dataInizio ? formatDate(editModal.dataInizio) : 'inizio stagione'} al ${editModal.dataFine ? formatDate(editModal.dataFine) : 'fine stagione'}: ` : 'In tutte le settimane: '}il corso e i suoi iscritti vengono rimossi.</div>
+                  </button>
+                  <button type="button" onClick={() => setConfermaElimina(false)} className="self-end px-4 py-2 rounded-lg font-bold text-slate-600 hover:bg-slate-100 transition-colors">Annulla</button>
+                </div>
+              </div>
+            </div>
+          )}
           {editModal && passaLivello && (() => {
             const persone = editModal.partecipanti.map((p, idx) => ({ p, idx })).filter(x => x.p && x.p.nome && isAttivoInSettimana(x.p, inizioSettimana)).map(({ p, idx }) => {
               const arc = archivioSoci[p.nome.toLowerCase().trim()] || {};
@@ -6472,6 +6517,19 @@
                           />
                         </div>
                       </div>
+                      {(editModal.dateEscluse || []).length > 0 && (
+                        <div className="mb-5">
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Settimane saltate (corso non svolto)</label>
+                          <div className="flex flex-wrap gap-2">
+                            {editModal.dateEscluse.map(d => (
+                              <span key={d} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-sm font-semibold text-amber-800">{formatDate(d)}
+                                <button type="button" title="Ripristina questa settimana" onClick={() => setEditModal({...editModal, dateEscluse: editModal.dateEscluse.filter(x => x !== d)})} className="w-5 h-5 rounded-full hover:bg-amber-200 flex items-center justify-center"><XIcon size={12}/></button>
+                              </span>
+                            ))}
+                          </div>
+                          <p className="mt-1 text-xs text-slate-400">Premi la X per rimettere il corso in quella settimana, poi Salva Tutto.</p>
+                        </div>
+                      )}
 
                       <div className="mb-5">
                         <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Corsie</label>
@@ -6693,7 +6751,7 @@
                               </td>
                               <td className="p-3 flex items-center justify-center gap-2">
                                 {(() => { const num = numeroPerWhatsapp(p.telefono); return num
-                                  ? <a href={`https://wa.me/${num}`} target="_blank" rel="noopener noreferrer" title="Apri chat WhatsApp" className="text-[#25D366] hover:text-[#1ebe57] transition-colors p-1.5 bg-green-50 hover:bg-green-100 rounded-md"><WhatsAppIcon size={16}/></a>
+                                  ? <a href={`whatsapp://send?phone=${num}`} title="Apri chat WhatsApp" className="text-[#25D366] hover:text-[#1ebe57] transition-colors p-1.5 bg-green-50 hover:bg-green-100 rounded-md"><WhatsAppIcon size={16}/></a>
                                   : <span title="Numero di telefono mancante" className="text-slate-300 p-1.5 bg-slate-100 rounded-md cursor-not-allowed"><WhatsAppIcon size={16}/></span>; })()}
                                 <button type="button" onClick={() => avviaModificaPartecipante(i)} title="Modifica" className="text-blue-500 hover:text-blue-700 transition-colors p-1.5 bg-blue-50 hover:bg-blue-100 rounded-md"><EditIcon size={16}/></button>
                                 <button type="button" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); const sopra = r.bottom + 120 > window.innerHeight; setMenuAzioniPart(menuAzioniPart && menuAzioniPart.idx === i ? null : { idx: i, x: r.right, y: sopra ? r.top - 112 : r.bottom + 4 }); }} title="Azioni" className="text-slate-500 hover:text-slate-800 transition-colors p-1.5 bg-slate-100 hover:bg-slate-200 rounded-md"><MoreVerticalIcon size={16}/></button>
@@ -6770,7 +6828,7 @@
                 {/* Footer Modal */}
                 <div className="px-6 py-4 border-t border-slate-200 flex justify-between bg-white rounded-b-2xl shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.05)] z-20">
                   {editModal.tab === 'dettagli' ? (
-                    <button type="button" onClick={eliminaCorsoModal} className="px-4 py-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-bold transition-colors flex items-center gap-2"><Trash2Icon size={18} /> <span className="hidden sm:inline">Elimina Corso</span></button>
+                    <button type="button" onClick={() => setConfermaElimina(true)} className="px-4 py-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-bold transition-colors flex items-center gap-2"><Trash2Icon size={18} /> <span className="hidden sm:inline">Elimina Corso</span></button>
                   ) : (
                     <div className="flex items-center gap-2">
                       <button type="button" onClick={stampaRegistro} disabled={partecipantiAttiviModal.length === 0} className={`px-5 py-2.5 rounded-lg font-bold transition-colors flex items-center gap-2 ${partecipantiAttiviModal.length > 0 ? 'text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm' : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed'}`}><PrinterIcon size={18} /> Stampa Registro</button>
