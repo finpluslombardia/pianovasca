@@ -882,7 +882,7 @@
       { nome: 'Variazione orario', testo: "Ciao {nome}, ti informiamo che la lezione di {corso} ({quando}) subisce una variazione di orario: …\n\nGrazie per la comprensione e a presto!\nCentro Federale Lampugnano" },
       { nome: 'Iniziativa / evento', testo: "Ciao {nome}, ti segnaliamo un'iniziativa per gli iscritti al corso di {corso}: …\n\nTi aspettiamo!\nCentro Federale Lampugnano" },
     ];
-    const MessaggioCorsoModal = ({ titolo, quando, persone, numeroPerWhatsapp, soloNomeProprio, mostraToast, onClose }) => {
+    const MessaggioCorsoModal = ({ titolo, quando, persone, numeroPerWhatsapp, soloNomeProprio, mostraToast, brevoCfg, setBrevoCfg, onClose }) => {
       const [testo, setTesto] = useState(TEMPLATE_MSG_CORSO[0].testo);
       const [avvisati, setAvvisati] = useState({});
       const [soloDaAvvisare, setSoloDaAvvisare] = useState(false);
@@ -930,6 +930,57 @@
         return out;
       })();
       const testoTroppoLungo = destinatari.length > 0 && urlGmail([destinatari[0]]).length > 8000;
+      // --- INVIO CON BREVO (una email per persona, con il nome) ---
+      const [mostraBrevo, setMostraBrevo] = useState(false);
+      const [invio, setInvio] = useState({ attivo: false, fatti: 0, tot: 0, errori: [], fine: false });
+      const cfg = brevoCfg || {};
+      const daInviare = destinatari.filter(d => d.keys.some(k => !avvisati[k]));
+      const chiamaBrevo = async ({ a, nomeA, oggetto, testoMail }) => {
+        let r;
+        try {
+          r = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            headers: { accept: 'application/json', 'content-type': 'application/json', 'api-key': String(cfg.apiKey || '').trim() },
+            body: JSON.stringify({
+              sender: { name: cfg.mittenteNome || undefined, email: String(cfg.mittenteEmail || '').trim() },
+              to: [{ email: a, name: nomeA || undefined }],
+              replyTo: cfg.replyTo ? { email: String(cfg.replyTo).trim() } : undefined,
+              subject: oggetto, textContent: testoMail
+            })
+          });
+        } catch (e) { const er = new Error('Connessione a Brevo non riuscita (rete assente o richiesta bloccata dal browser).'); er.fatale = true; throw er; }
+        if (!r.ok) {
+          let m = ''; try { const j = await r.json(); m = j.message || ''; } catch (e) {}
+          const er = new Error(`Brevo ha risposto ${r.status}${m ? ': ' + m : ''}`);
+          if (r.status === 401 || r.status === 403) { er.message += ' — controlla la chiave; se è giusta, in Brevo apri Sicurezza → Indirizzi IP autorizzati e disattiva il blocco.'; er.fatale = true; }
+          throw er;
+        }
+      };
+      const provaBrevo = async () => {
+        const a = String(cfg.replyTo || cfg.mittenteEmail || '').trim();
+        if (!cfg.apiKey || !cfg.mittenteEmail || !emailValida(a)) { mostraToast('Inserisci chiave, email mittente e indirizzo di risposta.', 'error'); return; }
+        try { await chiamaBrevo({ a, oggetto: '[Prova] ' + oggettoEmail, testoMail: 'Questa è una email di prova inviata dal gestionale tramite Brevo.\n\nSe la leggi, tutto funziona.' }); mostraToast('Email di prova inviata a ' + a + '. Controlla la casella (anche lo spam).', 'success'); }
+        catch (e) { mostraToast(e.message, 'error'); setInvio(v => ({ ...v, errori: [{ nome: 'Prova', email: a, msg: e.message }] })); }
+      };
+      const inviaBrevo = async () => {
+        if (!cfg.apiKey || !cfg.mittenteEmail) { setMostraBrevo(true); mostraToast('Completa prima le impostazioni di Brevo.', 'error'); return; }
+        if (daInviare.length === 0) return;
+        if (!window.confirm(`Inviare ${daInviare.length} email singole da ${cfg.mittenteEmail}?\n\nOggetto: ${oggettoEmail}`)) return;
+        const nuovi = { ...avvisati }; const errori = []; let fatti = 0;
+        setInvio({ attivo: true, fatti: 0, tot: daInviare.length, errori: [], fine: false });
+        for (const d of daInviare) {
+          const pers = persone.find(x => x.key === d.keys[0]);
+          try {
+            await chiamaBrevo({ a: d.email, nomeA: pers.nome, oggetto: oggettoEmail, testoMail: testoPer(pers) });
+            d.keys.forEach(k => { nuovi[k] = true; }); fatti++;
+          } catch (e) { errori.push({ nome: pers.nome, email: d.email, msg: e.message }); if (e.fatale) break; }
+          setInvio({ attivo: true, fatti, tot: daInviare.length, errori: [...errori], fine: false });
+          await new Promise(r => setTimeout(r, 250));
+        }
+        salva(nuovi);
+        setInvio({ attivo: false, fatti, tot: daInviare.length, errori, fine: true });
+        mostraToast(errori.length ? `Inviate ${fatti} email su ${daInviare.length}: ${errori.length} non riuscite.` : `Inviate ${fatti} email.`, errori.length ? 'error' : 'success');
+      };
       const segnaMolti = (keys) => { const n = { ...avvisati }; keys.forEach(k => { n[k] = true; }); salva(n); };
       const nAvvisati = persone.filter(x => avvisati[x.key]).length;
       const visibili = persone.filter(x => !soloDaAvvisare || !avvisati[x.key]);
@@ -944,7 +995,7 @@
               </div>
               <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
             </div>
-            <div className="p-5 flex-1 min-h-0 flex flex-col gap-4">
+            <div className="p-5 flex-1 min-h-0 overflow-y-auto flex flex-col gap-4">
               <div className="shrink-0">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Tipo di messaggio</div>
                 <div className="flex flex-wrap gap-2">
@@ -983,8 +1034,34 @@
                 {testoTroppoLungo && <div className="mt-2 text-xs font-semibold text-amber-700">Il testo è molto lungo: il link di Gmail potrebbe non aprirsi. Accorcialo.</div>}
                 {senzaEmail.length > 0 && <div className="mt-2 text-xs text-amber-700"><b>Senza email ({senzaEmail.length}):</b> {senzaEmail.map(x => x.nome).join(', ')}. Per loro usa il WhatsApp singolo qui sotto.</div>}
                 <div className="mt-1 text-xs text-slate-500">Nell'email "Ciao {'{nome}'}" diventa "Ciao a tutti". Gli indirizzi restano in copia nascosta. Apre una finestra di Gmail già compilata: controlla e premi Invia.</div>
+                <div className="mt-3 pt-3 border-t border-emerald-200">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div className="text-sm font-bold text-emerald-800">Oppure invia con Brevo <span className="font-normal text-emerald-700">(una email per persona, con il nome)</span></div>
+                    <button type="button" onClick={() => setMostraBrevo(v => !v)} className="text-xs font-bold text-emerald-700 hover:underline">{mostraBrevo ? 'Nascondi impostazioni' : (cfg.apiKey ? 'Impostazioni' : 'Configura')}</button>
+                  </div>
+                  {mostraBrevo && (
+                    <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                      <label className="text-xs text-slate-600">Chiave API di Brevo<input type="password" autoComplete="off" value={cfg.apiKey || ''} onChange={e => setBrevoCfg({ ...cfg, apiKey: e.target.value })} placeholder="incolla qui la chiave (non verrà mostrata)" className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
+                      <label className="text-xs text-slate-600">Nome del mittente<input type="text" value={cfg.mittenteNome || ''} onChange={e => setBrevoCfg({ ...cfg, mittenteNome: e.target.value })} className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
+                      <label className="text-xs text-slate-600">Email del mittente (verificata in Brevo)<input type="email" value={cfg.mittenteEmail || ''} onChange={e => setBrevoCfg({ ...cfg, mittenteEmail: e.target.value })} className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
+                      <label className="text-xs text-slate-600">Le risposte arrivano a<input type="email" value={cfg.replyTo || ''} onChange={e => setBrevoCfg({ ...cfg, replyTo: e.target.value })} className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
+                      <div className="md:col-span-2 flex items-center gap-3">
+                        <button type="button" onClick={provaBrevo} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-100">Invia una email di prova a me</button>
+                        <span className="text-xs text-slate-500">La chiave resta salvata solo nel tuo archivio protetto dal login: non entra nei backup né nei file esportati.</span>
+                      </div>
+                    </div>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button type="button" onClick={inviaBrevo} disabled={invio.attivo || !cfg.apiKey || daInviare.length === 0} className="px-3 py-1.5 rounded-lg text-sm font-bold bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white transition-colors">✉ Invia con Brevo a {daInviare.length} {daInviare.length === 1 ? 'persona' : 'persone'}</button>
+                    {invio.attivo && <span className="text-sm font-semibold text-emerald-800">Invio in corso… {invio.fatti}/{invio.tot}</span>}
+                    {invio.fine && !invio.attivo && <span className="text-sm font-semibold text-emerald-800">Inviate {invio.fatti} su {invio.tot}.</span>}
+                    {!cfg.apiKey && <span className="text-xs text-slate-500">Prima configura la chiave di Brevo.</span>}
+                    {daInviare.length > 300 && <span className="text-xs font-semibold text-amber-700">Il piano gratuito di Brevo permette 300 invii al giorno.</span>}
+                  </div>
+                  {invio.errori.length > 0 && <div className="mt-2 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md p-2 max-h-24 overflow-y-auto">{invio.errori.map((e, i) => <div key={i}><b>{e.nome}</b> ({e.email}): {e.msg}</div>)}</div>}
+                </div>
               </div>
-              <div className="flex-1 min-h-0 flex flex-col">
+              <div className="flex-1 min-h-[260px] flex flex-col">
                 <div className="flex items-center justify-between mb-2 gap-2 flex-wrap shrink-0">
                   <div className="text-sm font-bold text-slate-700">WhatsApp singolo · Iscritti: <span className={nAvvisati === persone.length && persone.length > 0 ? 'text-emerald-600' : ''}>{nAvvisati}/{persone.length} avvisati</span></div>
                   <div className="flex items-center gap-3">
@@ -1958,6 +2035,10 @@
 
       // --- CHIUSURE: documento cloud dedicato 'chiusure_v1' ---
       const chiusureSync = useDocDedicato('chiusure_v1', chiusure, setChiusure, user, firebaseInstances, mostraToast);
+      // Impostazioni di Brevo (servizio di invio email). Contiene la chiave segreta: sta in un documento cloud protetto dal login
+      // e NON entra nei backup né nelle esportazioni.
+      const [brevoCfg, setBrevoCfg] = useState({ apiKey: '', mittenteNome: 'Centro Federale Lampugnano', mittenteEmail: 'info.cflampugnano@gmail.com', replyTo: 'info.cflampugnano@gmail.com' });
+      useDocDedicato('brevo_v1', brevoCfg, setBrevoCfg, user, firebaseInstances, mostraToast);
 
       // --- NORMALIZZAZIONE DATI: nomi con iniziali maiuscole ed email in minuscolo (anche per i dati già presenti) ---
       useEffect(() => {
@@ -5566,7 +5647,7 @@
               const arc = archivioSoci[key] || {};
               return { key, nome: p.nome, telefono: arc.telefono || p.telefono || '', email: arc.email || p.email || '' };
             }).sort((a, b) => a.nome.localeCompare(b.nome));
-            return <MessaggioCorsoModal titolo={nomeC} quando={`${GIORNI[editModal.giorno]} ${editModal.oraInizio}`} persone={persone} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} onClose={() => setMsgCorso(false)} />;
+            return <MessaggioCorsoModal brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} titolo={nomeC} quando={`${GIORNI[editModal.giorno]} ${editModal.oraInizio}`} persone={persone} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} onClose={() => setMsgCorso(false)} />;
           })()}
           {isChiusureOpen && <ChiusureModal chiusure={chiusure} setChiusure={setChiusure} corsiColpiti={corsiColpiti} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} iniziale={chiusuraDaAprire ? { id: chiusuraDaAprire } : null} onClose={() => { setIsChiusureOpen(false); setChiusuraDaAprire(null); }} />}
           {isTirocinantiOpen && <TirocinantiModal tirocinanti={tirocinanti} setTirocinanti={setTirocinanti} onClose={() => setIsTirocinantiOpen(false)} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} />}
