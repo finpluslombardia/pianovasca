@@ -1106,28 +1106,28 @@
                     </div>
                     <div className="flex-1 flex min-h-0">
                       <div className="w-80 shrink-0 border-r border-slate-200 bg-slate-50 p-4 flex flex-col gap-3 overflow-y-auto">
-                        <div className="bg-white border border-slate-200 rounded-lg px-3 py-3 space-y-2 text-sm">
+                        <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 text-sm">
                           <div className="flex items-center justify-between">{badge(i)}<span className="text-slate-500">Pacchetto da <b className="text-slate-700">{p.totale}</b></span></div>
-                          <div><div className="text-xs text-slate-400">Istruttore</div><div className="font-semibold text-slate-800">{p.istruttore}</div></div>
-                          <div className="grid grid-cols-2 gap-2"><div><div className="text-xs text-slate-400">Acquistato il</div><div className="font-semibold text-slate-800">{formatDate(p.dataAcquisto)}</div></div><div><div className="text-xs text-slate-400">Scade il</div><div className="font-semibold text-slate-800">{formatDate(p.scadenza)}</div></div></div>
-                          {p.note && <div><div className="text-xs text-slate-400">Note</div><div className="text-slate-700">{p.note}</div></div>}
+                          <div>
+                            <div className="text-slate-500">Istruttore: <b className="text-slate-800">{p.istruttore}</b></div>
+                            <div className="text-xs text-slate-400 mt-0.5">dal {formatDate(p.dataAcquisto)} al {formatDate(p.scadenza)}</div>
+                          </div>
+                          <div>
+                            <div className="text-slate-700"><b>{i.usate}</b>/{p.totale} fatte · <b>{i.rimaste}</b> {i.rimaste === 1 ? 'rimasta' : 'rimaste'}</div>
+                            <div className="mt-1.5 h-2 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${i.stato === 'attivo' ? 'bg-emerald-500' : 'bg-slate-400'}`} style={{ width: Math.min(100, Math.round(i.usate / (p.totale || 1) * 100)) + '%' }}></div></div>
+                          </div>
+                          <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2"><span className="text-xs text-slate-500">Certificato medico</span>{certPill(anagDi(p))}</div>
+                          {p.note && <div className="pt-3 border-t border-slate-100 text-slate-600 italic">{p.note}</div>}
                         </div>
-                        <div className="bg-white border border-slate-200 rounded-lg px-3 py-3">
-                          <div className="text-sm text-slate-700"><b>{i.usate}</b>/{p.totale} fatte · <b>{i.rimaste}</b> {i.rimaste === 1 ? 'rimasta' : 'rimaste'}</div>
-                          <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${i.stato === 'attivo' ? 'bg-emerald-500' : 'bg-slate-400'}`} style={{ width: Math.min(100, Math.round(i.usate / (p.totale || 1) * 100)) + '%' }}></div></div>
-                        </div>
-                        <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 flex items-center justify-between gap-2">
-                          <span className="text-xs text-slate-500">Certificato medico (obbligatorio)</span>{certPill(anagDi(p))}
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => apriScheda(p.socioKey, p.nome)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-sm font-bold" title="Apri la scheda anagrafica"><UsersIcon size={15}/> Anagrafica</button>
-                          <button onClick={() => setContattaId(p.id)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-sm font-bold" title="Scrivi a questa persona su WhatsApp o per email"><MessageCircleIcon size={15}/> Contatta</button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button onClick={() => setForm({ id: p.id, socioKey: p.socioKey, nome: p.nome, ricerca: '', istruttore: p.istruttore, totale: p.totale, dataAcquisto: p.dataAcquisto, scadenza: p.scadenza, note: p.note || '' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-bold"><EditIcon size={14}/> Modifica pacchetto</button>
-                          <button onClick={() => eliminaPacchetto(p)} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-bold"><XIcon size={14}/> Elimina</button>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button onClick={() => apriScheda(p.socioKey, p.nome)} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-sm font-bold" title="Apri la scheda anagrafica"><UsersIcon size={15}/> Anagrafica</button>
+                          <button onClick={() => setContattaId(p.id)} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-sm font-bold" title="Scrivi a questa persona su WhatsApp o per email"><MessageCircleIcon size={15}/> Contatta</button>
                         </div>
                         <button onClick={() => nuovoPacchetto({ socioKey: p.socioKey, nome: p.nome, istruttore: p.istruttore })} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold" title="Registra l'acquisto di un nuovo pacchetto per questa persona"><PlusIcon size={15}/> Acquista nuovo pacchetto</button>
+                        <div className="mt-auto pt-3 flex items-center justify-between text-xs">
+                          <button onClick={() => setForm({ id: p.id, socioKey: p.socioKey, nome: p.nome, ricerca: '', istruttore: p.istruttore, totale: p.totale, dataAcquisto: p.dataAcquisto, scadenza: p.scadenza, note: p.note || '' })} className="font-semibold text-slate-500 hover:text-slate-800 hover:underline">Modifica pacchetto</button>
+                          <button onClick={() => eliminaPacchetto(p)} className="font-semibold text-red-500 hover:text-red-700 hover:underline">Elimina pacchetto</button>
+                        </div>
                       </div>
                       <div className="flex-1 flex flex-col min-w-0 bg-white">
                         <div className="px-5 py-3 border-b border-slate-200 font-bold text-slate-800">Lezioni fatte</div>
@@ -2712,7 +2712,7 @@
           let part = null;
           tuttiCorsiSelect.some(c => (c.data.partecipanti || []).some(p => { if (p && p.nome && p.nome.toLowerCase().trim() === key) { part = p; return true; } return false; }));
           const arc = archivioCompleto(archivioSoci, tuttiPiani)[key] || {};
-          setSchedaSocio({ ...(part || { nome, ...arc }), nome: (part && part.nome) || nome, _daPrivate: true });
+          setSchedaSocio({ ...(part || { nome, ...arc }), nome: (part && part.nome) || nome, documentiFirmati: (part && part.documentiFirmati) || (arc.docStagioni && arc.docStagioni[stagioneSelezionata]) || '', _daPrivate: true });
       };
       // "Modifica anagrafica" dalla scheda: se la persona ha un corso si apre il solito "Modifica Partecipante", altrimenti un modulo con gli stessi campi
       const modificaAnagraficaDaScheda = (sc) => {
@@ -2721,13 +2721,13 @@
           setSchedaSocio(null);
           if (corso) { setIsPrivateOpen(false); apriCorsoDaRicerca(corso, sc.nome, true); return; }
           const a = archivioCompleto(archivioSoci, tuttiPiani)[key] || {};
-          setFormAnagPriv({ key, nome: sc.nome, dataNascita: a.dataNascita || '', anno: a.anno || '', telefono: a.telefono || '', email: a.email || '', scadCertificato: a.scadCertificato || '', card: a.card || '' });
+          setFormAnagPriv({ key, nome: sc.nome, dataNascita: a.dataNascita || '', anno: a.anno || '', telefono: a.telefono || '', email: a.email || '', scadCertificato: a.scadCertificato || '', card: a.card || '', documentiFirmati: (a.docStagioni && a.docStagioni[stagioneSelezionata]) || '' });
       };
       const [formAnagPriv, setFormAnagPriv] = useState(null);
       const salvaFormAnagPriv = () => {
           const f = formAnagPriv;
           if (f.email && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(f.email.trim())) { mostraToast("L'indirizzo email non è valido.", 'error'); return; }
-          salvaAnagraficaPrivate(f.key, { dataNascita: f.dataNascita, anno: f.dataNascita ? f.dataNascita.slice(0, 4) : f.anno, telefono: f.telefono.trim(), email: f.email.trim().toLowerCase(), scadCertificato: f.scadCertificato, card: f.card });
+          salvaAnagraficaPrivate(f.key, { dataNascita: f.dataNascita, anno: f.dataNascita ? f.dataNascita.slice(0, 4) : f.anno, telefono: f.telefono.trim(), email: f.email.trim().toLowerCase(), scadCertificato: f.scadCertificato, card: f.card, docFirmati: f.documentiFirmati });
           setFormAnagPriv(null);
           mostraToast('Anagrafica aggiornata.', 'success');
       };
@@ -2736,7 +2736,10 @@
           setArchivioSoci(prev => {
               const completo = archivioCompleto(prev, tuttiPiani);
               const base = completo[key] || { nome: key };
-              return { ...prev, [key]: { ...base, ...campi, sesso: base.sesso || rilevaSesso(base.nome || key) } };
+              const { docFirmati, ...resto } = campi;
+              const docStagioni = { ...(base.docStagioni || {}) };
+              if (docFirmati !== undefined) docStagioni[stagioneSelezionata] = docFirmati;
+              return { ...prev, [key]: { ...base, ...resto, docStagioni, sesso: base.sesso || rilevaSesso(base.nome || key) } };
           });
       };
 
@@ -2816,6 +2819,7 @@
                       email: normalizzaEmail(email || (esistente ? esistente.email : '') || ''),
                       sesso: sesso || (esistente ? esistente.sesso : '') || rilevaSesso(nome),
                       livelloSocio: livelloSocio !== undefined ? (livelloSocio || '') : ((esistente && esistente.livelloSocio) || ''),
+                      ...((esistente && esistente.docStagioni) ? { docStagioni: esistente.docStagioni } : {}),
                       certMsgScad: (esistente && esistente.certMsgScad) || '',
                       rinnovoMsgFine: (esistente && esistente.rinnovoMsgFine) || '',
                       auguriMsgData: (esistente && esistente.auguriMsgData) || ''
@@ -5371,6 +5375,7 @@
                       <div><label className={lbl}>Telefono</label><input type="text" value={formAnagPriv.telefono} onChange={e => setFormAnagPriv({ ...formAnagPriv, telefono: e.target.value })} className={inp} /></div>
                       <div><label className={lbl}>Email</label><input type="email" value={formAnagPriv.email} onChange={e => setFormAnagPriv({ ...formAnagPriv, email: e.target.value })} className={inp} /></div>
                       <div><label className={lbl}>Scadenza certificato</label><input type="date" value={formAnagPriv.scadCertificato} onChange={e => setFormAnagPriv({ ...formAnagPriv, scadCertificato: e.target.value })} className={inp} /></div>
+                      <div><label className={lbl}>Documenti firmati</label><select value={formAnagPriv.documentiFirmati} onChange={e => setFormAnagPriv({ ...formAnagPriv, documentiFirmati: e.target.value })} className={inp}><option value="">Da verificare</option><option value="si">Sì</option><option value="no">No</option></select><div className="mt-1 text-[11px] text-slate-400">Stagione {stagioneSelezionata}</div></div>
                       <div><label className={lbl}>Card</label><select value={formAnagPriv.card} onChange={e => setFormAnagPriv({ ...formAnagPriv, card: e.target.value })} className={inp}><option value="">-</option><option value="si">Sì</option><option value="no">No</option></select></div>
                     </div>
                     <div className="mt-4 text-xs text-slate-500">Questa persona non è iscritta a corsi della stagione selezionata: qui modifichi i dati dell'anagrafica. Sono gli stessi usati in "Scadenze" e nel resto del gestionale.</div>
