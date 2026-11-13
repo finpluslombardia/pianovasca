@@ -907,7 +907,7 @@
       const [filtroStato, setFiltroStato] = useState('attivi');
       const [cerca, setCerca] = useState('');
       const [filtroIstr, setFiltroIstr] = useState('');
-      const [aperto, setAperto] = useState(null);
+      const [dettaglio, setDettaglio] = useState(null);
       const [form, setForm] = useState(null);
       const [nuovaLez, setNuovaLez] = useState({ data: oggiYMD, ora: '', note: '' });
       const nuovoId = () => 'lp' + Date.now() + Math.random().toString(36).slice(2, 5);
@@ -922,6 +922,7 @@
         (pacchetti || []).forEach(p => { const i = info[p.id]; if (!i) return; if (i.stato === 'attivo') { c.attivi++; c.rimaste += i.rimaste; if (i.inScadenza) c.inScadenza++; } else if (i.stato === 'scaduto') c.scaduti++; else c.esauriti++; });
         return c;
       }, [pacchetti, info]);
+      const pDett = dettaglio ? (pacchetti || []).find(x => x.id === dettaglio) : null;
       const q = cerca.trim().toLowerCase();
       const lista = (pacchetti || []).filter(p => {
         const i = info[p.id]; if (!i) return false;
@@ -943,14 +944,14 @@
         if (!form.dataAcquisto || !form.scadenza) { mostraToast('Indica data di acquisto e scadenza.', 'error'); return; }
         const dati = { socioKey: form.socioKey, nome: form.nome, istruttore: form.istruttore.trim(), totale: Number(form.totale), dataAcquisto: form.dataAcquisto, scadenza: form.scadenza, note: (form.note || '').trim() };
         if (form.id) setPacchetti(prev => prev.map(p => p.id === form.id ? { ...p, ...dati } : p));
-        else { const id = nuovoId(); setPacchetti(prev => [...prev, { id, ...dati, lezioni: [] }]); setAperto(id); }
+        else { const id = nuovoId(); setPacchetti(prev => [...prev, { id, ...dati, lezioni: [] }]); setDettaglio(id); }
         setForm(null);
       };
       const eliminaPacchetto = (p) => {
         const n = (p.lezioni || []).length;
         if (!window.confirm(`Eliminare il pacchetto di ${p.nome} con ${p.istruttore}?${n ? `\n\nSono registrate ${n} lezioni, andranno perse.` : ''}`)) return;
         setPacchetti(prev => prev.filter(x => x.id !== p.id));
-        if (aperto === p.id) setAperto(null);
+        if (dettaglio === p.id) setDettaglio(null);
       };
       const registraLezione = (p) => {
         const i = info[p.id];
@@ -986,34 +987,36 @@
       return (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center px-5 py-3 bg-[#1e3a5f] text-white">
-              <h3 className="font-bold text-xl flex items-center gap-2"><UsersIcon size={24}/> Lezioni private</h3>
-              <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={22}/></button>
-            </div>
-            <div className="px-5 py-3 bg-white border-b border-slate-200 flex flex-wrap items-center gap-3">
-              <div className="flex gap-1.5">
-                {[['attivi', `Attivi (${conteggi.attivi})`], ['scaduti', `Scaduti (${conteggi.scaduti})`], ['esauriti', `Esauriti (${conteggi.esauriti})`], ['tutti', `Tutti (${conteggi.tutti})`]].map(([k, l]) => (
-                  <button key={k} onClick={() => setFiltroStato(k)} className={`px-3 py-1.5 rounded-full text-sm font-bold border ${filtroStato === k ? 'bg-[#1e3a5f] text-white border-[#1e3a5f]' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}>{l}</button>
+            <div className="px-2 pt-2 flex flex-col bg-[#1e3a5f] text-white">
+              <div className="flex justify-between items-center px-3 pb-3 pt-1 mb-1 border-b border-white/20">
+                <h3 className="font-bold text-xl flex items-center gap-2"><UsersIcon size={24}/> Lezioni private</h3>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => nuovoPacchetto(null)} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-md text-sm font-semibold"><PlusIcon size={15}/> Nuovo pacchetto</button>
+                  <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors ml-1"><XIcon size={22}/></button>
+                </div>
+              </div>
+              <div className="flex">
+                {[['attivi', 'Attivi', conteggi.attivi], ['scaduti', 'Scaduti', conteggi.scaduti], ['esauriti', 'Esauriti', conteggi.esauriti], ['tutti', 'Tutti', conteggi.tutti]].map(([id, label, n]) => (
+                  <button key={id} onClick={() => setFiltroStato(id)} className={`flex-1 py-2.5 text-sm font-bold transition-all border-b-4 border-transparent leading-tight ${filtroStato === id ? 'bg-white/20' : 'opacity-80 hover:bg-white/5'}`}>{label}<span className="ml-1.5 bg-white/25 text-[11px] px-1.5 py-0.5 rounded-full">{n}</span></button>
                 ))}
               </div>
-              <input type="text" value={cerca} onChange={e => setCerca(e.target.value)} placeholder="Cerca persona…" className="px-3 py-1.5 border border-slate-300 rounded-md text-sm w-48" />
+            </div>
+            <div className="px-5 py-3 bg-white border-b border-slate-200 flex flex-wrap items-center gap-3">
+              <input type="text" value={cerca} onChange={e => setCerca(e.target.value)} placeholder="Cerca persona…" className="px-3 py-1.5 border border-slate-300 rounded-md text-sm w-56" />
               <select value={filtroIstr} onChange={e => setFiltroIstr(e.target.value)} className="px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white">
                 <option value="">Tutti gli istruttori</option>
                 {istrDisponibili.map(n => <option key={n} value={n}>{n}</option>)}
               </select>
-              <div className="ml-auto flex items-center gap-4">
-                <div className="text-sm text-slate-500"><b className="text-slate-700">{conteggi.rimaste}</b> lezioni da fare{conteggi.inScadenza > 0 && <> · <b className="text-amber-700">{conteggi.inScadenza}</b> in scadenza</>}</div>
-                <button onClick={() => nuovoPacchetto(null)} className="flex items-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold"><PlusIcon size={16}/> Nuovo pacchetto</button>
-              </div>
+              <div className="ml-auto text-sm text-slate-500"><b className="text-slate-700">{conteggi.rimaste}</b> lezioni da fare{conteggi.inScadenza > 0 && <> · <b className="text-amber-700">{conteggi.inScadenza}</b> in scadenza</>}</div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 p-5">
               {lista.length === 0 && <div className="p-8 text-center text-slate-400">{(pacchetti || []).length === 0 ? 'Nessun pacchetto registrato. Crea il primo con "Nuovo pacchetto".' : 'Nessun pacchetto con questi filtri.'}</div>}
               <div className="space-y-2">
                 {lista.map(p => {
-                  const i = info[p.id]; const open = aperto === p.id; const tel = numeroPerWhatsapp(telefonoDi(p));
+                  const i = info[p.id]; const tel = numeroPerWhatsapp(telefonoDi(p));
                   return (
                     <div key={p.id} className={`bg-white border border-slate-200 rounded-xl overflow-hidden ${i.stato !== 'attivo' ? 'opacity-80' : ''}`}>
-                      <div className="px-4 py-3 flex items-center gap-4 cursor-pointer hover:bg-slate-50" onClick={() => { setAperto(open ? null : p.id); setNuovaLez({ data: oggiYMD, ora: '', note: '' }); }}>
+                      <div className="px-4 py-3 flex items-center gap-4 cursor-pointer hover:bg-slate-50" onClick={() => { setDettaglio(p.id); setNuovaLez({ data: oggiYMD, ora: '', note: '' }); }} title="Apri il dettaglio e compila le lezioni">
                         <div className="min-w-0 flex-1">
                           <div className="font-bold text-slate-800 truncate">{p.nome}</div>
                           <div className="text-xs text-slate-500">Istruttore: <b className="text-slate-700">{p.istruttore}</b> · acquistato il {formatDate(p.dataAcquisto)} · scade il {formatDate(p.scadenza)}</div>
@@ -1025,43 +1028,73 @@
                         <div className="shrink-0 w-36 text-right">{badge(i)}</div>
                         <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                           {tel && <a href={`whatsapp://send?phone=${tel}&text=${encodeURIComponent(messaggioPromemoria(p))}`} title="Invia promemoria su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="p-1.5 rounded-md hover:brightness-95"><WhatsAppIcon size={15}/></a>}
-                          <button onClick={() => setForm({ id: p.id, socioKey: p.socioKey, nome: p.nome, ricerca: '', istruttore: p.istruttore, totale: p.totale, dataAcquisto: p.dataAcquisto, scadenza: p.scadenza, note: p.note || '' })} className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600" title="Modifica"><EditIcon size={15}/></button>
                           <button onClick={() => eliminaPacchetto(p)} className="p-1.5 rounded-md bg-red-50 hover:bg-red-100 text-red-600" title="Elimina"><XIcon size={15}/></button>
                         </div>
                       </div>
-                      {open && (
-                        <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/60">
-                          {p.note && <div className="mb-2 text-sm text-slate-600 italic">{p.note}</div>}
-                          {(p.lezioni || []).length === 0 && <div className="text-sm text-slate-400 mb-2">Nessuna lezione ancora registrata.</div>}
-                          <div className="space-y-1 mb-3">
-                            {(p.lezioni || []).map((l, idx) => (
-                              <div key={l.id} className="flex items-center gap-3 text-sm bg-white border border-slate-200 rounded-md px-3 py-1.5">
-                                <span className="w-6 text-slate-400 font-bold">{idx + 1}.</span>
-                                <span className="font-semibold text-slate-700">{formatDate(l.data)}{l.ora ? ` · ${l.ora}` : ''}</span>
-                                <span className="flex-1 text-slate-500 truncate">{l.note}</span>
-                                <button onClick={() => eliminaLezione(p, l)} className="p-1 rounded text-red-500 hover:bg-red-50" title="Togli lezione"><XIcon size={14}/></button>
-                              </div>
-                            ))}
-                          </div>
-                          {i.rimaste > 0 ? (
-                            <div className="flex flex-wrap items-end gap-2">
-                              <label className="text-xs text-slate-500">Data<input type="date" value={nuovaLez.data} onChange={e => setNuovaLez({ ...nuovaLez, data: e.target.value })} className="mt-0.5 block px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
-                              <label className="text-xs text-slate-500">Ora (facoltativa)<input type="time" value={nuovaLez.ora} onChange={e => setNuovaLez({ ...nuovaLez, ora: e.target.value })} className="mt-0.5 block px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
-                              <label className="text-xs text-slate-500 flex-1 min-w-[160px]">Nota (facoltativa)<input type="text" value={nuovaLez.note} onChange={e => setNuovaLez({ ...nuovaLez, note: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') registraLezione(p); }} className="mt-0.5 block w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
-                              <button onClick={() => registraLezione(p)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-bold">+ Registra lezione</button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-3 text-sm text-slate-500">Pacchetto concluso.
-                              <button onClick={() => nuovoPacchetto({ socioKey: p.socioKey, nome: p.nome, istruttore: p.istruttore })} className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold">Nuovo pacchetto per {soloNomeProprio(p.nome)}</button>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   );
                 })}
               </div>
             </div>
+
+            {pDett && (() => {
+              const p = pDett; const i = info[p.id] || statoPacchetto(p, oggiYMD); const tel = numeroPerWhatsapp(telefonoDi(p));
+              return (
+                <div className="fixed inset-0 z-[55] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setDettaglio(null)}>
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-center px-5 py-3 bg-[#1e3a5f] text-white">
+                      <h3 className="font-bold text-xl flex items-center gap-2"><UsersIcon size={24}/> {p.nome}</h3>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setDettaglio(null)} className="px-3 py-1.5 bg-white/15 hover:bg-white/25 rounded-md text-sm font-semibold">← Tutti i pacchetti</button>
+                        <button onClick={() => setDettaglio(null)} className="hover:bg-white/20 p-1 rounded-full transition-colors ml-1"><XIcon size={22}/></button>
+                      </div>
+                    </div>
+                    <div className="flex-1 flex min-h-0">
+                      <div className="w-80 shrink-0 border-r border-slate-200 bg-slate-50 p-4 flex flex-col gap-3 overflow-y-auto">
+                        <div className="bg-white border border-slate-200 rounded-lg px-3 py-3 space-y-2 text-sm">
+                          <div className="flex items-center justify-between">{badge(i)}<span className="text-slate-500">Pacchetto da <b className="text-slate-700">{p.totale}</b></span></div>
+                          <div><div className="text-xs text-slate-400">Istruttore</div><div className="font-semibold text-slate-800">{p.istruttore}</div></div>
+                          <div className="grid grid-cols-2 gap-2"><div><div className="text-xs text-slate-400">Acquistato il</div><div className="font-semibold text-slate-800">{formatDate(p.dataAcquisto)}</div></div><div><div className="text-xs text-slate-400">Scade il</div><div className="font-semibold text-slate-800">{formatDate(p.scadenza)}</div></div></div>
+                          {p.note && <div><div className="text-xs text-slate-400">Note</div><div className="text-slate-700">{p.note}</div></div>}
+                        </div>
+                        <div className="bg-white border border-slate-200 rounded-lg px-3 py-3">
+                          <div className="text-sm text-slate-700"><b>{i.usate}</b>/{p.totale} fatte · <b>{i.rimaste}</b> {i.rimaste === 1 ? 'rimasta' : 'rimaste'}</div>
+                          <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${i.stato === 'attivo' ? 'bg-emerald-500' : 'bg-slate-400'}`} style={{ width: Math.min(100, Math.round(i.usate / (p.totale || 1) * 100)) + '%' }}></div></div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => setForm({ id: p.id, socioKey: p.socioKey, nome: p.nome, ricerca: '', istruttore: p.istruttore, totale: p.totale, dataAcquisto: p.dataAcquisto, scadenza: p.scadenza, note: p.note || '' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-bold"><EditIcon size={14}/> Modifica</button>
+                          {tel && <a href={`whatsapp://send?phone=${tel}&text=${encodeURIComponent(messaggioPromemoria(p))}`} title="Invia promemoria su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold hover:brightness-95"><WhatsAppIcon size={14}/> Promemoria</a>}
+                          <button onClick={() => eliminaPacchetto(p)} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-bold"><XIcon size={14}/> Elimina</button>
+                        </div>
+                        {i.rimaste <= 0 && <button onClick={() => nuovoPacchetto({ socioKey: p.socioKey, nome: p.nome, istruttore: p.istruttore })} className="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold">Nuovo pacchetto per {soloNomeProprio(p.nome)}</button>}
+                      </div>
+                      <div className="flex-1 flex flex-col min-w-0 bg-white">
+                        <div className="px-5 py-3 border-b border-slate-200 font-bold text-slate-800">Lezioni fatte</div>
+                        {i.rimaste > 0 ? (
+                          <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex flex-wrap items-end gap-2">
+                            <label className="text-xs text-slate-500">Data<input type="date" value={nuovaLez.data} onChange={e => setNuovaLez({ ...nuovaLez, data: e.target.value })} className="mt-0.5 block px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
+                            <label className="text-xs text-slate-500">Ora (facoltativa)<input type="time" value={nuovaLez.ora} onChange={e => setNuovaLez({ ...nuovaLez, ora: e.target.value })} className="mt-0.5 block px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
+                            <label className="text-xs text-slate-500 flex-1 min-w-[160px]">Nota (facoltativa)<input type="text" value={nuovaLez.note} onChange={e => setNuovaLez({ ...nuovaLez, note: e.target.value })} onKeyDown={e => { if (e.key === 'Enter') registraLezione(p); }} className="mt-0.5 block w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
+                            <button onClick={() => registraLezione(p)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-sm font-bold">+ Registra lezione</button>
+                          </div>
+                        ) : <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 text-sm text-slate-500">Pacchetto concluso: tutte le {p.totale} lezioni sono state fatte.</div>}
+                        <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+                          {(p.lezioni || []).length === 0 && <div className="p-8 text-center text-slate-400">Nessuna lezione ancora registrata.</div>}
+                          {(p.lezioni || []).map((l, idx) => (
+                            <div key={l.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
+                              <span className="w-7 text-slate-400 font-bold">{idx + 1}.</span>
+                              <span className="font-semibold text-slate-700 w-40 shrink-0">{formatDate(l.data)}{l.ora ? ` · ${l.ora}` : ''}</span>
+                              <span className="flex-1 text-slate-500 truncate">{l.note}</span>
+                              <button onClick={() => eliminaLezione(p, l)} className="p-1 rounded text-red-500 hover:bg-red-50" title="Togli lezione"><XIcon size={15}/></button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {form && (
               <div className="fixed inset-0 z-[60] bg-slate-900/40 flex items-center justify-center p-4" onClick={() => setForm(null)}>
