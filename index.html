@@ -1066,7 +1066,7 @@
                           {tel && <a href={`whatsapp://send?phone=${tel}&text=${encodeURIComponent(messaggioPromemoria(p))}`} title="Invia promemoria su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold hover:brightness-95"><WhatsAppIcon size={14}/> Promemoria</a>}
                           <button onClick={() => eliminaPacchetto(p)} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-bold"><XIcon size={14}/> Elimina</button>
                         </div>
-                        {i.rimaste <= 0 && <button onClick={() => nuovoPacchetto({ socioKey: p.socioKey, nome: p.nome, istruttore: p.istruttore })} className="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold">Nuovo pacchetto per {soloNomeProprio(p.nome)}</button>}
+                        <button onClick={() => nuovoPacchetto({ socioKey: p.socioKey, nome: p.nome, istruttore: p.istruttore })} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold" title="Registra l'acquisto di un nuovo pacchetto per questa persona"><PlusIcon size={15}/> Acquista nuovo pacchetto</button>
                       </div>
                       <div className="flex-1 flex flex-col min-w-0 bg-white">
                         <div className="px-5 py-3 border-b border-slate-200 font-bold text-slate-800">Lezioni fatte</div>
@@ -7477,6 +7477,8 @@
                     >
                       <UserPlusIcon size={16} /> <span className="hidden sm:inline">Aggiungi Utente</span>
                     </button>
+                    <div className="w-px h-7 bg-slate-200 mx-1"></div>
+                    <button onClick={handleLogout} className="p-2.5 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-700 border border-slate-200 rounded-md transition-colors" title="Esci"><LogOutIcon size={16} /></button>
 
                   </div>
                 </div>
@@ -7687,8 +7689,6 @@
             {/* BANNER INFERIORE: esportazione/importazione e uscita */}
             <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-3">
-                    <button onClick={handleLogout} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-medium transition-colors" title="Esci"><LogOutIcon size={16} /> Esci</button>
-                    <div className="w-px h-6 bg-slate-200"></div>
                     {/* MENU ESPORTAZIONE */}
                     <div className="relative">
                       <button onClick={() => setIsExportMenuOpen(!isExportMenuOpen)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors" title="Esporta / Importa">
@@ -7746,13 +7746,32 @@
                     })()}
 
               </div>
-              <div className="flex items-center gap-2">
-                    <button onClick={() => { setCatDispEspansa(null); setIsDisponibilitaOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] hover:bg-[#2a4d7c] text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Posti liberi per ogni categoria di corso"><UsersIcon size={16} /> Disponibilità corsi</button>
-                    <button onClick={() => { setRicercaIscrittiPeriodo(''); setIscrittiPeriodo('primo'); setIsIscrittiGiornoOpen(false); }} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Elenco iscritti per periodo o per giorno"><UsersIcon size={16} /> Iscritti per periodo</button>
-                    <button onClick={() => setIsTirocinantiOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Calendario e ore dei tirocinanti"><CalendarIcon size={16} /> Tirocinanti</button>
-                    <button onClick={() => { setChiusuraDaAprire(null); setIsChiusureOpen(true); }} className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Chiusure della vasca e avvisi agli iscritti"><BanIcon size={16} /> Chiusure</button>
-                    <button onClick={() => setIsPrivateOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-sm font-bold transition-colors shadow-sm" title="Pacchetti di lezioni private da 5 o 10 lezioni"><UsersIcon size={16} /> Lezioni private</button>
-              </div>
+              {(() => {
+                const oggiB = toYMD(new Date());
+                const nChiusure = chiusure.filter(c => c.al >= oggiB).length;
+                const nPrivScad = lezioniPrivate.filter(x => statoPacchetto(x, oggiB).inScadenza).length;
+                const btn = "relative flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 hover:border-[#1e3a5f] rounded-md text-sm font-bold transition-colors";
+                const bd = (n, col, t) => n > 0 ? <span title={t} className={`absolute -top-2 -right-2 min-w-[20px] h-5 px-1 rounded-full ${col} text-white text-[11px] font-bold flex items-center justify-center border-2 border-white`}>{n}</span> : null;
+                const grp = (titolo, figli) => <div className="flex flex-col gap-1"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-0.5">{titolo}</div><div className="flex items-center gap-2">{figli}</div></div>;
+                const sep = <div className="w-px self-stretch bg-slate-200 mx-1"></div>;
+                return (
+                  <div className="flex items-stretch gap-3 flex-wrap">
+                    {grp('Iscritti', <>
+                      <button onClick={() => { setCatDispEspansa(null); setIsDisponibilitaOpen(true); }} className={btn} title="Posti liberi per ogni categoria di corso"><span className="text-[#1e3a5f]"><UsersIcon size={16} /></span> Disponibilità corsi</button>
+                      <button onClick={() => { setRicercaIscrittiPeriodo(''); setIscrittiPeriodo('primo'); setIsIscrittiGiornoOpen(false); }} className={btn} title="Elenco iscritti per periodo o per giorno"><span className="text-[#1e3a5f]"><UsersIcon size={16} /></span> Iscritti per periodo</button>
+                    </>)}
+                    {sep}
+                    {grp('Attività', <>
+                      <button onClick={() => setIsPrivateOpen(true)} className={btn} title="Pacchetti di lezioni private da 5 o 10 lezioni"><span className="text-[#1e3a5f]"><UsersIcon size={16} /></span> Lezioni private{bd(nPrivScad, 'bg-amber-500', nPrivScad + ' pacchetti in scadenza entro 30 giorni')}</button>
+                      <button onClick={() => setIsTirocinantiOpen(true)} className={btn} title="Calendario e ore dei tirocinanti"><span className="text-[#1e3a5f]"><CalendarIcon size={16} /></span> Tirocinanti</button>
+                    </>)}
+                    {sep}
+                    {grp('Avvisi', <>
+                      <button onClick={() => { setChiusuraDaAprire(null); setIsChiusureOpen(true); }} className={btn} title="Chiusure della vasca e avvisi agli iscritti"><span className="text-[#1e3a5f]"><BanIcon size={16} /></span> Chiusure{bd(nChiusure, 'bg-red-500', nChiusure + ' chiusure in corso o future')}</button>
+                    </>)}
+                  </div>
+                );
+              })()}
             </div>
 
           </main>
