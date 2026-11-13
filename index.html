@@ -7721,7 +7721,7 @@
                 const oggiB = toYMD(new Date());
                 const nChiusure = chiusure.filter(c => c.al >= oggiB).length;
                 const nPrivScad = lezioniPrivate.filter(x => statoPacchetto(x, oggiB).inScadenza).length;
-                const COL = { blu: 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200', indaco: 'bg-violet-50 hover:bg-violet-100 text-violet-700 border-violet-200', rosa: 'bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200', verde: 'bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border-cyan-200', ambra: 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' };
+                const COL = { blu: 'bg-cyan-100 hover:bg-cyan-200 text-cyan-800 border-cyan-300', indaco: 'bg-violet-100 hover:bg-violet-200 text-violet-800 border-violet-300', rosa: 'bg-pink-100 hover:bg-pink-200 text-pink-800 border-pink-300', verde: 'bg-lime-100 hover:bg-lime-200 text-lime-800 border-lime-300', ambra: 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300' };
                 const btn = (c) => `relative flex items-center gap-2 px-3 py-2 border rounded-md text-sm font-medium transition-colors ${COL[c]}`;
                 const bd = (n, col, t) => n > 0 ? <span title={t} className={`absolute -top-2 -right-2 min-w-[20px] h-5 px-1 rounded-full ${col} text-white text-[11px] font-bold flex items-center justify-center border-2 border-white`}>{n}</span> : null;
                 const grp = (titolo, figli) => <div className="flex flex-col gap-1"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-0.5">{titolo}</div><div className="flex items-center gap-2">{figli}</div></div>;
