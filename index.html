@@ -1108,11 +1108,11 @@
       const anagDi = (p) => (anagrafiche || []).find(x => x.key === p.socioKey) || {};
       const certPill = (a, rif) => {
         const c = statoCertificato(a, rif || oggiYMD);
-        if (c.stato === 'mancante') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200">Certificato mancante</span>;
-        if (c.stato === 'scaduto') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200">Certificato scaduto</span>;
-        if (c.stato === 'inscadenza') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">Certificato scade fra {c.giorni} gg</span>;
-        if (c.stato === 'valido') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Certificato valido</span>;
-        return <span className="px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">Certificato non richiesto</span>;
+        if (c.stato === 'mancante') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200">Scadenza mancante</span>;
+        if (c.stato === 'scaduto') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200">Scaduto il {formatDate(c.scad)}</span>;
+        if (c.stato === 'inscadenza') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">Scade il {formatDate(c.scad)} ({c.giorni === 0 ? 'oggi' : `fra ${c.giorni} gg`})</span>;
+        if (c.stato === 'valido') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Scade il {formatDate(c.scad)}</span>;
+        return <span className="px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">Non richiesto</span>;
       };
       const emailDi = (p) => { const a = (anagrafiche || []).find(x => x.key === p.socioKey); return a ? String(a.email || '').trim() : ''; };
       const emailOk = (e) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(e || '').trim());
@@ -3600,7 +3600,9 @@
           if (!num) {
               return <span title="Numero di telefono mancante: aggiungilo nella scheda della persona" className={`${base} bg-slate-100 text-slate-300 cursor-not-allowed`}><WhatsAppIcon size={16}/></span>;
           }
-          const testo = scaduto
+          const testo = u.mancante
+              ? `Ciao ${u.nome}, ti scriviamo dal Centro Federale Lampugnano.\nNella tua anagrafica non risulta ancora il certificato medico.\nTi chiediamo di farcelo avere appena possibile: puoi inviarcelo scansionato direttamente in questa chat oppure consegnarlo in segreteria.\nGrazie!`
+              : scaduto
               ? `Ciao ${u.nome}, ti scriviamo dal Centro Federale Lampugnano.\nIl tuo certificato medico risulta scaduto il ${formatDate(u.scadCertificato)}.\nTi chiediamo di farci avere il certificato aggiornato appena possibile: puoi inviarcelo scansionato direttamente in questa chat oppure consegnarne una copia presso la segreteria.\nTi ricordiamo che senza certificato medico valido non è in alcun modo possibile partecipare al corso.\nRestiamo a disposizione per qualsiasi necessità o chiarimento.\n\nGrazie e a presto!\nCentro Federale Lampugnano`
               : `Ciao ${u.nome}, ti scriviamo dal Centro Federale Lampugnano.\nIl tuo certificato medico scadrà il ${formatDate(u.scadCertificato)}.\nTi chiediamo di farci avere il certificato aggiornato prima della scadenza: puoi inviarcelo scansionato direttamente in questa chat oppure consegnarne una copia presso la segreteria.\nTi ricordiamo che senza certificato medico valido non è in alcun modo possibile partecipare al corso.\nRestiamo a disposizione per qualsiasi necessità o chiarimento.\n\nGrazie e a presto!\nCentro Federale Lampugnano`;
           return <a href={`whatsapp://send?phone=${num}&text=${encodeURIComponent(testo)}`} title="Invia messaggio WhatsApp" className={`${base} bg-emerald-500 hover:bg-emerald-600 text-white`}><WhatsAppIcon size={16}/></a>;
@@ -3612,7 +3614,7 @@
       const segnaCertMsgInviato = (u, inviato) => {
           setArchivioSoci(prev => {
               const esistente = prev[u.key] || { nome: u.nome, anno: u.anno || '', dataNascita: u.dataNascita || '', scadCertificato: u.scadCertificato || '', card: u.card || '', telefono: u.telefono || '', email: u.email || '' };
-              return { ...prev, [u.key]: { ...esistente, certMsgScad: inviato ? u.scadCertificato : '' } };
+              return { ...prev, [u.key]: { ...esistente, certMsgScad: inviato ? (u.mancante ? 'mancante' : u.scadCertificato) : '' } };
           });
       };
       const spuntaCertMsg = (u) => (
@@ -3792,6 +3794,17 @@
               });
           });
 
+          // Lezioni private: anche chi ha un pacchetto attivo (e magari nessun corso) compare nelle scadenze del certificato.
+          const oggiPriv = toYMD(oggi);
+          (lezioniPrivate || []).forEach(pk => {
+              if (!pk || !pk.nome || statoPacchetto(pk, oggiPriv).stato !== 'attivo') return;
+              const pKey = (pk.socioKey || pk.nome).toLowerCase().trim();
+              let u = mapUtenti.get(pKey);
+              if (!u) { u = { nome: pk.nome, scadCertificatoCorso: '', annoCorso: '', dataNascitaCorso: '', corsi: [] }; mapUtenti.set(pKey, u); }
+              const testo = `Lezioni private${pk.istruttore ? ' (' + pk.istruttore + ')' : ''}`;
+              if (!u.corsi.some(co => co.testo === testo)) u.corsi.push({ testo, giorno: undefined, attivitaId: 'privato', oraInizio: '', nomeCorso: 'Lezioni private' });
+          });
+
           const scaduti = [];
           const inScadenza = [];
 
@@ -3808,7 +3821,12 @@
               const annoEffettivo = (inArchivio && inArchivio.anno) || u.annoCorso;
 
               const dataNascitaEffettiva = (inArchivio && inArchivio.dataNascita) || u.dataNascitaCorso || '';
-              if (!scadCertificatoEffettivo || !certificatoObbligatorio(annoEffettivo, annoRif, dataNascitaEffettiva)) return;
+              if (!certificatoObbligatorio(annoEffettivo, annoRif, dataNascitaEffettiva)) return;
+              if (!scadCertificatoEffettivo) {
+                  // Nessuna data di certificato: compare tra gli "scaduti" come "Certificato mancante"
+                  scaduti.push({ nome: u.nome, anno: annoEffettivo, scadCertificato: '', mancante: true, corsi: u.corsi, telefono: (inArchivio && inArchivio.telefono) || '', key: pKey, card: (inArchivio && inArchivio.card) || '', certMsgInviato: !!(inArchivio && inArchivio.certMsgScad === 'mancante') });
+                  return;
+              }
 
               const dataScad = new Date(scadCertificatoEffettivo);
               dataScad.setHours(0,0,0,0);
@@ -3822,11 +3840,11 @@
               }
           });
 
-          scaduti.sort((a, b) => new Date(a.scadCertificato) - new Date(b.scadCertificato));
+          scaduti.sort((a, b) => (a.mancante ? 1 : 0) - (b.mancante ? 1 : 0) || (a.mancante ? a.nome.localeCompare(b.nome) : new Date(a.scadCertificato) - new Date(b.scadCertificato)));
           inScadenza.sort((a, b) => new Date(a.scadCertificato) - new Date(b.scadCertificato));
 
           return { scaduti, inScadenza };
-      }, [tuttiCorsiSelect, attivita, archivioSoci, stagioneSelezionata]);
+      }, [tuttiCorsiSelect, attivita, archivioSoci, stagioneSelezionata, lezioniPrivate]);
 
       // Per "Oggi": certificati SCADUTI di chi ha un corso nel giorno della settimana di oggi (mostrati solo i corsi di oggi).
       const certificatiScadutiOggi = useMemo(() => {
@@ -3919,7 +3937,7 @@
           } else if (ordinamentoScadenze === 'corso') {
               arr.sort((a, b) => (corsoRilevantePerOrdinamento(a)?.nomeCorso || '').localeCompare(corsoRilevantePerOrdinamento(b)?.nomeCorso || ''));
           } else {
-              arr.sort((a, b) => new Date(a.scadCertificato) - new Date(b.scadCertificato));
+              arr.sort((a, b) => (a.mancante ? 1 : 0) - (b.mancante ? 1 : 0) || (a.mancante ? a.nome.localeCompare(b.nome) : new Date(a.scadCertificato) - new Date(b.scadCertificato)));
           }
           return arr;
       }, [ordinamentoScadenze, corsoRilevantePerOrdinamento]);
@@ -3955,7 +3973,7 @@
           <tr>
             <td>${u.nome}</td>
             <td>${(u.corsi || []).map(co => co.testo).join(', ')}</td>
-            <td style="text-align:right; font-weight:bold; color:#dc2626;">Scaduto il ${formatDate(u.scadCertificato)}</td>
+            <td style="text-align:right; font-weight:bold; color:#dc2626;">${u.mancante ? 'Certificato mancante' : 'Scaduto il ' + formatDate(u.scadCertificato)}</td>
           </tr>
         `;
         const rigaDocumento = (u) => `
@@ -4241,7 +4259,7 @@
       const modificaAnagraficaDaScadenza = (u) => {
           const key = String(u.nome || '').toLowerCase().trim();
           const corso = tuttiCorsiSelect.find(c => (c.data.partecipanti || []).some(p => p && p.nome && p.nome.toLowerCase().trim() === key));
-          if (!corso) { alert('Non trovo il corso di questa persona nella stagione selezionata.'); return; }
+          if (!corso) { modificaAnagraficaDaScheda({ nome: u.nome }); return; }
           apriCorsoDaRicerca(corso, u.nome, true);
       };
 
@@ -5471,10 +5489,32 @@
                         if (corsi.length) stag.push({ st, corsi });
                       });
                       const nCorsi = stag.reduce((t, x) => t + x.corsi.length, 0);
+                      const oggiSt = toYMD(new Date());
+                      const privPers = (lezioniPrivate || []).filter(x => x && String(x.socioKey || x.nome || '').toLowerCase().trim() === key).sort((a, b) => String(b.dataAcquisto || '').localeCompare(String(a.dataAcquisto || '')));
                       return (
                         <div className="border-t border-slate-200 pt-4">
                           <div className={lbl}>Storico corsi{stag.length ? ` · ${nCorsi} ${nCorsi === 1 ? 'corso' : 'corsi'} in ${stag.length} ${stag.length === 1 ? 'stagione' : 'stagioni'}` : ''}</div>
-                          {stag.length === 0 && <div className="text-sm text-slate-400 italic mt-1">Nessun corso trovato nelle stagioni salvate.</div>}
+                          {stag.length === 0 && privPers.length === 0 && <div className="text-sm text-slate-400 italic mt-1">Nessun corso trovato nelle stagioni salvate.</div>}
+                          {privPers.length > 0 && (
+                            <div className="mt-2">
+                              <div className="text-xs font-bold text-slate-500 mb-1">Lezioni private</div>
+                              <div className="flex flex-col gap-1.5">
+                                {privPers.map(pk => {
+                                  const st = statoPacchetto(pk, oggiSt);
+                                  const etich = st.stato === 'attivo' ? 'Attivo' : st.stato === 'scaduto' ? 'Scaduto' : 'Esaurito';
+                                  return (
+                                    <div key={pk.id} className="flex gap-2 items-stretch">
+                                      <div className="w-1.5 rounded-full shrink-0 bg-yellow-300"></div>
+                                      <div className="min-w-0">
+                                        <div className="text-sm text-slate-800 font-semibold">Pacchetto da {pk.totale} · <span className="text-blue-700">Lez. Privata</span></div>
+                                        <div className="text-xs text-slate-500">{pk.istruttore ? `${pk.istruttore} · ` : ''}{st.usate}/{pk.totale} fatte{pk.dataAcquisto ? ` · dal ${formatDate(pk.dataAcquisto)}` : ''}{pk.scadenza ? ` al ${formatDate(pk.scadenza)}` : ''} · {etich}</div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                           <div className="mt-2 flex flex-col gap-3">
                             {stag.map(({ st, corsi }) => (
                               <div key={st}>
@@ -5957,7 +5997,7 @@
                                                       </div>
                                                   </div>
                                               </td>
-                                              <td className="p-3 font-bold text-red-600 text-right w-1/3"><div className="flex items-center justify-end gap-3"><span>Scaduto il {formatDate(u.scadCertificato)}</span>{bottoneWhatsappCertificato(u, true)}{bottoneModificaAnagrafica(u)}</div></td>
+                                              <td className="p-3 font-bold text-red-600 text-right w-1/3"><div className="flex items-center justify-end gap-3"><span>{u.mancante ? 'Certificato mancante' : `Scaduto il ${formatDate(u.scadCertificato)}`}</span>{bottoneWhatsappCertificato(u, true)}{bottoneModificaAnagrafica(u)}</div></td>
                                           </tr>
                                       ))}
                                   </tbody>
@@ -6193,7 +6233,7 @@
                               <div className="flex flex-wrap gap-1.5 mt-1">{u.corsiOggi.map((c, ci) => <span key={ci} className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-bold border border-slate-200 text-xs">{c.oraInizio} · {c.nomeCorso}</span>)}</div>
                             </div>
                             <div className="shrink-0 flex items-center gap-3">
-                              <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-100 text-red-700">Scaduto {formatDate(u.scadCertificato)}</span>
+                              <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-100 text-red-700">{u.mancante ? 'Certificato mancante' : `Scaduto ${formatDate(u.scadCertificato)}`}</span>
                               {num
                                 ? <a href={`whatsapp://send?phone=${num}`} title="Apri chat WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="p-2 rounded-md hover:bg-green-100 transition-colors"><WhatsAppIcon size={18}/></a>
                                 : <span title="Numero di telefono mancante" style={{ color: '#cbd5e1', backgroundColor: '#f1f5f9' }} className="p-2 rounded-md cursor-not-allowed"><WhatsAppIcon size={18}/></span>}
