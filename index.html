@@ -902,7 +902,15 @@
       const giorni = p.scadenza ? Math.round((new Date(p.scadenza + 'T12:00:00') - new Date(oggiYMD + 'T12:00:00')) / 86400000) : null;
       return { usate, rimaste, scaduto, stato, giorni, inScadenza: stato === 'attivo' && giorni !== null && giorni <= 30 };
     };
-    const LezioniPrivateModal = ({ pacchetti, setPacchetti, anagrafiche, istruttori, mostraToast, numeroPerWhatsapp, soloNomeProprio, brevoCfg, setBrevoCfg, onClose }) => {
+    const statoCertificato = (a, rifYMD) => {
+      a = a || {};
+      if (!certificatoObbligatorio(a.anno, null, a.dataNascita)) return { stato: 'nonrichiesto', scad: '' };
+      if (!a.scadCertificato) return { stato: 'mancante', scad: '' };
+      if (a.scadCertificato < rifYMD) return { stato: 'scaduto', scad: a.scadCertificato };
+      const g = Math.round((new Date(a.scadCertificato + 'T12:00:00') - new Date(rifYMD + 'T12:00:00')) / 86400000);
+      return { stato: g <= 30 ? 'inscadenza' : 'valido', scad: a.scadCertificato, giorni: g };
+    };
+    const LezioniPrivateModal = ({ pacchetti, setPacchetti, anagrafiche, istruttori, mostraToast, numeroPerWhatsapp, soloNomeProprio, brevoCfg, setBrevoCfg, salvaAnagrafica, onClose }) => {
       const oggiYMD = toYMD(new Date());
       const [filtroStato, setFiltroStato] = useState('attivi');
       const [cerca, setCerca] = useState('');
@@ -912,6 +920,7 @@
       const [nuovaLez, setNuovaLez] = useState({ data: oggiYMD, ora: '', note: '' });
       const [msgCustom, setMsgCustom] = useState({ id: null, testo: null, oggetto: null });
       const [conflitto, setConflitto] = useState(null);
+      const [formAnag, setFormAnag] = useState(null);
       const [mostraKey, setMostraKey] = useState(false);
       const [invioMsg, setInvioMsg] = useState(false);
       const cfgB = brevoCfg || {};
@@ -973,6 +982,8 @@
         if (i.rimaste <= 0) { mostraToast('Il pacchetto è esaurito.', 'error'); return; }
         if (!nuovaLez.data) { mostraToast('Indica la data della lezione.', 'error'); return; }
         if (p.scadenza && nuovaLez.data > p.scadenza && !window.confirm(`La data è dopo la scadenza del pacchetto (${formatDate(p.scadenza)}). Registrare lo stesso?`)) return;
+        const cert = statoCertificato(anagDi(p), nuovaLez.data);
+        if ((cert.stato === 'mancante' || cert.stato === 'scaduto') && !window.confirm(`Il certificato medico di ${p.nome} risulta ${cert.stato === 'mancante' ? 'mancante' : 'scaduto il ' + formatDate(cert.scad)}.\n\nSenza certificato medico valido non è possibile fare lezione. Registrare lo stesso?`)) return;
         const dati = { data: nuovaLez.data, ora: nuovaLez.ora || '', note: (nuovaLez.note || '').trim() };
         const gia = (p.lezioni || []).find(l => l.data === dati.data && (l.n || 1) === 1);
         if (gia) { setConflitto({ pid: p.id, dati, esisteId: gia.id }); return; }
@@ -991,6 +1002,23 @@
         if (i.stato === 'attivo') return base + `Ti ricordiamo che il tuo pacchetto di lezioni private con ${p.istruttore} ha ancora ${i.rimaste} ${i.rimaste === 1 ? 'lezione' : 'lezioni'} e scade il ${formatDate(p.scadenza)}.\nPer prenotare le prossime lezioni scrivici pure qui. Grazie!\nCentro Federale Lampugnano`;
         if (i.stato === 'scaduto') return base + `Il tuo pacchetto di lezioni private con ${p.istruttore} è scaduto il ${formatDate(p.scadenza)}${i.rimaste ? ` (restavano ${i.rimaste} lezioni)` : ''}.\nSe vuoi rinnovarlo scrivici pure qui. Grazie!\nCentro Federale Lampugnano`;
         return base + `Hai concluso il tuo pacchetto di lezioni private con ${p.istruttore}.\nSe vuoi acquistarne uno nuovo scrivici pure qui. Grazie!\nCentro Federale Lampugnano`;
+      };
+      const anagDi = (p) => (anagrafiche || []).find(x => x.key === p.socioKey) || {};
+      const certPill = (a, rif) => {
+        const c = statoCertificato(a, rif || oggiYMD);
+        if (c.stato === 'mancante') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200">Certificato mancante</span>;
+        if (c.stato === 'scaduto') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-red-50 text-red-700 border border-red-200">Certificato scaduto</span>;
+        if (c.stato === 'inscadenza') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">Certificato scade fra {c.giorni} gg</span>;
+        if (c.stato === 'valido') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Certificato valido</span>;
+        return <span className="px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">Certificato non richiesto</span>;
+      };
+      const apriFormAnag = (p) => { const a = anagDi(p); setFormAnag({ key: p.socioKey, nome: p.nome, dataNascita: a.dataNascita || '', anno: a.anno || '', telefono: a.telefono || '', email: a.email || '', scadCertificato: a.scadCertificato || '', card: a.card || '' }); };
+      const salvaFormAnag = () => {
+        const f = formAnag;
+        if (f.email && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(f.email.trim())) { mostraToast('L\'indirizzo email non è valido.', 'error'); return; }
+        salvaAnagrafica(f.key, { dataNascita: f.dataNascita, anno: f.dataNascita ? f.dataNascita.slice(0, 4) : f.anno, telefono: f.telefono.trim(), email: f.email.trim().toLowerCase(), scadCertificato: f.scadCertificato, card: f.card });
+        setFormAnag(null);
+        mostraToast('Anagrafica aggiornata.', 'success');
       };
       const emailDi = (p) => { const a = (anagrafiche || []).find(x => x.key === p.socioKey); return a ? String(a.email || '').trim() : ''; };
       const emailOk = (e) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(e || '').trim());
@@ -1060,7 +1088,7 @@
                           <div className="text-sm text-slate-700 text-right"><b>{i.usate}</b>/{p.totale} fatte · <b>{i.rimaste}</b> {i.rimaste === 1 ? 'rimasta' : 'rimaste'}</div>
                           <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${i.stato === 'attivo' ? 'bg-emerald-500' : 'bg-slate-400'}`} style={{ width: Math.min(100, Math.round(i.usate / (p.totale || 1) * 100)) + '%' }}></div></div>
                         </div>
-                        <div className="shrink-0 w-36 text-right">{badge(i)}</div>
+                        <div className="shrink-0 w-44 text-right flex flex-col items-end gap-1">{badge(i)}{['mancante', 'scaduto', 'inscadenza'].includes(statoCertificato(anagDi(p), oggiYMD).stato) && certPill(anagDi(p))}</div>
                         <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                           {tel && <a href={`whatsapp://send?phone=${tel}&text=${encodeURIComponent(messaggioPromemoria(p))}`} title="Invia promemoria su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="p-1.5 rounded-md hover:brightness-95"><WhatsAppIcon size={15}/></a>}
                           <button onClick={() => eliminaPacchetto(p)} className="p-1.5 rounded-md bg-red-50 hover:bg-red-100 text-red-600" title="Elimina"><XIcon size={15}/></button>
@@ -1092,6 +1120,18 @@
                           <div className="grid grid-cols-2 gap-2"><div><div className="text-xs text-slate-400">Acquistato il</div><div className="font-semibold text-slate-800">{formatDate(p.dataAcquisto)}</div></div><div><div className="text-xs text-slate-400">Scade il</div><div className="font-semibold text-slate-800">{formatDate(p.scadenza)}</div></div></div>
                           {p.note && <div><div className="text-xs text-slate-400">Note</div><div className="text-slate-700">{p.note}</div></div>}
                         </div>
+                        {(() => { const a = anagDi(p); const nasc = a.dataNascita ? formatDate(a.dataNascita) : (a.anno || '-'); return (
+                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-3 space-y-2 text-sm">
+                            <div className="flex items-center justify-between"><div className="font-bold text-slate-800">Anagrafica</div><button onClick={() => apriFormAnag(p)} className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline"><EditIcon size={13}/> Modifica</button></div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div><div className="text-xs text-slate-400">Nato/a</div><div className="font-semibold text-slate-800">{nasc}</div></div>
+                              <div><div className="text-xs text-slate-400">Card</div><div className="font-semibold text-slate-800">{a.card === 'si' ? 'Sì' : a.card === 'no' ? 'No' : '-'}</div></div>
+                            </div>
+                            <div><div className="text-xs text-slate-400">Telefono</div><div className="font-semibold text-slate-800">{a.telefono || '-'}</div></div>
+                            <div><div className="text-xs text-slate-400">Email</div><div className="font-semibold text-slate-800 break-all">{a.email || '-'}</div></div>
+                            <div><div className="text-xs text-slate-400 mb-1">Certificato medico (obbligatorio){a.scadCertificato ? ` · scade il ${formatDate(a.scadCertificato)}` : ''}</div>{certPill(a)}</div>
+                          </div>
+                        ); })()}
                         <div className="bg-white border border-slate-200 rounded-lg px-3 py-3">
                           <div className="text-sm text-slate-700"><b>{i.usate}</b>/{p.totale} fatte · <b>{i.rimaste}</b> {i.rimaste === 1 ? 'rimasta' : 'rimaste'}</div>
                           <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${i.stato === 'attivo' ? 'bg-emerald-500' : 'bg-slate-400'}`} style={{ width: Math.min(100, Math.round(i.usate / (p.totale || 1) * 100)) + '%' }}></div></div>
@@ -1145,6 +1185,31 @@
               );
             })()}
 
+            {formAnag && (
+              <div className="fixed inset-0 z-[65] bg-slate-900/40 flex items-center justify-center p-4" onClick={() => setFormAnag(null)}>
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className="px-5 py-3 bg-[#1e3a5f] text-white font-bold flex justify-between items-center">Anagrafica · {formAnag.nome}<button onClick={() => setFormAnag(null)}><XIcon size={18}/></button></div>
+                  <div className="p-5 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Data di nascita</label><input type="date" value={formAnag.dataNascita} onChange={e => setFormAnag({ ...formAnag, dataNascita: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm"/></div>
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Scadenza certificato medico</label><input type="date" value={formAnag.scadCertificato} onChange={e => setFormAnag({ ...formAnag, scadCertificato: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm"/></div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Telefono</label><input type="text" value={formAnag.telefono} onChange={e => setFormAnag({ ...formAnag, telefono: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"/></div>
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Card</label>
+                        <select value={formAnag.card} onChange={e => setFormAnag({ ...formAnag, card: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm bg-white"><option value="">-</option><option value="si">Sì</option><option value="no">No</option></select></div>
+                    </div>
+                    <div><label className="block text-xs font-semibold text-slate-500 mb-1">Email</label><input type="email" value={formAnag.email} onChange={e => setFormAnag({ ...formAnag, email: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"/></div>
+                    <div className="text-xs text-slate-500">Le modifiche valgono per tutto il gestionale: sono gli stessi dati usati nei corsi e in "Scadenze".</div>
+                  </div>
+                  <div className="px-5 py-3 bg-slate-50 border-t flex justify-end gap-2">
+                    <button onClick={() => setFormAnag(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>
+                    <button onClick={salvaFormAnag} className="px-4 py-2 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md">Salva</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {conflitto && (
               <div className="fixed inset-0 z-[70] bg-slate-900/50 flex items-center justify-center p-4" onClick={() => setConflitto(null)}>
                 <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -1182,6 +1247,7 @@
                           {form.ricerca.trim().length >= 2 && risultatiPersona.length === 0 && <div className="mt-1 text-xs text-amber-700">Nessuna persona trovata in anagrafica.</div>}
                         </div>
                       )}
+                      {form.socioKey && ['mancante', 'scaduto'].includes(statoCertificato(anagDi({ socioKey: form.socioKey }), oggiYMD).stato) && <div className="mt-1.5 text-xs font-semibold text-red-700">Attenzione: certificato medico {statoCertificato(anagDi({ socioKey: form.socioKey }), oggiYMD).stato === 'mancante' ? 'mancante' : 'scaduto'}. È obbligatorio anche per le lezioni private: lo puoi aggiornare dal dettaglio del pacchetto.</div>}
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 mb-1">Istruttore</label>
@@ -2650,8 +2716,17 @@
       const anagrafichePrivate = useMemo(() => {
           if (!isPrivateOpen) return [];
           const arc = archivioCompleto(archivioSoci, tuttiPiani);
-          return Object.keys(arc).map(k => ({ key: k, nome: (arc[k] && arc[k].nome) || k, telefono: (arc[k] && arc[k].telefono) || '', email: (arc[k] && arc[k].email) || '' })).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+          return Object.keys(arc).map(k => ({ ...(arc[k] || {}), key: k, nome: (arc[k] && arc[k].nome) || k, telefono: (arc[k] && arc[k].telefono) || '', email: (arc[k] && arc[k].email) || '' })).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
       }, [isPrivateOpen, archivioSoci, tuttiPiani]);
+
+      // Modifica diretta dell'anagrafica di una persona (anche se non è iscritta a nessun corso)
+      const salvaAnagraficaPrivate = (key, campi) => {
+          setArchivioSoci(prev => {
+              const completo = archivioCompleto(prev, tuttiPiani);
+              const base = completo[key] || { nome: key };
+              return { ...prev, [key]: { ...base, ...campi, sesso: base.sesso || rilevaSesso(base.nome || key) } };
+          });
+      };
 
       const corsiRaggruppatiPerFiltro = useMemo(() => {
           const map = new Map();
@@ -6065,7 +6140,7 @@
             return <MessaggioCorsoModal brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} titolo={nomeC} quando={`${GIORNI[editModal.giorno]} ${editModal.oraInizio}`} persone={persone} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} onClose={() => setMsgCorso(false)} />;
           })()}
           {isChiusureOpen && <ChiusureModal chiusure={chiusure} setChiusure={setChiusure} corsiColpiti={corsiColpiti} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} iniziale={chiusuraDaAprire ? { id: chiusuraDaAprire } : null} onClose={() => { setIsChiusureOpen(false); setChiusuraDaAprire(null); }} />}
-          {isPrivateOpen && <LezioniPrivateModal pacchetti={lezioniPrivate} setPacchetti={setLezioniPrivate} anagrafiche={anagrafichePrivate} istruttori={elencoIstruttori} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} onClose={() => setIsPrivateOpen(false)} />}
+          {isPrivateOpen && <LezioniPrivateModal pacchetti={lezioniPrivate} setPacchetti={setLezioniPrivate} anagrafiche={anagrafichePrivate} istruttori={elencoIstruttori} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} salvaAnagrafica={salvaAnagraficaPrivate} onClose={() => setIsPrivateOpen(false)} />}
           {isTirocinantiOpen && <TirocinantiModal tirocinanti={tirocinanti} setTirocinanti={setTirocinanti} onClose={() => setIsTirocinantiOpen(false)} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} />}
 
           {/* --- MODALE LISTA D'ATTESA (contatti da ricontattare) --- */}
