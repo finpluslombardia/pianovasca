@@ -910,7 +910,7 @@
       const g = Math.round((new Date(a.scadCertificato + 'T12:00:00') - new Date(rifYMD + 'T12:00:00')) / 86400000);
       return { stato: g <= 30 ? 'inscadenza' : 'valido', scad: a.scadCertificato, giorni: g };
     };
-    const LezioniPrivateModal = ({ pacchetti, setPacchetti, anagrafiche, istruttori, mostraToast, numeroPerWhatsapp, soloNomeProprio, brevoCfg, setBrevoCfg, salvaAnagrafica, onClose }) => {
+    const LezioniPrivateModal = ({ pacchetti, setPacchetti, anagrafiche, istruttori, mostraToast, numeroPerWhatsapp, soloNomeProprio, brevoCfg, setBrevoCfg, apriScheda, onClose }) => {
       const oggiYMD = toYMD(new Date());
       const [filtroStato, setFiltroStato] = useState('attivi');
       const [cerca, setCerca] = useState('');
@@ -920,7 +920,7 @@
       const [nuovaLez, setNuovaLez] = useState({ data: oggiYMD, ora: '', note: '' });
       const [msgCustom, setMsgCustom] = useState({ id: null, testo: null, oggetto: null });
       const [conflitto, setConflitto] = useState(null);
-      const [formAnag, setFormAnag] = useState(null);
+      const [contattaId, setContattaId] = useState(null);
       const [mostraKey, setMostraKey] = useState(false);
       const [invioMsg, setInvioMsg] = useState(false);
       const cfgB = brevoCfg || {};
@@ -1011,14 +1011,6 @@
         if (c.stato === 'inscadenza') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">Certificato scade fra {c.giorni} gg</span>;
         if (c.stato === 'valido') return <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Certificato valido</span>;
         return <span className="px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">Certificato non richiesto</span>;
-      };
-      const apriFormAnag = (p) => { const a = anagDi(p); setFormAnag({ key: p.socioKey, nome: p.nome, dataNascita: a.dataNascita || '', anno: a.anno || '', telefono: a.telefono || '', email: a.email || '', scadCertificato: a.scadCertificato || '', card: a.card || '' }); };
-      const salvaFormAnag = () => {
-        const f = formAnag;
-        if (f.email && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(f.email.trim())) { mostraToast('L\'indirizzo email non è valido.', 'error'); return; }
-        salvaAnagrafica(f.key, { dataNascita: f.dataNascita, anno: f.dataNascita ? f.dataNascita.slice(0, 4) : f.anno, telefono: f.telefono.trim(), email: f.email.trim().toLowerCase(), scadCertificato: f.scadCertificato, card: f.card });
-        setFormAnag(null);
-        mostraToast('Anagrafica aggiornata.', 'success');
       };
       const emailDi = (p) => { const a = (anagrafiche || []).find(x => x.key === p.socioKey); return a ? String(a.email || '').trim() : ''; };
       const emailOk = (e) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(e || '').trim());
@@ -1120,38 +1112,20 @@
                           <div className="grid grid-cols-2 gap-2"><div><div className="text-xs text-slate-400">Acquistato il</div><div className="font-semibold text-slate-800">{formatDate(p.dataAcquisto)}</div></div><div><div className="text-xs text-slate-400">Scade il</div><div className="font-semibold text-slate-800">{formatDate(p.scadenza)}</div></div></div>
                           {p.note && <div><div className="text-xs text-slate-400">Note</div><div className="text-slate-700">{p.note}</div></div>}
                         </div>
-                        {(() => { const a = anagDi(p); const nasc = a.dataNascita ? formatDate(a.dataNascita) : (a.anno || '-'); return (
-                          <div className="bg-white border border-slate-200 rounded-lg px-3 py-3 space-y-2 text-sm">
-                            <div className="flex items-center justify-between"><div className="font-bold text-slate-800">Anagrafica</div><button onClick={() => apriFormAnag(p)} className="flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline"><EditIcon size={13}/> Modifica</button></div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div><div className="text-xs text-slate-400">Nato/a</div><div className="font-semibold text-slate-800">{nasc}</div></div>
-                              <div><div className="text-xs text-slate-400">Card</div><div className="font-semibold text-slate-800">{a.card === 'si' ? 'Sì' : a.card === 'no' ? 'No' : '-'}</div></div>
-                            </div>
-                            <div><div className="text-xs text-slate-400">Telefono</div><div className="font-semibold text-slate-800">{a.telefono || '-'}</div></div>
-                            <div><div className="text-xs text-slate-400">Email</div><div className="font-semibold text-slate-800 break-all">{a.email || '-'}</div></div>
-                            <div><div className="text-xs text-slate-400 mb-1">Certificato medico (obbligatorio){a.scadCertificato ? ` · scade il ${formatDate(a.scadCertificato)}` : ''}</div>{certPill(a)}</div>
-                          </div>
-                        ); })()}
                         <div className="bg-white border border-slate-200 rounded-lg px-3 py-3">
                           <div className="text-sm text-slate-700"><b>{i.usate}</b>/{p.totale} fatte · <b>{i.rimaste}</b> {i.rimaste === 1 ? 'rimasta' : 'rimaste'}</div>
                           <div className="mt-2 h-2 bg-slate-100 rounded-full overflow-hidden"><div className={`h-full ${i.stato === 'attivo' ? 'bg-emerald-500' : 'bg-slate-400'}`} style={{ width: Math.min(100, Math.round(i.usate / (p.totale || 1) * 100)) + '%' }}></div></div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button onClick={() => setForm({ id: p.id, socioKey: p.socioKey, nome: p.nome, ricerca: '', istruttore: p.istruttore, totale: p.totale, dataAcquisto: p.dataAcquisto, scadenza: p.scadenza, note: p.note || '' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-bold"><EditIcon size={14}/> Modifica</button>
-                          <button onClick={() => eliminaPacchetto(p)} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-bold"><XIcon size={14}/> Elimina</button>
+                        <div className="bg-white border border-slate-200 rounded-lg px-3 py-2.5 flex items-center justify-between gap-2">
+                          <span className="text-xs text-slate-500">Certificato medico (obbligatorio)</span>{certPill(anagDi(p))}
                         </div>
-                        <div className="bg-white border border-emerald-200 rounded-lg p-3 space-y-2">
-                          <div className="flex items-center justify-between"><div className="text-sm font-bold text-emerald-800">Scrivi a {soloNomeProprio(p.nome)}</div><button type="button" onClick={() => setMostraKey(v => !v)} className="text-xs font-bold text-emerald-700 hover:underline">{cfgB.apiKey ? 'Impostazioni' : 'Configura'}</button></div>
-                          <label className="block text-xs text-slate-500">Oggetto (email)<input type="text" value={oggettoMsgDi(p)} onChange={e => setMsgCustom({ id: p.id, testo: msgCustom.id === p.id ? msgCustom.testo : null, oggetto: e.target.value })} className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
-                          <label className="block text-xs text-slate-500">Messaggio<textarea rows={6} value={testoMsgDi(p)} onChange={e => setMsgCustom({ id: p.id, testo: e.target.value, oggetto: msgCustom.id === p.id ? msgCustom.oggetto : null })} className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
-                          {mostraKey && <label className="block text-xs text-slate-500">Chiave API di Brevo<input type="password" autoComplete="off" value={cfgB.apiKey || ''} onChange={e => setBrevoCfg({ ...cfgB, apiKey: e.target.value })} placeholder="incolla qui la chiave" className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /><span className="block mt-1 text-[11px]">Mittente e piè di pagina si impostano in "Scrivi al corso" (stessa configurazione).</span></label>}
-                          <div className="flex flex-wrap gap-2">
-                            {tel
-                              ? <a href={`whatsapp://send?phone=${tel}&text=${encodeURIComponent(testoMsgDi(p))}`} style={{ color: '#fff', backgroundColor: '#25D366' }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold hover:brightness-95"><WhatsAppIcon size={14}/> WhatsApp</a>
-                              : <button type="button" disabled title="Numero di telefono mancante in anagrafica" className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold bg-slate-200 text-slate-400 cursor-not-allowed"><WhatsAppIcon size={14}/> WhatsApp</button>}
-                            <button type="button" onClick={() => inviaEmailPacchetto(p)} disabled={invioMsg || !emailOk(emailDi(p))} title={emailOk(emailDi(p)) ? 'Invia con Brevo a ' + emailDi(p) : 'Email mancante in anagrafica'} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white">✉ Email (Brevo)</button>
-                          </div>
-                          {!tel && !emailOk(emailDi(p)) && <div className="text-xs text-amber-700">Mancano telefono ed email in anagrafica.</div>}
+                        <div className="flex gap-2">
+                          <button onClick={() => apriScheda(p.socioKey, p.nome)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-sm font-bold" title="Apri la scheda anagrafica"><UsersIcon size={15}/> Anagrafica</button>
+                          <button onClick={() => setContattaId(p.id)} className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-sm font-bold" title="Scrivi a questa persona su WhatsApp o per email"><MessageCircleIcon size={15}/> Contatta</button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button onClick={() => setForm({ id: p.id, socioKey: p.socioKey, nome: p.nome, ricerca: '', istruttore: p.istruttore, totale: p.totale, dataAcquisto: p.dataAcquisto, scadenza: p.scadenza, note: p.note || '' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-sm font-bold"><EditIcon size={14}/> Modifica pacchetto</button>
+                          <button onClick={() => eliminaPacchetto(p)} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-bold"><XIcon size={14}/> Elimina</button>
                         </div>
                         <button onClick={() => nuovoPacchetto({ socioKey: p.socioKey, nome: p.nome, istruttore: p.istruttore })} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold" title="Registra l'acquisto di un nuovo pacchetto per questa persona"><PlusIcon size={15}/> Acquista nuovo pacchetto</button>
                       </div>
@@ -1185,30 +1159,44 @@
               );
             })()}
 
-            {formAnag && (
-              <div className="fixed inset-0 z-[65] bg-slate-900/40 flex items-center justify-center p-4" onClick={() => setFormAnag(null)}>
-                <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
-                  <div className="px-5 py-3 bg-[#1e3a5f] text-white font-bold flex justify-between items-center">Anagrafica · {formAnag.nome}<button onClick={() => setFormAnag(null)}><XIcon size={18}/></button></div>
-                  <div className="p-5 space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Data di nascita</label><input type="date" value={formAnag.dataNascita} onChange={e => setFormAnag({ ...formAnag, dataNascita: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm"/></div>
-                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Scadenza certificato medico</label><input type="date" value={formAnag.scadCertificato} onChange={e => setFormAnag({ ...formAnag, scadCertificato: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm"/></div>
+            {contattaId && (() => {
+              const p = (pacchetti || []).find(x => x.id === contattaId);
+              if (!p) return null;
+              const tel = numeroPerWhatsapp(telefonoDi(p)); const em = emailDi(p);
+              return (
+                <div className="fixed inset-0 z-[56] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setContattaId(null)}>
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
+                    <div className="px-5 py-4 bg-emerald-600 text-white flex justify-between items-center">
+                      <div className="min-w-0"><h3 className="font-bold text-lg flex items-center gap-2"><MessageCircleIcon size={20}/> Scrivi a {p.nome}</h3><div className="text-sm text-white/85 truncate">Lezioni private con {p.istruttore}</div></div>
+                      <button onClick={() => setContattaId(null)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Telefono</label><input type="text" value={formAnag.telefono} onChange={e => setFormAnag({ ...formAnag, telefono: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"/></div>
-                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Card</label>
-                        <select value={formAnag.card} onChange={e => setFormAnag({ ...formAnag, card: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm bg-white"><option value="">-</option><option value="si">Sì</option><option value="no">No</option></select></div>
+                    <div className="flex-1 min-h-0 flex">
+                      <div className="flex-1 min-w-0 p-5 overflow-y-auto flex flex-col gap-3">
+                        <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wide">Oggetto (solo per l'email)<input type="text" value={oggettoMsgDi(p)} onChange={e => setMsgCustom({ id: p.id, testo: msgCustom.id === p.id ? msgCustom.testo : null, oggetto: e.target.value })} className="mt-1 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-normal normal-case text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none" /></label>
+                        <label className="block flex-1 flex flex-col text-[11px] font-bold text-slate-400 uppercase tracking-wide">Messaggio (puoi modificarlo)<textarea value={testoMsgDi(p)} onChange={e => setMsgCustom({ id: p.id, testo: e.target.value, oggetto: msgCustom.id === p.id ? msgCustom.oggetto : null })} className="mt-1 flex-1 min-h-[220px] w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-normal normal-case text-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none" /></label>
+                        <div className="text-xs text-slate-500 whitespace-pre-line"><b>In fondo a ogni email viene aggiunto:</b>{brevoPiede(cfgB, numeroPerWhatsapp)}</div>
+                      </div>
+                      <div className="w-80 shrink-0 border-l border-slate-200 bg-slate-50 p-5 flex flex-col gap-3 overflow-y-auto">
+                        <div className="bg-white border border-slate-200 rounded-lg p-3">
+                          <div className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">WhatsApp</div>
+                          <div className="text-sm text-slate-700 mb-2">{telefonoDi(p) || 'Telefono mancante in anagrafica'}</div>
+                          {tel
+                            ? <a href={`whatsapp://send?phone=${tel}&text=${encodeURIComponent(testoMsgDi(p))}`} style={{ color: '#fff', backgroundColor: '#25D366' }} className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-bold hover:brightness-95"><WhatsAppIcon size={15}/> Invia su WhatsApp</a>
+                            : <button type="button" disabled className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-bold bg-slate-200 text-slate-400 cursor-not-allowed"><WhatsAppIcon size={15}/> Invia su WhatsApp</button>}
+                        </div>
+                        <div className="bg-white border border-slate-200 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2"><div className="text-xs font-bold text-slate-400 uppercase tracking-wide">Email (Brevo)</div><button type="button" onClick={() => setMostraKey(v => !v)} className="text-xs font-bold text-emerald-700 hover:underline">{cfgB.apiKey ? 'Impostazioni' : 'Configura'}</button></div>
+                          <div className="text-sm text-slate-700 mb-2 break-all">{em || 'Email mancante in anagrafica'}</div>
+                          {mostraKey && <label className="block text-xs text-slate-500 mb-2">Chiave API di Brevo<input type="password" autoComplete="off" value={cfgB.apiKey || ''} onChange={e => setBrevoCfg({ ...cfgB, apiKey: e.target.value })} placeholder="incolla qui la chiave" className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /><span className="block mt-1 text-[11px]">Mittente e piè di pagina si impostano in "Scrivi al corso" (stessa configurazione).</span></label>}
+                          <button type="button" onClick={() => inviaEmailPacchetto(p)} disabled={invioMsg || !emailOk(em)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-bold bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white">✉ Invia con Brevo</button>
+                        </div>
+                        {!tel && !emailOk(em) && <div className="text-xs text-amber-700">Mancano telefono ed email in anagrafica: aggiornali da "Anagrafica".</div>}
+                      </div>
                     </div>
-                    <div><label className="block text-xs font-semibold text-slate-500 mb-1">Email</label><input type="email" value={formAnag.email} onChange={e => setFormAnag({ ...formAnag, email: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"/></div>
-                    <div className="text-xs text-slate-500">Le modifiche valgono per tutto il gestionale: sono gli stessi dati usati nei corsi e in "Scadenze".</div>
-                  </div>
-                  <div className="px-5 py-3 bg-slate-50 border-t flex justify-end gap-2">
-                    <button onClick={() => setFormAnag(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>
-                    <button onClick={salvaFormAnag} className="px-4 py-2 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md">Salva</button>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {conflitto && (
               <div className="fixed inset-0 z-[70] bg-slate-900/50 flex items-center justify-center p-4" onClick={() => setConflitto(null)}>
@@ -2719,6 +2707,30 @@
           return Object.keys(arc).map(k => ({ ...(arc[k] || {}), key: k, nome: (arc[k] && arc[k].nome) || k, telefono: (arc[k] && arc[k].telefono) || '', email: (arc[k] && arc[k].email) || '' })).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
       }, [isPrivateOpen, archivioSoci, tuttiPiani]);
 
+      // Dalle lezioni private: apre la scheda anagrafica "classica" della persona
+      const apriSchedaPrivate = (key, nome) => {
+          let part = null;
+          tuttiCorsiSelect.some(c => (c.data.partecipanti || []).some(p => { if (p && p.nome && p.nome.toLowerCase().trim() === key) { part = p; return true; } return false; }));
+          const arc = archivioCompleto(archivioSoci, tuttiPiani)[key] || {};
+          setSchedaSocio({ ...(part || { nome, ...arc }), nome: (part && part.nome) || nome, _daPrivate: true });
+      };
+      // "Modifica anagrafica" dalla scheda: se la persona ha un corso si apre il solito "Modifica Partecipante", altrimenti un modulo con gli stessi campi
+      const modificaAnagraficaDaScheda = (sc) => {
+          const key = String(sc.nome || '').toLowerCase().trim();
+          const corso = tuttiCorsiSelect.find(c => (c.data.partecipanti || []).some(p => p && p.nome && p.nome.toLowerCase().trim() === key));
+          setSchedaSocio(null);
+          if (corso) { setIsPrivateOpen(false); apriCorsoDaRicerca(corso, sc.nome, true); return; }
+          const a = archivioCompleto(archivioSoci, tuttiPiani)[key] || {};
+          setFormAnagPriv({ key, nome: sc.nome, dataNascita: a.dataNascita || '', anno: a.anno || '', telefono: a.telefono || '', email: a.email || '', scadCertificato: a.scadCertificato || '', card: a.card || '' });
+      };
+      const [formAnagPriv, setFormAnagPriv] = useState(null);
+      const salvaFormAnagPriv = () => {
+          const f = formAnagPriv;
+          if (f.email && !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(f.email.trim())) { mostraToast("L'indirizzo email non è valido.", 'error'); return; }
+          salvaAnagraficaPrivate(f.key, { dataNascita: f.dataNascita, anno: f.dataNascita ? f.dataNascita.slice(0, 4) : f.anno, telefono: f.telefono.trim(), email: f.email.trim().toLowerCase(), scadCertificato: f.scadCertificato, card: f.card });
+          setFormAnagPriv(null);
+          mostraToast('Anagrafica aggiornata.', 'success');
+      };
       // Modifica diretta dell'anagrafica di una persona (anche se non è iscritta a nessun corso)
       const salvaAnagraficaPrivate = (key, campi) => {
           setArchivioSoci(prev => {
@@ -5333,8 +5345,39 @@
                       );
                     })()}
                   </div>
-                  <div className="px-6 py-3 border-t border-slate-200 flex justify-end bg-slate-50">
+                  <div className="px-6 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50">
+                    {schedaSocio._daPrivate && <button onClick={() => modificaAnagraficaDaScheda(schedaSocio)} className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors"><EditIcon size={15}/> Modifica anagrafica</button>}
                     <button onClick={() => setSchedaSocio(null)} className="px-4 py-2 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition-colors">Chiudi</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {formAnagPriv && (() => {
+            const lbl = "block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1";
+            const inp = "w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white";
+            return (
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={() => setFormAnagPriv(null)}>
+                <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                  <div className="px-5 py-4 bg-[#1e3a5f] text-white flex justify-between items-center">
+                    <h3 className="font-bold text-lg flex items-center gap-2"><EditIcon size={20}/> Modifica anagrafica</h3>
+                    <button onClick={() => setFormAnagPriv(null)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><XIcon size={20}/></button>
+                  </div>
+                  <div className="p-6 overflow-y-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="md:col-span-1"><label className={lbl}>Cognome e nome</label><input type="text" value={formAnagPriv.nome} readOnly className={inp + ' bg-slate-50 text-slate-500'} /></div>
+                      <div><label className={lbl}>Data di nascita</label><input type="date" value={formAnagPriv.dataNascita} onChange={e => setFormAnagPriv({ ...formAnagPriv, dataNascita: e.target.value })} className={inp} /></div>
+                      <div><label className={lbl}>Telefono</label><input type="text" value={formAnagPriv.telefono} onChange={e => setFormAnagPriv({ ...formAnagPriv, telefono: e.target.value })} className={inp} /></div>
+                      <div><label className={lbl}>Email</label><input type="email" value={formAnagPriv.email} onChange={e => setFormAnagPriv({ ...formAnagPriv, email: e.target.value })} className={inp} /></div>
+                      <div><label className={lbl}>Scadenza certificato</label><input type="date" value={formAnagPriv.scadCertificato} onChange={e => setFormAnagPriv({ ...formAnagPriv, scadCertificato: e.target.value })} className={inp} /></div>
+                      <div><label className={lbl}>Card</label><select value={formAnagPriv.card} onChange={e => setFormAnagPriv({ ...formAnagPriv, card: e.target.value })} className={inp}><option value="">-</option><option value="si">Sì</option><option value="no">No</option></select></div>
+                    </div>
+                    <div className="mt-4 text-xs text-slate-500">Questa persona non è iscritta a corsi della stagione selezionata: qui modifichi i dati dell'anagrafica. Sono gli stessi usati in "Scadenze" e nel resto del gestionale.</div>
+                  </div>
+                  <div className="px-6 py-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50">
+                    <button onClick={() => setFormAnagPriv(null)} className="px-4 py-2 rounded-lg font-bold text-slate-600 hover:bg-slate-200 transition-colors">Annulla</button>
+                    <button onClick={salvaFormAnagPriv} className="px-4 py-2 rounded-lg font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors">Salva</button>
                   </div>
                 </div>
               </div>
@@ -6140,7 +6183,7 @@
             return <MessaggioCorsoModal brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} titolo={nomeC} quando={`${GIORNI[editModal.giorno]} ${editModal.oraInizio}`} persone={persone} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} onClose={() => setMsgCorso(false)} />;
           })()}
           {isChiusureOpen && <ChiusureModal chiusure={chiusure} setChiusure={setChiusure} corsiColpiti={corsiColpiti} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} iniziale={chiusuraDaAprire ? { id: chiusuraDaAprire } : null} onClose={() => { setIsChiusureOpen(false); setChiusuraDaAprire(null); }} />}
-          {isPrivateOpen && <LezioniPrivateModal pacchetti={lezioniPrivate} setPacchetti={setLezioniPrivate} anagrafiche={anagrafichePrivate} istruttori={elencoIstruttori} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} salvaAnagrafica={salvaAnagraficaPrivate} onClose={() => setIsPrivateOpen(false)} />}
+          {isPrivateOpen && <LezioniPrivateModal pacchetti={lezioniPrivate} setPacchetti={setLezioniPrivate} anagrafiche={anagrafichePrivate} istruttori={elencoIstruttori} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} apriScheda={apriSchedaPrivate} onClose={() => setIsPrivateOpen(false)} />}
           {isTirocinantiOpen && <TirocinantiModal tirocinanti={tirocinanti} setTirocinanti={setTirocinanti} onClose={() => setIsTirocinantiOpen(false)} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} />}
 
           {/* --- MODALE LISTA D'ATTESA (contatti da ricontattare) --- */}
