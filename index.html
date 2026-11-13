@@ -155,13 +155,14 @@
     const idStagione = (n) => String(n).replace(/[\/\s.]/g, '_');
     const N_BLOCCHI_ARCHIVIO = 12;
     const hashBlocco = (str) => { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0; return h % N_BLOCCHI_ARCHIVIO; };
-    const statoToDocs = ({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, tirocinanti, chiusure, lezioniPrivate }) => {
+    const statoToDocs = ({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci, listaAttesa, tirocinanti, chiusure, lezioniPrivate, nuotoLibero }) => {
       const docs = {};
       docs['v2_meta'] = { formato: 'v2', stagioni: stagioni || [], stagionePredefinita: stagionePredefinita || '' };
       docs['v2_attesa'] = { listaAttesa: listaAttesa || [] };
       docs['v2_tirocinanti'] = { tirocinanti: tirocinanti || [] };
       docs['v2_chiusure'] = { chiusure: chiusure || [] };
       docs['v2_private'] = { pacchetti: lezioniPrivate || [] };
+      docs['v2_libero'] = { periodi: nuotoLibero || [] };
       const blocchiArc = {};
       Object.keys(archivioSoci || {}).forEach(k => { const b = hashBlocco(k); (blocchiArc[b] = blocchiArc[b] || {})[k] = archivioSoci[k]; });
       Object.keys(blocchiArc).forEach(b => { docs['v2_arc_' + String(b).padStart(2, '0')] = { archivioSoci: blocchiArc[b] }; });
@@ -185,6 +186,7 @@
       let tirocinanti = [];
       let chiusure = [];
       let lezioniPrivate = [];
+      let nuotoLibero = [];
       Object.keys(m).forEach(id => {
         const d = m[id] || {};
         if (id.startsWith('v2_piano__')) { const n = d.stagione; if (n !== undefined) { tuttiPiani[n] = tuttiPiani[n] || {}; Object.assign(tuttiPiani[n], d.celle || {}); } }
@@ -193,8 +195,9 @@
         else if (id === 'v2_tirocinanti') tirocinanti = d.tirocinanti || [];
         else if (id === 'v2_chiusure') chiusure = d.chiusure || [];
         else if (id === 'v2_private') lezioniPrivate = d.pacchetti || [];
+        else if (id === 'v2_libero') nuotoLibero = d.periodi || [];
       });
-      return { tuttiPiani, stagioni: (meta.stagioni && meta.stagioni.length) ? meta.stagioni : Object.keys(tuttiPiani), stagionePredefinita: meta.stagionePredefinita || '', archivioSoci, listaAttesa, tirocinanti, chiusure, lezioniPrivate, updatedAt: meta.updatedAt || null };
+      return { tuttiPiani, stagioni: (meta.stagioni && meta.stagioni.length) ? meta.stagioni : Object.keys(tuttiPiani), stagionePredefinita: meta.stagionePredefinita || '', archivioSoci, listaAttesa, tirocinanti, chiusure, lezioniPrivate, nuotoLibero, updatedAt: meta.updatedAt || null };
     };
 
     // --- CALENDARIO TIROCINANTI (dati in un documento cloud separato: v2_tirocinanti) ---
@@ -878,6 +881,105 @@
                   <div className="px-5 py-3 bg-slate-50 border-t flex justify-end gap-2">
                     <button onClick={() => setFormC(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>
                     <button onClick={salvaChiusura} className="px-4 py-2 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md">Salva</button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    // --- NUOTO LIBERO: periodi, giorni e orari mostrati come sfondo chiaro nel piano vasca (documento cloud dedicato: libero_v1) ---
+    const liberoGiorniTxt = (gg) => {
+      const o = [...gg].sort((a, b) => a - b);
+      if (o.length === 7) return 'Tutti i giorni';
+      if (o.length === 5 && o.join() === '0,1,2,3,4') return 'Lun–Ven';
+      if (o.length === 2 && o.join() === '5,6') return 'Sab–Dom';
+      return o.map(g => GIORNI[g].slice(0, 3)).join(', ');
+    };
+    const liberoTocca = (l, ymd, gIdx, vasca) => (l.vasca === 'tutte' || l.vasca === vasca) && l.dal <= ymd && l.al >= ymd && (l.giorni || []).includes(gIdx);
+    const NuotoLiberoModal = ({ periodi, setPeriodi, mostraToast, onClose }) => {
+      const oggiYMD = toYMD(new Date());
+      const [form, setForm] = useState(null);
+      const ordinati = useMemo(() => [...periodi].sort((a, b) => a.dal.localeCompare(b.dal) || (a.dalle || '').localeCompare(b.dalle || '')), [periodi]);
+      const attivi = ordinati.filter(x => x.al >= oggiYMD), passati = ordinati.filter(x => x.al < oggiYMD).reverse();
+      const salva = () => {
+        const f = form;
+        if (!f.dal || !f.al) return alert('Indica il periodo (dal / al).');
+        if (f.al < f.dal) return alert('La data finale è precedente a quella iniziale.');
+        if (!f.giorni.length) return alert('Seleziona almeno un giorno.');
+        if (!f.dalle || !f.alle || f.alle <= f.dalle) return alert("Controlla gli orari: la fine deve essere dopo l'inizio.");
+        const rec = { id: f.id || 'nl' + Date.now() + Math.random().toString(36).slice(2, 5), vasca: f.vasca, dal: f.dal, al: f.al, giorni: [...f.giorni].sort((a, b) => a - b), dalle: f.dalle, alle: f.alle, nota: (f.nota || '').trim() };
+        setPeriodi(prev => f.id ? prev.map(x => x.id === f.id ? rec : x) : [...prev, rec]);
+        setForm(null); mostraToast(f.id ? 'Nuoto libero aggiornato.' : 'Nuoto libero aggiunto al piano vasca.');
+      };
+      const elimina = (x) => { if (window.confirm('Eliminare questo periodo di nuoto libero?')) setPeriodi(prev => prev.filter(y => y.id !== x.id)); };
+      const riga = (x, passato) => (
+        <div key={x.id} className={`px-4 py-3 flex items-center gap-4 ${passato ? 'opacity-60' : ''}`}>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-slate-800">{liberoGiorniTxt(x.giorni)} · {x.dalle}–{x.alle}</div>
+            <div className="text-sm text-slate-500">dal {formatDate(x.dal)} al {formatDate(x.al)} · {VASCHE_CHIUSURA[x.vasca] || x.vasca}{x.nota ? ` · ${x.nota}` : ''}</div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button onClick={() => setForm({ ...x })} className="p-1.5 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-600" title="Modifica"><EditIcon size={15}/></button>
+            <button onClick={() => setForm({ ...x, id: undefined })} className="px-2 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold" title="Duplica">Duplica</button>
+            <button onClick={() => elimina(x)} className="p-1.5 rounded-md bg-red-50 hover:bg-red-100 text-red-600" title="Elimina"><XIcon size={15}/></button>
+          </div>
+        </div>
+      );
+      const nuovo = () => setForm({ vasca: 'interna', dal: oggiYMD, al: '', giorni: [0, 1, 2, 3, 4], dalle: '12:00', alle: '14:00', nota: '' });
+      return (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-6xl overflow-hidden flex flex-col h-[85vh] max-h-[800px]" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center px-5 py-3 bg-[#1e3a5f] text-white">
+              <h3 className="font-bold text-xl flex items-center gap-2"><ClockIcon size={24}/> Nuoto libero</h3>
+              <button onClick={onClose} className="hover:bg-white/20 p-1 rounded-full transition-colors ml-1"><XIcon size={22}/></button>
+            </div>
+            <div className="flex-1 flex flex-col min-h-0 bg-slate-50">
+              <div className="flex items-center justify-between px-5 py-3 bg-white border-b border-slate-200">
+                <p className="text-sm text-slate-500">Indica periodo, giorni e orari: nel piano vasca compare uno sfondo grigio chiaro (i corsi restano sopra).</p>
+                <button onClick={nuovo} className="flex items-center gap-2 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold shrink-0"><PlusIcon size={16}/> Nuovo periodo</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                {periodi.length === 0 && <div className="p-8 text-center text-slate-400">Nessun periodo di nuoto libero inserito.</div>}
+                {[['In corso e futuri', attivi, false], ['Passati', passati, true]].map(([t, lista, pas]) => lista.length > 0 && (
+                  <div key={t}>
+                    <div className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">{t}</div>
+                    <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">{lista.map(x => riga(x, pas))}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {form && (
+              <div className="fixed inset-0 z-[60] bg-slate-900/40 flex items-center justify-center p-4" onClick={() => setForm(null)}>
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className="px-5 py-3 bg-[#1e3a5f] text-white font-bold flex justify-between items-center">{form.id ? 'Modifica nuoto libero' : 'Nuovo nuoto libero'}<button onClick={() => setForm(null)}><XIcon size={18}/></button></div>
+                  <div className="p-5 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Dal</label><input type="date" value={form.dal} onChange={e => setForm({ ...form, dal: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm" /></div>
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Al</label><input type="date" value={form.al} min={form.dal} onChange={e => setForm({ ...form, al: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm" /></div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Giorni</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {GIORNI.map((g, i) => <button key={g} type="button" onClick={() => setForm({ ...form, giorni: form.giorni.includes(i) ? form.giorni.filter(x => x !== i) : [...form.giorni, i] })} className={`px-2.5 py-1.5 rounded-md text-xs font-bold border ${form.giorni.includes(i) ? 'bg-[#1e3a5f] text-white border-[#1e3a5f]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#1e3a5f]'}`}>{g.slice(0, 3)}</button>)}
+                      </div>
+                      <div className="mt-1.5 flex gap-1.5 text-[11px]">{[['Lun–Ven', [0, 1, 2, 3, 4]], ['Sab–Dom', [5, 6]], ['Tutti', [0, 1, 2, 3, 4, 5, 6]]].map(([l, v]) => <button key={l} type="button" onClick={() => setForm({ ...form, giorni: v })} className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 rounded text-slate-600 font-semibold">{l}</button>)}</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Dalle</label><input type="time" step="900" value={form.dalle} onChange={e => setForm({ ...form, dalle: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm" /></div>
+                      <div><label className="block text-xs font-semibold text-slate-500 mb-1">Alle</label><input type="time" step="900" value={form.alle} onChange={e => setForm({ ...form, alle: e.target.value })} className="w-full px-2 py-2 border border-slate-300 rounded-md text-sm" /></div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1">Quale vasca</label>
+                      <div className="flex gap-2">{Object.keys(VASCHE_CHIUSURA).map(v => <button key={v} type="button" onClick={() => setForm({ ...form, vasca: v })} className={`flex-1 py-2 rounded-md text-sm font-bold border ${form.vasca === v ? 'bg-[#1e3a5f] text-white border-[#1e3a5f]' : 'bg-white text-slate-600 border-slate-300 hover:border-[#1e3a5f]'}`}>{VASCHE_CHIUSURA[v]}</button>)}</div>
+                    </div>
+                    <div><label className="block text-xs font-semibold text-slate-500 mb-1">Nota <span className="font-normal">(facoltativa)</span></label><input type="text" value={form.nota || ''} onChange={e => setForm({ ...form, nota: e.target.value })} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" /></div>
+                  </div>
+                  <div className="px-5 py-3 bg-slate-50 border-t flex justify-end gap-2">
+                    <button onClick={() => setForm(null)} className="px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-200 rounded-md">Annulla</button>
+                    <button onClick={salva} className="px-4 py-2 text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white rounded-md">Salva</button>
                   </div>
                 </div>
               </div>
@@ -2038,6 +2140,9 @@
       const [lezioniPrivate, setLezioniPrivate] = useState([]);
       const [isPrivateOpen, setIsPrivateOpen] = useState(false);
       const privateRef = useRef([]); privateRef.current = lezioniPrivate;
+      const [nuotoLibero, setNuotoLibero] = useState([]);
+      const [isLiberoOpen, setIsLiberoOpen] = useState(false);
+      const liberoRef = useRef([]); liberoRef.current = nuotoLibero;
       const [editandoContattoAttesaId, setEditandoContattoAttesaId] = useState(null);
       const [isFormAttesaOpen, setIsFormAttesaOpen] = useState(false);
       const [dettaglioContattoAttesa, setDettaglioContattoAttesa] = useState(null);
@@ -2115,7 +2220,7 @@
 
       // --- BLOCCO SCORRIMENTO SFONDO ---
       useEffect(() => {
-          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen || isDisponibilitaOpen || !!iscrittiPeriodo || isIscrittiGiornoOpen || isTirocinantiOpen || isChiusureOpen || isPrivateOpen;
+          const isAnyModalOpen = isSearchModalOpen || isAddUserModalOpen || isGestioneStagioniOpen || isAddModalOpen || !!editModal || isScadenzeModalOpen || isListaAttesaOpen || isFormAttesaOpen || !!dettaglioContattoAttesa || isInseritiOggiOpen || isDisponibilitaOpen || !!iscrittiPeriodo || isIscrittiGiornoOpen || isTirocinantiOpen || isChiusureOpen || isPrivateOpen || isLiberoOpen;
           if (isAnyModalOpen) {
               document.body.style.overflow = 'hidden';
           } else {
@@ -2124,7 +2229,7 @@
           return () => {
               document.body.style.overflow = '';
           };
-      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen, isListaAttesaOpen, isFormAttesaOpen, dettaglioContattoAttesa, isInseritiOggiOpen, isTirocinantiOpen, isChiusureOpen, isPrivateOpen]);
+      }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen, isListaAttesaOpen, isFormAttesaOpen, dettaglioContattoAttesa, isInseritiOggiOpen, isTirocinantiOpen, isChiusureOpen, isPrivateOpen, isLiberoOpen]);
 
       const partecipantiAttiviModal = useMemo(() => {
           return editModal ? (editModal.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)) : [];
@@ -2343,7 +2448,7 @@
                     const limiteOra = new Date(oraBk); limiteOra.setHours(13, 0, 0, 0);
                     if (oraBk < limiteOra) limiteOra.setDate(limiteOra.getDate() - 1);
                     const chiaveGiorno = toYMD(limiteOra);
-                    const docsPrec = statoToDocs({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], tirocinanti: tirocinantiRef.current, chiusure: chiusureRef.current, lezioniPrivate: privateRef.current });
+                    const docsPrec = statoToDocs({ tuttiPiani: prec.t || {}, stagioni: prec.s || [], stagionePredefinita: prec.def || '', archivioSoci: prec.arch || {}, listaAttesa: prec.la || [], tirocinanti: tirocinantiRef.current, chiusure: chiusureRef.current, lezioniPrivate: privateRef.current, nuotoLibero: liberoRef.current });
                     const scriviBackup = async (slot) => {
                         const ids = Object.keys(docsPrec);
                         const ops = ids.map(id => [`bk2_${slot}__${id}`, JSON.parse(JSON.stringify(docsPrec[id]))]);
@@ -2375,6 +2480,7 @@
             delete docsNuovi['v2_tirocinanti'];
             delete docsNuovi['v2_chiusure'];
             delete docsNuovi['v2_private'];
+            delete docsNuovi['v2_libero'];
             docsNuovi['v2_meta'].updatedAt = adessoISO;
             const strNuovi = {};
             Object.keys(docsNuovi).forEach(id => {
@@ -2495,6 +2601,7 @@
       const chiusureSync = useDocDedicato('chiusure_v1', chiusure, setChiusure, user, firebaseInstances, mostraToast);
       // --- LEZIONI PRIVATE: documento cloud dedicato 'private_v1' ---
       const privateSync = useDocDedicato('private_v1', lezioniPrivate, setLezioniPrivate, user, firebaseInstances, mostraToast);
+      const liberoSync = useDocDedicato('libero_v1', nuotoLibero, setNuotoLibero, user, firebaseInstances, mostraToast);
       // Impostazioni di Brevo (servizio di invio email). Contiene la chiave segreta: sta in un documento cloud protetto dal login
       // e NON entra nei backup né nelle esportazioni.
       const [brevoCfg, setBrevoCfg] = useState({ apiKey: '', mittenteNome: 'Centro Federale Lampugnano', mittenteEmail: 'info.cflampugnano@gmail.com', replyTo: 'info.cflampugnano@gmail.com' });
@@ -2518,7 +2625,7 @@
       // in tempo a salvarsi. Il browser mostrerà un avviso nativo in quel caso.
       useEffect(() => {
         const handleBeforeUnload = (e) => {
-          if (hasModificheLocaliInSospeso.current || tiPending.current || chiusureSync.inAttesa.current || privateSync.inAttesa.current) {
+          if (hasModificheLocaliInSospeso.current || tiPending.current || chiusureSync.inAttesa.current || privateSync.inAttesa.current || liberoSync.inAttesa.current) {
             e.preventDefault();
             e.returnValue = '';
             return '';
@@ -3921,9 +4028,13 @@
           : [];
       }, [tuttiCorsiSelect, addUtenteRapido.attivitaId]);
 
+      const privatoUI = (() => { const a = attivita.find(x => x.id === addUtenteRapido.attivitaId); return !!a && (a.id === 'privato' || /privat/i.test(a.name || '')); })();
+
       const salvaUtenteRapido = (e) => {
         e.preventDefault();
-        if (!addUtenteRapido.corsiSelezionati || addUtenteRapido.corsiSelezionati.length === 0) return alert("Seleziona almeno un corso!");
+        const attSel = attivita.find(a => a.id === addUtenteRapido.attivitaId);
+        const soloAnagrafica = !!attSel && (attSel.id === 'privato' || /privat/i.test(attSel.name || ''));
+        if (!soloAnagrafica && (!addUtenteRapido.corsiSelezionati || addUtenteRapido.corsiSelezionati.length === 0)) return alert("Seleziona almeno un corso!");
         if (!addUtenteRapido.nome.trim()) return alert("Inserisci il Cognome e Nome!");
         
         const iscrizioniPulite = (addUtenteRapido.iscrizioni || []).filter(i => i.inizio || i.fine);
@@ -3933,6 +4044,17 @@
         // Archivio soci permanente: memorizziamo/aggiorniamo questo socio così non andrà
         // ridigitato da capo la prossima volta (anche in un'altra stagione).
         aggiornaArchivioSoci(addUtenteRapido.nome, addUtenteRapido.anno, addUtenteRapido.scadCertificato, addUtenteRapido.card, addUtenteRapido.telefono, addUtenteRapido.dataNascita, addUtenteRapido.email, addUtenteRapido.sesso, addUtenteRapido.livelloSocio);
+        if (soloAnagrafica) {
+            // Lezione privata: si crea solo l'anagrafica (nessun corso). Il pacchetto si crea poi da "Lezioni private".
+            const keyAn = addUtenteRapido.nome.trim().toLowerCase();
+            const docF = addUtenteRapido.documentiFirmati || '';
+            if (docF) setArchivioSoci(prev => ({ ...prev, [keyAn]: { ...(prev[keyAn] || {}), docStagioni: { ...((prev[keyAn] && prev[keyAn].docStagioni) || {}), [stagioneSelezionata]: docF } } }));
+            const nomeNuovo = addUtenteRapido.nome.trim();
+            setIsAddUserModalOpen(false);
+            setAddUtenteRapido({ attivitaId: '', corsiSelezionati: [], nome: '', anno: '', dataNascita: '', scadCertificato: '', documentiFirmati: '', card: '', telefono: '', email: '', iscrizioni: [{inizio: '', fine: ''}] });
+            mostraToast(`${nomeNuovo}: anagrafica creata. Ora puoi creare il pacchetto da "Lezioni private".`);
+            return;
+        }
 
         setTuttiPiani(prevTutti => {
             const prevSeason = prevTutti[stagioneSelezionata] || {};
@@ -4682,7 +4804,7 @@
           });
           if (slot === null) slot = piuVecchio || 'x0';
           const arc = archivioCompleto(archivioSoci, tuttiPiani);
-          const docsAtt = statoToDocs({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arc, listaAttesa, tirocinanti, chiusure, lezioniPrivate });
+          const docsAtt = statoToDocs({ tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arc, listaAttesa, tirocinanti, chiusure, lezioniPrivate, nuotoLibero });
           const ids = Object.keys(docsAtt);
           const cc = contaDati(tuttiPiani, arc);
           const ops = ids.map(id => [`bk2_${slot}__${id}`, JSON.parse(JSON.stringify(docsAtt[id]))]);
@@ -4710,7 +4832,7 @@
             snaps.forEach((sn, i) => { if (sn.exists()) mappa[b0.docIds[i]] = sn.data(); });
             if (!mappa['v2_meta']) { alert("Questo backup risulta incompleto: non lo ripristino."); return; }
             const st = stateFromDocs(mappa);
-            b = { ...b0, tuttiPiani: st.tuttiPiani, stagioni: st.stagioni, stagionePredefinita: st.stagionePredefinita, archivioSoci: st.archivioSoci, listaAttesa: st.listaAttesa, tirocinanti: mappa['v2_tirocinanti'] ? st.tirocinanti : undefined, chiusure: mappa['v2_chiusure'] ? st.chiusure : undefined, lezioniPrivate: mappa['v2_private'] ? st.lezioniPrivate : undefined };
+            b = { ...b0, tuttiPiani: st.tuttiPiani, stagioni: st.stagioni, stagionePredefinita: st.stagionePredefinita, archivioSoci: st.archivioSoci, listaAttesa: st.listaAttesa, tirocinanti: mappa['v2_tirocinanti'] ? st.tirocinanti : undefined, chiusure: mappa['v2_chiusure'] ? st.chiusure : undefined, lezioniPrivate: mappa['v2_private'] ? st.lezioniPrivate : undefined, nuotoLibero: mappa['v2_libero'] ? st.nuotoLibero : undefined };
           } catch (err) { console.error(err); alert("Non sono riuscito a leggere questo backup."); return; }
         }
         setTuttiPiani(b.tuttiPiani || {});
@@ -4721,6 +4843,7 @@
         if (b.tirocinanti) setTirocinanti(b.tirocinanti);
         if (b.chiusure) setChiusure(b.chiusure);
         if (b.lezioniPrivate) setLezioniPrivate(b.lezioniPrivate);
+        if (b.nuotoLibero) setNuotoLibero(b.nuotoLibero);
         // la versione ripristinata è "nuova" rispetto al cloud: azzeriamo i freni per questo salvataggio
         ultimiConteggi.current = null; updatedAtNoto.current = updatedAtServer.current;
         setIsBackupModalOpen(false);
@@ -4729,7 +4852,7 @@
 
       const esportaDati = () => {
         const arcCompleto = archivioCompleto(archivioSoci, tuttiPiani);
-        const dataStr = JSON.stringify({ formato: 'pianovasca-backup-v2', esportatoIl: new Date().toISOString(), conteggi: contaDati(tuttiPiani, arcCompleto), tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arcCompleto, listaAttesa, tirocinanti, chiusure, lezioniPrivate, attivita: ATTIVITA_DI_BASE }, null, 2);
+        const dataStr = JSON.stringify({ formato: 'pianovasca-backup-v2', esportatoIl: new Date().toISOString(), conteggi: contaDati(tuttiPiani, arcCompleto), tuttiPiani, stagioni, stagionePredefinita, archivioSoci: arcCompleto, listaAttesa, tirocinanti, chiusure, lezioniPrivate, nuotoLibero, attivita: ATTIVITA_DI_BASE }, null, 2);
         const blob = new Blob([dataStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -4905,6 +5028,7 @@
               if (dati.tirocinanti) setTirocinanti(dati.tirocinanti);
               if (dati.chiusure) setChiusure(dati.chiusure);
               if (dati.lezioniPrivate) setLezioniPrivate(dati.lezioniPrivate);
+              if (dati.nuotoLibero) setNuotoLibero(dati.nuotoLibero);
               if (dati.stagionePredefinita) setStagionePredefinita(dati.stagionePredefinita);
               if (dati.stagioni && dati.stagioni.length > 0) setStagioneSelezionata(dati.stagioni[0]);
             } else if (dati.piano) {
@@ -5038,6 +5162,15 @@
                                                   c.startMin < (fasciaStartMin + intervallo)
                                               );
 
+                                              const dataG = new Date(inizioSettimana); dataG.setDate(dataG.getDate() + gIdx);
+                                              const ymdG = toYMD(dataG);
+                                              const fondiLibero = nuotoLibero.filter(l => liberoTocca(l, ymdG, gIdx, vascaSelezionata)).map(l => {
+                                                  const [a1, a2] = l.dalle.split(':').map(Number), [b1, b2] = l.alle.split(':').map(Number);
+                                                  const ini = a1 * 60 + a2, fin = b1 * 60 + b2;
+                                                  const da = Math.max(ini, fasciaStartMin), a = Math.min(fin, fasciaStartMin + intervallo);
+                                                  return a > da ? { id: l.id, top: (da - fasciaStartMin) * pixelsPerMin, h: (a - da) * pixelsPerMin, etichetta: corsia === activeCorsie[0] && ((ini >= fasciaStartMin && ini < fasciaStartMin + intervallo) || (ini < fasciaStartMin && fascia.id === fasce[0].id)) } : null;
+                                              }).filter(Boolean);
+
                                               return (
                                                   <td 
                                                       key={corsia} 
@@ -5047,6 +5180,11 @@
                                                           setIsAddModalOpen(true);
                                                       }}
                                                   >
+                                                      {fondiLibero.map(f => (
+                                                          <div key={'nl' + f.id} className="absolute left-0 right-0 z-0 pointer-events-none" style={{ top: `${f.top}px`, height: `${f.h}px`, backgroundColor: 'rgba(226,232,240,0.45)' }} title="Nuoto libero">
+                                                              {f.etichetta && <span className="absolute top-0.5 left-1 text-[9px] font-semibold text-slate-400 leading-none">Nuoto libero</span>}
+                                                          </div>
+                                                      ))}
                                                       {corsiInCella.map((corso, i) => {
                                                           const infoAttivita = attivita.find(a => a.id === corso.data.id);
                                                           const livelloInfoCella = infoAttivita?.levels?.find(l => l.val === corso.data.livello);
@@ -6188,6 +6326,7 @@
             return <MessaggioCorsoModal brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} titolo={nomeC} quando={`${GIORNI[editModal.giorno]} ${editModal.oraInizio}`} persone={persone} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} onClose={() => setMsgCorso(false)} />;
           })()}
           {isChiusureOpen && <ChiusureModal chiusure={chiusure} setChiusure={setChiusure} corsiColpiti={corsiColpiti} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} iniziale={chiusuraDaAprire ? { id: chiusuraDaAprire } : null} onClose={() => { setIsChiusureOpen(false); setChiusuraDaAprire(null); }} />}
+          {isLiberoOpen && <NuotoLiberoModal periodi={nuotoLibero} setPeriodi={setNuotoLibero} mostraToast={mostraToast} onClose={() => setIsLiberoOpen(false)} />}
           {isPrivateOpen && <LezioniPrivateModal pacchetti={lezioniPrivate} setPacchetti={setLezioniPrivate} anagrafiche={anagrafichePrivate} istruttori={elencoIstruttori} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} apriScheda={apriSchedaPrivate} onClose={() => setIsPrivateOpen(false)} />}
           {isTirocinantiOpen && <TirocinantiModal tirocinanti={tirocinanti} setTirocinanti={setTirocinanti} onClose={() => setIsTirocinantiOpen(false)} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} />}
 
@@ -6629,7 +6768,10 @@
 
                     {addUtenteRapido.attivitaId && (
                         <div className="mb-5">
-                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">2. Seleziona i Corsi <span className="font-normal text-slate-500">(puoi sceglierne più di uno)</span></label>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1.5">2. {privatoUI ? 'Corso' : 'Seleziona i Corsi'} {!privatoUI && <span className="font-normal text-slate-500">(puoi sceglierne più di uno)</span>}</label>
+                            {privatoUI ? (
+                              <div className="border border-yellow-300 bg-yellow-50 rounded-lg p-3 text-sm text-yellow-900">Lezione privata: <b>non serve scegliere nessun corso</b>. Compila i dati qui sotto per creare l'anagrafica; poi crea il pacchetto da <b>Lezioni private</b>.</div>
+                            ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border border-slate-300 rounded-lg p-3 bg-slate-50">
                                 {corsiPerUtenteRapido.map(c => {
                                     const isChecked = (addUtenteRapido.corsiSelezionati || []).some(sel => sel.selId === c.selId);
@@ -6660,6 +6802,7 @@
                                     <div className="col-span-full text-center text-sm text-slate-500 italic py-2">Nessun corso trovato per questa attività.</div>
                                 )}
                             </div>
+                            )}
                         </div>
                     )}
 
@@ -6743,6 +6886,7 @@
                            </div>
                         </div>
 
+                        {!privatoUI && (
                         <div className="mt-1 border-t border-slate-200 pt-4">
                            <div className="flex justify-between items-center mb-3">
                              <label className="block text-sm font-semibold text-slate-700">Periodi Iscrizione <span className="normal-case text-[10px] font-normal text-slate-400">(Si allineano a Lun/Dom)</span></label>
@@ -6780,13 +6924,14 @@
                              ))}
                            </div>
                         </div>
+                        )}
                     </div>
                   </form>
                 </div>
                 
                 <div className="px-6 py-4 border-t border-slate-200 flex gap-3 justify-end bg-slate-50 rounded-b-2xl">
                   <button type="button" onClick={() => setIsAddUserModalOpen(false)} className="px-5 py-2.5 text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg font-bold transition-colors">Annulla</button>
-                  <button type="submit" form="addUserForm" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><UserPlusIcon size={18} /> Aggiungi Iscritto</button>
+                  <button type="submit" form="addUserForm" className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-md transition-all transform hover:scale-105 flex items-center gap-2"><UserPlusIcon size={18} /> {privatoUI ? 'Crea anagrafica' : 'Aggiungi Iscritto'}</button>
                 </div>
               </div>
             </div>
@@ -7879,12 +8024,15 @@
                 const oggiB = toYMD(new Date());
                 const nChiusure = chiusure.filter(c => c.al >= oggiB).length;
                 const nPrivScad = lezioniPrivate.filter(x => statoPacchetto(x, oggiB).inScadenza).length;
-                const COL = { blu: 'bg-cyan-100 hover:bg-cyan-200 text-cyan-800 border-cyan-300', indaco: 'bg-violet-100 hover:bg-violet-200 text-violet-800 border-violet-300', rosa: 'bg-pink-100 hover:bg-pink-200 text-pink-800 border-pink-300', verde: 'bg-lime-100 hover:bg-lime-200 text-lime-800 border-lime-300', ambra: 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300' };
+                const COL = { blu: 'bg-cyan-100 hover:bg-cyan-200 text-cyan-800 border-cyan-300', indaco: 'bg-violet-100 hover:bg-violet-200 text-violet-800 border-violet-300', rosa: 'bg-pink-100 hover:bg-pink-200 text-pink-800 border-pink-300', verde: 'bg-lime-100 hover:bg-lime-200 text-lime-800 border-lime-300', ambra: 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300', arancio: 'bg-orange-100 hover:bg-orange-200 text-orange-800 border-orange-300' };
                 const btn = (c) => `relative flex items-center gap-2 px-3 py-2 border rounded-md text-sm font-medium transition-colors ${COL[c]}`;
                 const bd = (n, col, t) => n > 0 ? <span title={t} className={`absolute -top-2 -right-2 min-w-[20px] h-5 px-1 rounded-full ${col} text-white text-[11px] font-bold flex items-center justify-center border-2 border-white`}>{n}</span> : null;
                 const grp = (titolo, figli) => <div className="flex flex-col gap-1"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-0.5">{titolo}</div><div className="flex items-center gap-2">{figli}</div></div>;
                 const sep = <div className="w-px self-stretch bg-slate-200 mx-1"></div>;
-                return (
+                return (<>
+                  <div className="flex items-stretch gap-3 mr-auto">
+                    {grp('Piano vasca', <button onClick={() => setIsLiberoOpen(true)} className={btn('arancio')} title="Periodi, giorni e orari del nuoto libero (sfondo nel piano vasca)"><ClockIcon size={16} /> Nuoto libero</button>)}
+                  </div>
                   <div className="flex items-stretch gap-3 flex-wrap">
                     {grp('Iscritti', <>
                       <button onClick={() => { setCatDispEspansa(null); setIsDisponibilitaOpen(true); }} className={btn('blu')} title="Posti liberi per ogni categoria di corso"><UsersIcon size={16} /> Disponibilità corsi</button>
@@ -7900,7 +8048,7 @@
                       <button onClick={() => { setChiusuraDaAprire(null); setIsChiusureOpen(true); }} className={btn('ambra')} title="Chiusure della vasca e avvisi agli iscritti"><BanIcon size={16} /> Chiusure{bd(nChiusure, 'bg-red-500', nChiusure + ' chiusure in corso o future')}</button>
                     </>)}
                   </div>
-                );
+                </>);
               })()}
             </div>
             <div className="shrink-0 flex items-center gap-3 flex-wrap">
