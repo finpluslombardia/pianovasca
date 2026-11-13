@@ -902,7 +902,7 @@
       const giorni = p.scadenza ? Math.round((new Date(p.scadenza + 'T12:00:00') - new Date(oggiYMD + 'T12:00:00')) / 86400000) : null;
       return { usate, rimaste, scaduto, stato, giorni, inScadenza: stato === 'attivo' && giorni !== null && giorni <= 30 };
     };
-    const LezioniPrivateModal = ({ pacchetti, setPacchetti, anagrafiche, istruttori, mostraToast, numeroPerWhatsapp, soloNomeProprio, onClose }) => {
+    const LezioniPrivateModal = ({ pacchetti, setPacchetti, anagrafiche, istruttori, mostraToast, numeroPerWhatsapp, soloNomeProprio, brevoCfg, setBrevoCfg, onClose }) => {
       const oggiYMD = toYMD(new Date());
       const [filtroStato, setFiltroStato] = useState('attivi');
       const [cerca, setCerca] = useState('');
@@ -910,6 +910,10 @@
       const [dettaglio, setDettaglio] = useState(null);
       const [form, setForm] = useState(null);
       const [nuovaLez, setNuovaLez] = useState({ data: oggiYMD, ora: '', note: '' });
+      const [msgCustom, setMsgCustom] = useState({ id: null, testo: null, oggetto: null });
+      const [mostraKey, setMostraKey] = useState(false);
+      const [invioMsg, setInvioMsg] = useState(false);
+      const cfgB = brevoCfg || {};
       const nuovoId = () => 'lp' + Date.now() + Math.random().toString(36).slice(2, 5);
       const istrDisponibili = useMemo(() => {
         const s = new Set(istruttori || []);
@@ -971,6 +975,21 @@
         if (i.stato === 'attivo') return base + `Ti ricordiamo che il tuo pacchetto di lezioni private con ${p.istruttore} ha ancora ${i.rimaste} ${i.rimaste === 1 ? 'lezione' : 'lezioni'} e scade il ${formatDate(p.scadenza)}.\nPer prenotare le prossime lezioni scrivici pure qui. Grazie!\nCentro Federale Lampugnano`;
         if (i.stato === 'scaduto') return base + `Il tuo pacchetto di lezioni private con ${p.istruttore} è scaduto il ${formatDate(p.scadenza)}${i.rimaste ? ` (restavano ${i.rimaste} lezioni)` : ''}.\nSe vuoi rinnovarlo scrivici pure qui. Grazie!\nCentro Federale Lampugnano`;
         return base + `Hai concluso il tuo pacchetto di lezioni private con ${p.istruttore}.\nSe vuoi acquistarne uno nuovo scrivici pure qui. Grazie!\nCentro Federale Lampugnano`;
+      };
+      const emailDi = (p) => { const a = (anagrafiche || []).find(x => x.key === p.socioKey); return a ? String(a.email || '').trim() : ''; };
+      const emailOk = (e) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(e || '').trim());
+      const testoMsgDi = (p) => (msgCustom.id === p.id && msgCustom.testo !== null) ? msgCustom.testo : messaggioPromemoria(p);
+      const oggettoMsgDi = (p) => (msgCustom.id === p.id && msgCustom.oggetto !== null) ? msgCustom.oggetto : 'Centro Federale Lampugnano - Lezioni private';
+      const inviaEmailPacchetto = async (p) => {
+        const a = emailDi(p);
+        if (!emailOk(a)) { mostraToast('Questa persona non ha un indirizzo email in anagrafica.', 'error'); return; }
+        if (!cfgB.apiKey || !cfgB.mittenteEmail) { setMostraKey(true); mostraToast('Inserisci prima la chiave di Brevo.', 'error'); return; }
+        const oggetto = (oggettoMsgDi(p) || '').trim() || 'Centro Federale Lampugnano - Lezioni private';
+        if (!window.confirm(`Inviare l'email a ${p.nome} (${a})?\n\nOggetto: ${oggetto}`)) return;
+        setInvioMsg(true);
+        try { await brevoInvia(cfgB, { a, nomeA: p.nome, oggetto, testoMail: testoMsgDi(p) + brevoPiede(cfgB, numeroPerWhatsapp) }); mostraToast('Email inviata a ' + a + '.', 'success'); }
+        catch (e) { mostraToast(e.message, 'error'); }
+        setInvioMsg(false);
       };
       const telefonoDi = (p) => { const a = (anagrafiche || []).find(x => x.key === p.socioKey); return a ? a.telefono : ''; };
       const risultatiPersona = (() => {
@@ -1063,8 +1082,20 @@
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <button onClick={() => setForm({ id: p.id, socioKey: p.socioKey, nome: p.nome, ricerca: '', istruttore: p.istruttore, totale: p.totale, dataAcquisto: p.dataAcquisto, scadenza: p.scadenza, note: p.note || '' })} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-md text-sm font-bold"><EditIcon size={14}/> Modifica</button>
-                          {tel && <a href={`whatsapp://send?phone=${tel}&text=${encodeURIComponent(messaggioPromemoria(p))}`} title="Invia promemoria su WhatsApp" style={{ color: '#25D366', backgroundColor: '#f0fdf4' }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold hover:brightness-95"><WhatsAppIcon size={14}/> Promemoria</a>}
                           <button onClick={() => eliminaPacchetto(p)} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-md text-sm font-bold"><XIcon size={14}/> Elimina</button>
+                        </div>
+                        <div className="bg-white border border-emerald-200 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center justify-between"><div className="text-sm font-bold text-emerald-800">Scrivi a {soloNomeProprio(p.nome)}</div><button type="button" onClick={() => setMostraKey(v => !v)} className="text-xs font-bold text-emerald-700 hover:underline">{cfgB.apiKey ? 'Impostazioni' : 'Configura'}</button></div>
+                          <label className="block text-xs text-slate-500">Oggetto (email)<input type="text" value={oggettoMsgDi(p)} onChange={e => setMsgCustom({ id: p.id, testo: msgCustom.id === p.id ? msgCustom.testo : null, oggetto: e.target.value })} className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
+                          <label className="block text-xs text-slate-500">Messaggio<textarea rows={6} value={testoMsgDi(p)} onChange={e => setMsgCustom({ id: p.id, testo: e.target.value, oggetto: msgCustom.id === p.id ? msgCustom.oggetto : null })} className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /></label>
+                          {mostraKey && <label className="block text-xs text-slate-500">Chiave API di Brevo<input type="password" autoComplete="off" value={cfgB.apiKey || ''} onChange={e => setBrevoCfg({ ...cfgB, apiKey: e.target.value })} placeholder="incolla qui la chiave" className="mt-0.5 w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" /><span className="block mt-1 text-[11px]">Mittente e piè di pagina si impostano in "Scrivi al corso" (stessa configurazione).</span></label>}
+                          <div className="flex flex-wrap gap-2">
+                            {tel
+                              ? <a href={`whatsapp://send?phone=${tel}&text=${encodeURIComponent(testoMsgDi(p))}`} style={{ color: '#fff', backgroundColor: '#25D366' }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold hover:brightness-95"><WhatsAppIcon size={14}/> WhatsApp</a>
+                              : <button type="button" disabled title="Numero di telefono mancante in anagrafica" className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold bg-slate-200 text-slate-400 cursor-not-allowed"><WhatsAppIcon size={14}/> WhatsApp</button>}
+                            <button type="button" onClick={() => inviaEmailPacchetto(p)} disabled={invioMsg || !emailOk(emailDi(p))} title={emailOk(emailDi(p)) ? 'Invia con Brevo a ' + emailDi(p) : 'Email mancante in anagrafica'} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-bold bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white">✉ Email (Brevo)</button>
+                          </div>
+                          {!tel && !emailOk(emailDi(p)) && <div className="text-xs text-amber-700">Mancano telefono ed email in anagrafica.</div>}
                         </div>
                         <button onClick={() => nuovoPacchetto({ socioKey: p.socioKey, nome: p.nome, istruttore: p.istruttore })} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold" title="Registra l'acquisto di un nuovo pacchetto per questa persona"><PlusIcon size={15}/> Acquista nuovo pacchetto</button>
                       </div>
@@ -2584,7 +2615,7 @@
       const anagrafichePrivate = useMemo(() => {
           if (!isPrivateOpen) return [];
           const arc = archivioCompleto(archivioSoci, tuttiPiani);
-          return Object.keys(arc).map(k => ({ key: k, nome: (arc[k] && arc[k].nome) || k, telefono: (arc[k] && arc[k].telefono) || '' })).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
+          return Object.keys(arc).map(k => ({ key: k, nome: (arc[k] && arc[k].nome) || k, telefono: (arc[k] && arc[k].telefono) || '', email: (arc[k] && arc[k].email) || '' })).sort((a, b) => a.nome.localeCompare(b.nome, 'it'));
       }, [isPrivateOpen, archivioSoci, tuttiPiani]);
 
       const corsiRaggruppatiPerFiltro = useMemo(() => {
@@ -5999,7 +6030,7 @@
             return <MessaggioCorsoModal brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} titolo={nomeC} quando={`${GIORNI[editModal.giorno]} ${editModal.oraInizio}`} persone={persone} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} onClose={() => setMsgCorso(false)} />;
           })()}
           {isChiusureOpen && <ChiusureModal chiusure={chiusure} setChiusure={setChiusure} corsiColpiti={corsiColpiti} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} mostraToast={mostraToast} brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} iniziale={chiusuraDaAprire ? { id: chiusuraDaAprire } : null} onClose={() => { setIsChiusureOpen(false); setChiusuraDaAprire(null); }} />}
-          {isPrivateOpen && <LezioniPrivateModal pacchetti={lezioniPrivate} setPacchetti={setLezioniPrivate} anagrafiche={anagrafichePrivate} istruttori={elencoIstruttori} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} onClose={() => setIsPrivateOpen(false)} />}
+          {isPrivateOpen && <LezioniPrivateModal pacchetti={lezioniPrivate} setPacchetti={setLezioniPrivate} anagrafiche={anagrafichePrivate} istruttori={elencoIstruttori} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} soloNomeProprio={soloNomeProprio} brevoCfg={brevoCfg} setBrevoCfg={setBrevoCfg} onClose={() => setIsPrivateOpen(false)} />}
           {isTirocinantiOpen && <TirocinantiModal tirocinanti={tirocinanti} setTirocinanti={setTirocinanti} onClose={() => setIsTirocinantiOpen(false)} mostraToast={mostraToast} numeroPerWhatsapp={numeroPerWhatsapp} />}
 
           {/* --- MODALE LISTA D'ATTESA (contatti da ricontattare) --- */}
@@ -7685,8 +7716,38 @@
             </div>
 
             {/* BANNER INFERIORE: esportazione/importazione e uscita */}
-            <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3 flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-3">
+            <div className="shrink-0 bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3 flex items-center justify-end gap-2 flex-wrap">
+              {(() => {
+                const oggiB = toYMD(new Date());
+                const nChiusure = chiusure.filter(c => c.al >= oggiB).length;
+                const nPrivScad = lezioniPrivate.filter(x => statoPacchetto(x, oggiB).inScadenza).length;
+                const COL = { blu: 'bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200', indaco: 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200', rosa: 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200', verde: 'bg-teal-50 hover:bg-teal-100 text-teal-700 border-teal-200', ambra: 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200' };
+                const btn = (c) => `relative flex items-center gap-2 px-3 py-2 border rounded-md text-sm font-medium transition-colors ${COL[c]}`;
+                const bd = (n, col, t) => n > 0 ? <span title={t} className={`absolute -top-2 -right-2 min-w-[20px] h-5 px-1 rounded-full ${col} text-white text-[11px] font-bold flex items-center justify-center border-2 border-white`}>{n}</span> : null;
+                const grp = (titolo, figli) => <div className="flex flex-col gap-1"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-0.5">{titolo}</div><div className="flex items-center gap-2">{figli}</div></div>;
+                const sep = <div className="w-px self-stretch bg-slate-200 mx-1"></div>;
+                return (
+                  <div className="flex items-stretch gap-3 flex-wrap">
+                    {grp('Iscritti', <>
+                      <button onClick={() => { setCatDispEspansa(null); setIsDisponibilitaOpen(true); }} className={btn('blu')} title="Posti liberi per ogni categoria di corso"><UsersIcon size={16} /> Disponibilità corsi</button>
+                      <button onClick={() => { setRicercaIscrittiPeriodo(''); setIscrittiPeriodo('primo'); setIsIscrittiGiornoOpen(false); }} className={btn('indaco')} title="Elenco iscritti per periodo o per giorno"><UsersIcon size={16} /> Iscritti per periodo</button>
+                    </>)}
+                    {sep}
+                    {grp('Attività', <>
+                      <button onClick={() => setIsPrivateOpen(true)} className={btn('rosa')} title="Pacchetti di lezioni private da 5 o 10 lezioni"><UsersIcon size={16} /> Lezioni private{bd(nPrivScad, 'bg-amber-500', nPrivScad + ' pacchetti in scadenza entro 30 giorni')}</button>
+                      <button onClick={() => setIsTirocinantiOpen(true)} className={btn('verde')} title="Calendario e ore dei tirocinanti"><CalendarIcon size={16} /> Tirocinanti</button>
+                    </>)}
+                    {sep}
+                    {grp('Avvisi', <>
+                      <button onClick={() => { setChiusuraDaAprire(null); setIsChiusureOpen(true); }} className={btn('ambra')} title="Chiusure della vasca e avvisi agli iscritti"><BanIcon size={16} /> Chiusure{bd(nChiusure, 'bg-red-500', nChiusure + ' chiusure in corso o future')}</button>
+                    </>)}
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="shrink-0 flex items-center gap-3 flex-wrap">
+              <button onClick={handleLogout} className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-md transition-colors" title="Esci dal gestionale"><LogOutIcon size={13} /> Esci</button>
+              <div className="w-px h-6 bg-slate-300"></div>
                     {/* MENU ESPORTAZIONE */}
                     <div className="relative">
                       <button onClick={() => setIsExportMenuOpen(!isExportMenuOpen)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-md text-sm font-medium transition-colors" title="Esporta / Importa">
@@ -7743,36 +7804,6 @@
                       return <button onClick={apriBackupCloud} className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-semibold ${stato}`} title="Apri l'elenco dei backup sul cloud"><span className="w-2 h-2 rounded-full bg-current"></span>Ultimo backup: {quando} {hhmm}</button>;
                     })()}
 
-              </div>
-              {(() => {
-                const oggiB = toYMD(new Date());
-                const nChiusure = chiusure.filter(c => c.al >= oggiB).length;
-                const nPrivScad = lezioniPrivate.filter(x => statoPacchetto(x, oggiB).inScadenza).length;
-                const btn = "relative flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 hover:border-[#1e3a5f] rounded-md text-sm font-bold transition-colors";
-                const bd = (n, col, t) => n > 0 ? <span title={t} className={`absolute -top-2 -right-2 min-w-[20px] h-5 px-1 rounded-full ${col} text-white text-[11px] font-bold flex items-center justify-center border-2 border-white`}>{n}</span> : null;
-                const grp = (titolo, figli) => <div className="flex flex-col gap-1"><div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-0.5">{titolo}</div><div className="flex items-center gap-2">{figli}</div></div>;
-                const sep = <div className="w-px self-stretch bg-slate-200 mx-1"></div>;
-                return (
-                  <div className="flex items-stretch gap-3 flex-wrap">
-                    {grp('Iscritti', <>
-                      <button onClick={() => { setCatDispEspansa(null); setIsDisponibilitaOpen(true); }} className={btn} title="Posti liberi per ogni categoria di corso"><span className="text-[#1e3a5f]"><UsersIcon size={16} /></span> Disponibilità corsi</button>
-                      <button onClick={() => { setRicercaIscrittiPeriodo(''); setIscrittiPeriodo('primo'); setIsIscrittiGiornoOpen(false); }} className={btn} title="Elenco iscritti per periodo o per giorno"><span className="text-[#1e3a5f]"><UsersIcon size={16} /></span> Iscritti per periodo</button>
-                    </>)}
-                    {sep}
-                    {grp('Attività', <>
-                      <button onClick={() => setIsPrivateOpen(true)} className={btn} title="Pacchetti di lezioni private da 5 o 10 lezioni"><span className="text-[#1e3a5f]"><UsersIcon size={16} /></span> Lezioni private{bd(nPrivScad, 'bg-amber-500', nPrivScad + ' pacchetti in scadenza entro 30 giorni')}</button>
-                      <button onClick={() => setIsTirocinantiOpen(true)} className={btn} title="Calendario e ore dei tirocinanti"><span className="text-[#1e3a5f]"><CalendarIcon size={16} /></span> Tirocinanti</button>
-                    </>)}
-                    {sep}
-                    {grp('Avvisi', <>
-                      <button onClick={() => { setChiusuraDaAprire(null); setIsChiusureOpen(true); }} className={btn} title="Chiusure della vasca e avvisi agli iscritti"><span className="text-[#1e3a5f]"><BanIcon size={16} /></span> Chiusure{bd(nChiusure, 'bg-red-500', nChiusure + ' chiusure in corso o future')}</button>
-                    </>)}
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="shrink-0 flex justify-start -mt-1">
-              <button onClick={handleLogout} className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-md transition-colors" title="Esci dal gestionale"><LogOutIcon size={13} /> Esci</button>
             </div>
 
           </main>
