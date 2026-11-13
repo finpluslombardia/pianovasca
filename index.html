@@ -1479,16 +1479,8 @@
       // --- INVIO PER EMAIL (Brevo) ---
       const emailValida = (e) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(e || '').trim());
       const senzaEmail = persone.filter(x => !emailValida(x.email));
-      // un indirizzo solo anche se condiviso da più persone (es. fratelli): ricordiamo tutte le persone che copre
-      const destinatari = (() => {
-        const m = new Map();
-        persone.filter(x => emailValida(x.email)).forEach(x => {
-          const e = x.email.trim().toLowerCase();
-          if (!m.has(e)) m.set(e, { email: e, keys: [] });
-          m.get(e).keys.push(x.key);
-        });
-        return Array.from(m.values());
-      })();
+      // una email per ogni persona (con il suo nome), anche se più persone condividono lo stesso indirizzo (es. fratelli)
+      const destinatari = persone.filter(x => emailValida(x.email)).map(x => ({ email: x.email.trim().toLowerCase(), keys: [x.key] }));
       const oggettoEmail = (String(oggetto || '').replace(/\{corso\}/g, titolo).replace(/\{quando\}/g, quando).trim()) || ('Centro Federale Lampugnano - ' + titolo);
       // --- INVIO CON BREVO (una email per persona, con il nome) ---
       const [mostraBrevo, setMostraBrevo] = useState(false);
@@ -1940,7 +1932,7 @@
     };
     const ORE_INIZIO = 6;  
     const MINUTI_INIZIO = 0;
-    const ORE_FINE = 22;   
+    const ORE_FINE = 23;   
     const MINUTI_FINE = 30;
     const START_MIN_TOTAL = ORE_INIZIO * 60 + MINUTI_INIZIO;
     const END_MIN_TOTAL = ORE_FINE * 60 + MINUTI_FINE;
@@ -2230,6 +2222,24 @@
               document.body.style.overflow = '';
           };
       }, [isSearchModalOpen, isAddUserModalOpen, isGestioneStagioniOpen, isAddModalOpen, editModal, isScadenzeModalOpen, isListaAttesaOpen, isFormAttesaOpen, dettaglioContattoAttesa, isInseritiOggiOpen, isTirocinantiOpen, isChiusureOpen, isPrivateOpen, isLiberoOpen]);
+
+      // --- SCORCIATOIE: "/" oppure Ctrl/Cmd+K aprono "Cerca Socio" (solo se nessun box è già aperto) ---
+      useEffect(() => {
+          const onKey = (e) => {
+              const k = e.key;
+              const combo = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (k === 'k' || k === 'K');
+              const slash = k === '/' && !e.ctrlKey && !e.metaKey && !e.altKey;
+              if (!combo && !slash) return;
+              const t = e.target, tag = t && t.tagName;
+              if (slash && (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable))) return;
+              if (document.body.style.overflow === 'hidden') return;
+              e.preventDefault();
+              setSearchQuery(''); setFiltroLivelloRic(''); setFiltroPeriodoRic(''); setFiltroCertRic('');
+              setIsSearchModalOpen(true);
+          };
+          window.addEventListener('keydown', onKey);
+          return () => window.removeEventListener('keydown', onKey);
+      }, []);
 
       const partecipantiAttiviModal = useMemo(() => {
           return editModal ? (editModal.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)) : [];
