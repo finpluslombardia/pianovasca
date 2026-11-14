@@ -958,7 +958,7 @@
               <div class="elenco">${righe.map(r => `<div><b>Corsia ${esc(r.co)}</b>: ${r.liberi.length ? r.liberi.map(([a, b]) => `${toHM(a)}–${toHM(b)}`).join(' · ') : '<span class="no">non disponibile</span>'}</div>`).join('')}</div></div>`;
           });
           if (!corpo) corpo = '<div class="avviso">Nessun nuoto libero in programma.</div>';
-          pagine.push(`<section class="pagina"><div class="testa"><div class="centro">Centro Federale Lampugnano</div><h1>Nuoto libero <span class="pill">${GIORNI[g]}</span></h1><div class="sub">Corsie disponibili</div></div>${corpo}<div class="piede">Orari soggetti a variazioni.</div></section>`);
+          pagine.push(`<section class="pagina"><div class="testa"><div class="centro">Centro Federale Lampugnano</div><h1>Nuoto libero controllato <span class="pill">${GIORNI[g]}</span></h1><div class="sub">Corsie disponibili</div></div>${corpo}<div class="piede">Orari soggetti a variazioni.</div></section>`);
         }
         if (riepPdf) {
           let tabelle = '';
@@ -976,11 +976,11 @@
             tabelle += `<div class="vasca"><h3>${vasca === 'interna' ? 'Vasca interna' : 'Vasca esterna'}</h3><table class="riep"><thead><tr><th></th>${col.map(x => `<th>Corsia ${esc(x.co)}</th>`).join('')}</tr></thead><tbody>${righeT}</tbody></table></div>`;
           });
           if (!tabelle) tabelle = '<div class="avviso">Nessun nuoto libero in programma.</div>';
-          pagine.unshift(`<section class="pagina"><div class="testa"><div class="centro">Centro Federale Lampugnano</div><h1>Nuoto libero <span class="pill">Riepilogo settimanale</span></h1><div class="sub">Corsie disponibili</div></div>${tabelle}<div class="piede">Orari soggetti a variazioni.</div></section>`);
+          pagine.unshift(`<section class="pagina"><div class="testa"><div class="centro">Centro Federale Lampugnano</div><h1>Nuoto libero controllato <span class="pill">Riepilogo settimanale</span></h1><div class="sub">Corsie disponibili</div></div>${tabelle}<div class="piede">Orari soggetti a variazioni.</div></section>`);
         }
         const w = window.open('', '_blank');
         if (!w) { alert('Attenzione: Abilita i popup nel browser per scaricare il PDF.'); return; }
-        w.document.write(`<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>Nuoto libero – corsie libere</title>
+        w.document.write(`<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>Nuoto libero controllato – corsie libere</title>
           <style>
             @page { size: A4 ${orientPdf === 'verticale' ? 'portrait' : 'landscape'}; margin: 12mm; }
             * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
