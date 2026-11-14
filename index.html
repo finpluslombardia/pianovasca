@@ -906,6 +906,10 @@
       const [orientPdf, setOrientPdf] = useState('orizzontale');
       const [riepPdf, setRiepPdf] = useState(true);
       const lunediDi = (ymd) => { const d = new Date(ymd + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d; };
+      // "Validi fino al": di default la prima scadenza tra i periodi di nuoto libero attivi nella settimana scelta (modificabile)
+      const [validoFino, setValidoFino] = useState(null);
+      const validoAuto = (() => { const l = lunediDi(rifPdf), d = new Date(l); d.setDate(d.getDate() + 6); const a = toYMD(l), b = toYMD(d); return periodi.filter(x => x.al >= a && x.dal <= b).map(x => x.al).sort()[0] || ''; })();
+      const validoEff = validoFino === null ? validoAuto : validoFino;
 
       // PDF: una pagina per ogni giorno della settimana scelta, con le corsie libere per il nuoto libero
       // (fasce del nuoto libero meno le ore in cui la corsia è occupata da un corso).
@@ -958,7 +962,7 @@
               <div class="elenco">${righe.map(r => `<div><b>Corsia ${esc(r.co)}</b>: ${r.liberi.length ? r.liberi.map(([a, b]) => `${toHM(a)}–${toHM(b)}`).join(' · ') : '<span class="no">non disponibile</span>'}</div>`).join('')}</div></div>`;
           });
           if (!corpo) corpo = '<div class="avviso">Nessun nuoto libero in programma.</div>';
-          pagine.push(`<section class="pagina"><div class="testa"><div class="centro">Centro Federale Lampugnano</div><h1>Nuoto libero controllato <span class="pill">${GIORNI[g]}</span></h1><div class="sub">Corsie disponibili</div></div>${corpo}<div class="piede">Orari soggetti a variazioni.</div></section>`);
+          pagine.push(`<section class="pagina"><div class="testa"><div class="centro">Centro Federale Lampugnano</div><h1>Nuoto libero controllato <span class="pill">${GIORNI[g]}</span></h1><div class="sub">Corsie disponibili</div></div>${corpo}<div class="piede">Orari e disponibilità soggetti a variazioni.${validoEff ? ' Validi fino al ' + esc(formatDate(validoEff)) + '.' : ''}</div></section>`);
         }
         if (riepPdf) {
           let tabelle = '';
@@ -976,7 +980,7 @@
             tabelle += `<div class="vasca"><h3>${vasca === 'interna' ? 'Vasca interna' : 'Vasca esterna'}</h3><table class="riep"><thead><tr><th></th>${col.map(x => `<th>Corsia ${esc(x.co)}</th>`).join('')}</tr></thead><tbody>${righeT}</tbody></table></div>`;
           });
           if (!tabelle) tabelle = '<div class="avviso">Nessun nuoto libero in programma.</div>';
-          pagine.unshift(`<section class="pagina"><div class="testa"><div class="centro">Centro Federale Lampugnano</div><h1>Nuoto libero controllato <span class="pill">Riepilogo settimanale</span></h1><div class="sub">Corsie disponibili</div></div>${tabelle}<div class="piede">Orari soggetti a variazioni.</div></section>`);
+          pagine.unshift(`<section class="pagina"><div class="testa"><div class="centro">Centro Federale Lampugnano</div><h1>Nuoto libero controllato <span class="pill">Riepilogo settimanale</span></h1><div class="sub">Corsie disponibili</div></div>${tabelle}<div class="piede">Orari e disponibilità soggetti a variazioni.${validoEff ? ' Validi fino al ' + esc(formatDate(validoEff)) + '.' : ''}</div></section>`);
         }
         const w = window.open('', '_blank');
         if (!w) { alert('Attenzione: Abilita i popup nel browser per scaricare il PDF.'); return; }
@@ -1073,6 +1077,9 @@
                 {['orizzontale', 'verticale'].map(o => <button key={o} type="button" onClick={() => setOrientPdf(o)} className={`px-3 py-2 ${orientPdf === o ? 'bg-[#1e3a5f] text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}>{o === 'orizzontale' ? 'Orizzontale' : 'Verticale'}</button>)}
               </div>
               <label className="flex items-center gap-2 text-sm text-slate-600 font-semibold cursor-pointer"><input type="checkbox" checked={riepPdf} onChange={e => setRiepPdf(e.target.checked)} className="w-4 h-4" /> Pagina di riepilogo</label>
+              <label className="flex items-center gap-2 text-sm text-slate-500">Validi fino al
+                <input type="date" value={validoEff} onChange={e => setValidoFino(e.target.value)} className="px-2 py-1.5 border border-slate-300 rounded-md text-sm text-slate-700" />
+              </label>
               <label className="flex items-center gap-2 text-sm text-slate-500">Settimana di riferimento
                 <input type="date" value={rifPdf} onChange={e => e.target.value && setRifPdf(e.target.value)} className="px-2 py-1.5 border border-slate-300 rounded-md text-sm text-slate-700" />
                 <span className="text-xs text-slate-400">dal {formatDate(toYMD(lunediDi(rifPdf)))} al {formatDate(toYMD((() => { const x = lunediDi(rifPdf); x.setDate(x.getDate() + 6); return x; })()))}</span>
