@@ -928,6 +928,7 @@
           const d = new Date(lun); d.setDate(d.getDate() + g);
           const ymd = toYMD(d);
           let corpo = '';
+          const nVasche = ['interna', 'esterna'].filter(v => periodi.some(l => liberoTocca(l, ymd, g, v))).length;
           ['interna', 'esterna'].forEach(vasca => {
             const liberi = unisci(periodi.filter(l => liberoTocca(l, ymd, g, vasca)).map(l => [toMin(l.dalle), toMin(l.alle)]));
             if (!liberi.length) return;
@@ -956,9 +957,19 @@
             let assi = '';
             for (let m = t0; m <= t1; m += 60) assi += `<div class="ora" style="left:${(m - t0) / tot * 100}%"><span>${toHM(m)}</span></div>`;
             const barre = (r) => r.liberi.map(([a, b]) => `<div class="barra" style="left:${(a - t0) / tot * 100}%;width:${(b - a) / tot * 100}%">${(b - a) / tot * (orientPdf === 'verticale' ? 160 : 245) >= 19 ? `<span>${toHM(a)}–${toHM(b)}</span>` : ''}</div>`).join('');
+            let ganttHtml;
+            if (orientPdf === 'verticale') {
+              // layout verticale: corsie sull'asse X (colonne), orari sull'asse Y
+              const Hmm = nVasche > 1 ? 85 : 150;
+              let assiV = '', linee = '';
+              for (let m = t0; m <= t1; m += 60) { const pc = (m - t0) / tot * 100; assiV += `<div class="vora" style="top:${pc}%">${toHM(m)}</div>`; linee += `<div class="hl" style="top:${pc}%"></div>`; }
+              const barreV = (r) => r.liberi.map(([a, b]) => `<div class="vbarra" style="top:${(a - t0) / tot * 100}%;height:${(b - a) / tot * 100}%">${(b - a) / tot * Hmm >= 6 ? `<span>${toHM(a)}–${toHM(b)}</span>` : ''}</div>`).join('');
+              ganttHtml = `<div class="vwrap"><div class="vassi"><div class="vtesta"></div><div class="vaxis" style="height:${Hmm}mm">${assiV}</div></div>${righe.map(r => `<div class="vcol"><div class="vtesta">Corsia ${esc(r.co)}</div><div class="vtraccia" style="height:${Hmm}mm">${linee}${barreV(r)}</div></div>`).join('')}</div>`;
+            } else {
+              ganttHtml = `<div class="gantt"><div class="assi">${assi}</div>${righe.map(r => `<div class="riga"><div class="nome">Corsia ${esc(r.co)}</div><div class="traccia">${barre(r)}</div></div>`).join('')}</div>`;
+            }
             corpo += `<div class="vasca"><h3>${nomeVasca}</h3>
-              <div class="gantt"><div class="assi">${assi}</div>
-              ${righe.map(r => `<div class="riga"><div class="nome">Corsia ${esc(r.co)}</div><div class="traccia">${barre(r)}</div></div>`).join('')}</div>
+              ${ganttHtml}
               <div class="elenco">${righe.map(r => `<div><b>Corsia ${esc(r.co)}</b>: ${r.liberi.length ? r.liberi.map(([a, b]) => `${toHM(a)}–${toHM(b)}`).join(' · ') : '<span class="no">non disponibile</span>'}</div>`).join('')}</div></div>`;
           });
           if (!corpo) corpo = '<div class="avviso">Nessun nuoto libero in programma.</div>';
@@ -1007,6 +1018,17 @@
             .traccia { position: absolute; inset: 0; }
             .barra { position: absolute; top: 1.5mm; bottom: 1.5mm; background: #bfdbfe; border: 1px solid #3b82f6; border-radius: 3px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
             .barra span { font-size: ${orientPdf === 'verticale' ? '8pt' : '9pt'}; font-weight: bold; color: #1e3a8a; white-space: nowrap; }
+            .vwrap { display: flex; margin-top: 4px; }
+            .vassi { width: 44px; flex: none; }
+            .vtesta { height: 8mm; display: flex; align-items: center; justify-content: center; font-size: 9pt; font-weight: bold; }
+            .vaxis { position: relative; }
+            .vora { position: absolute; left: 0; right: 5px; text-align: right; font-size: 8pt; color: #64748b; transform: translateY(-50%); }
+            .vcol { flex: 1; min-width: 0; border-left: 1px solid #cbd5e1; }
+            .vcol:last-child { border-right: 1px solid #cbd5e1; }
+            .vtraccia { position: relative; border-top: 1px solid #94a3b8; border-bottom: 1px solid #94a3b8; }
+            .hl { position: absolute; left: 0; right: 0; border-top: 1px solid #e2e8f0; }
+            .vbarra { position: absolute; left: 1.5mm; right: 1.5mm; background: #bfdbfe; border: 1px solid #3b82f6; border-radius: 3px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+            .vbarra span { font-size: 8pt; font-weight: bold; color: #1e3a8a; white-space: nowrap; }
             table.riep { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
             table.riep th, table.riep td { border: 1px solid #94a3b8; padding: 5px 6px; text-align: center; vertical-align: middle; line-height: 1.45; }
             table.riep thead th { background: #1e3a5f; color: #fff; font-size: 9pt; }
