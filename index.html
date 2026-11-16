@@ -8237,7 +8237,10 @@
                 const sep = <div className="w-px self-stretch bg-slate-200 mx-1"></div>;
                 return (<>
                   <div className="flex items-stretch gap-3 mr-auto">
-                    {grp('Piano vasca', <button onClick={() => setIsLiberoOpen(true)} className={btn('arancio')} title="Periodi, giorni e orari del nuoto libero (sfondo nel piano vasca)"><ClockIcon size={16} /> Nuoto libero</button>)}
+                    {grp('Piano vasca', <>
+                      <button onClick={() => setIsLiberoOpen(true)} className={btn('arancio')} title="Periodi, giorni e orari del nuoto libero (sfondo nel piano vasca)"><ClockIcon size={16} /> Nuoto libero</button>
+                      <button onClick={() => { setChiusuraDaAprire(null); setIsChiusureOpen(true); }} className={btn('ambra')} title="Chiusure della vasca e avvisi agli iscritti"><BanIcon size={16} /> Chiusure</button>
+                    </>)}
                   </div>
                   <div className="flex items-stretch gap-3 flex-wrap">
                     {grp('Iscritti', <>
@@ -8248,10 +8251,6 @@
                     {grp('Attività', <>
                       <button onClick={() => setIsPrivateOpen(true)} className={btn('rosa')} title="Pacchetti di lezioni private da 5 o 10 lezioni"><UsersIcon size={16} /> Lezioni private{bd(nPrivScad, 'bg-amber-500', nPrivScad + ' pacchetti in scadenza entro 30 giorni')}</button>
                       <button onClick={() => setIsTirocinantiOpen(true)} className={btn('verde')} title="Calendario e ore dei tirocinanti"><CalendarIcon size={16} /> Tirocinanti</button>
-                    </>)}
-                    {sep}
-                    {grp('Avvisi', <>
-                      <button onClick={() => { setChiusuraDaAprire(null); setIsChiusureOpen(true); }} className={btn('ambra')} title="Chiusure della vasca e avvisi agli iscritti"><BanIcon size={16} /> Chiusure{bd(nChiusure, 'bg-red-500', nChiusure + ' chiusure in corso o future')}</button>
                     </>)}
                   </div>
                 </>);
