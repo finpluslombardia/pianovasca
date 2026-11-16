@@ -1173,6 +1173,7 @@
       const [filtroStato, setFiltroStato] = useState('attivi');
       const [cerca, setCerca] = useState('');
       const [filtroIstr, setFiltroIstr] = useState('');
+      const [ordina, setOrdina] = useState('acquisto');
       const [dettaglio, setDettaglio] = useState(null);
       const [form, setForm] = useState(null);
       const [nuovaLez, setNuovaLez] = useState({ data: oggiYMD, ora: '', note: '' });
@@ -1222,7 +1223,10 @@
           if (q && !nome.toLowerCase().includes(q)) return;
           righe.push({ key: k, nome, p: ok[0], tutti });
         });
-        return righe.sort((a, b) => filtroStato === 'attivi' ? (a.p.scadenza || '').localeCompare(b.p.scadenza || '') : a.nome.localeCompare(b.nome, 'it'));
+        const ultAcq = (r) => r.tutti.reduce((m, x) => (x.dataAcquisto || '') > m ? (x.dataAcquisto || '') : m, '');
+        const ultLez = (r) => r.tutti.reduce((m, x) => (x.lezioni || []).reduce((mm, l) => (l.data || '') > mm ? (l.data || '') : mm, m), '');
+        const alfa = (a, b) => a.nome.localeCompare(b.nome, 'it');
+        return righe.sort((a, b) => ordina === 'alfabetico' ? alfa(a, b) : ordina === 'lezione' ? (ultLez(b).localeCompare(ultLez(a)) || alfa(a, b)) : (ultAcq(b).localeCompare(ultAcq(a)) || alfa(a, b)));
       })();
 
       const nuovoPacchetto = (base) => {
@@ -1339,6 +1343,11 @@
                 <option value="">Tutti gli istruttori</option>
                 {istrDisponibili.map(n => <option key={n} value={n}>{n}</option>)}
               </select>
+              <select value={ordina} onChange={e => setOrdina(e.target.value)} className="px-2 py-1.5 border border-slate-300 rounded-md text-sm bg-white" title="Ordinamento dell'elenco">
+                <option value="acquisto">Ordina: ultimo acquisto</option>
+                <option value="lezione">Ordina: ultima lezione segnata</option>
+                <option value="alfabetico">Ordina: alfabetico</option>
+              </select>
               <div className="ml-auto text-sm text-slate-500"><b className="text-slate-700">{conteggi.rimaste}</b> lezioni da fare{conteggi.inScadenza > 0 && <> · <b className="text-amber-700">{conteggi.inScadenza}</b> in scadenza</>}</div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50 p-5">
@@ -1381,21 +1390,8 @@
                       </div>
                     </div>
                     <div className="flex-1 flex min-h-0">
-                      <div className="w-80 shrink-0 border-r border-slate-200 bg-slate-50 p-4 flex flex-col gap-3 overflow-y-auto">
-                        {(() => { const pks = pacchettiDi(chiavePers(p)); if (pks.length < 2) return null; return (
-                          <div>
-                            <div className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Pacchetti di {p.nome} ({pks.length})</div>
-                            <div className="flex flex-col gap-1.5">
-                              {pks.map(x => { const ix = info[x.id]; const sel = x.id === p.id; return (
-                                <button key={x.id} onClick={() => { setDettaglio(x.id); setNuovaLez({ data: oggiYMD, ora: '', note: '' }); }} className={`text-left rounded-lg border px-3 py-2 text-xs transition-colors ${sel ? 'bg-white border-[#1e3a5f] ring-1 ring-[#1e3a5f]' : 'bg-white border-slate-200 hover:border-slate-400'}`}>
-                                  <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-800">Da {x.totale} · {x.istruttore}</span>{badge(ix)}</div>
-                                  <div className="text-slate-500 mt-0.5">{formatDate(x.dataAcquisto)} → {formatDate(x.scadenza)} · <b>{ix.usate}</b>/{x.totale} fatte</div>
-                                </button>
-                              ); })}
-                            </div>
-                          </div>
-                        ); })()}
-                        <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 text-sm">
+                      <div className="w-80 shrink-0 border-r border-slate-200 bg-slate-50 p-4 flex flex-col gap-3 overflow-hidden">
+                        <div className="bg-white border border-slate-200 rounded-lg p-4 space-y-3 text-sm shrink-0">
                           <div className="flex items-center justify-between">{badge(i)}<span className="text-slate-500">Pacchetto da <b className="text-slate-700">{p.totale}</b></span></div>
                           <div>
                             <div className="text-slate-500">Istruttore: <b className="text-slate-800">{p.istruttore}</b></div>
@@ -1413,6 +1409,19 @@
                           <button onClick={() => setContattaId(p.id)} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md text-sm font-bold" title="Scrivi a questa persona su WhatsApp o per email"><MessageCircleIcon size={15}/> Contatta</button>
                         </div>
                         <button onClick={() => nuovoPacchetto({ socioKey: p.socioKey, nome: p.nome, istruttore: p.istruttore })} className="flex items-center justify-center gap-1.5 px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-md text-sm font-bold" title="Registra l'acquisto di un nuovo pacchetto per questa persona"><PlusIcon size={15}/> Acquista nuovo pacchetto</button>
+                        {(() => { const pks = pacchettiDi(chiavePers(p)); if (pks.length < 2) return null; return (
+                          <div className="flex-1 min-h-0 flex flex-col">
+                            <div className="text-[11px] shrink-0 font-bold uppercase tracking-wide text-slate-400 mb-1.5">Pacchetti di {p.nome} ({pks.length})</div>
+                            <div className="flex flex-col gap-1.5 flex-1 min-h-0 overflow-y-auto pr-1">
+                              {pks.map(x => { const ix = info[x.id]; const sel = x.id === p.id; return (
+                                <button key={x.id} onClick={() => { setDettaglio(x.id); setNuovaLez({ data: oggiYMD, ora: '', note: '' }); }} className={`text-left rounded-lg border px-3 py-2 text-xs transition-colors ${sel ? 'bg-white border-[#1e3a5f] ring-1 ring-[#1e3a5f]' : 'bg-white border-slate-200 hover:border-slate-400'}`}>
+                                  <div className="flex items-center justify-between gap-2"><span className="font-bold text-slate-800">Da {x.totale} · {x.istruttore}</span>{badge(ix)}</div>
+                                  <div className="text-slate-500 mt-0.5">{formatDate(x.dataAcquisto)} → {formatDate(x.scadenza)} · <b>{ix.usate}</b>/{x.totale} fatte</div>
+                                </button>
+                              ); })}
+                            </div>
+                          </div>
+                        ); })()}
                         <div className="mt-auto pt-3 flex items-center justify-between text-xs">
                           <button onClick={() => setForm({ id: p.id, socioKey: p.socioKey, nome: p.nome, ricerca: '', istruttore: p.istruttore, totale: p.totale, dataAcquisto: p.dataAcquisto, scadenza: p.scadenza, note: p.note || '' })} className="font-semibold text-slate-500 hover:text-slate-800 hover:underline">Modifica pacchetto</button>
                           <button onClick={() => eliminaPacchetto(p)} className="font-semibold text-red-500 hover:text-red-700 hover:underline">Elimina pacchetto</button>
