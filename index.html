@@ -253,7 +253,7 @@
       box-shadow: inset 0 1px 2px rgba(30,58,95,.10), 0 1px 0 rgba(255,255,255,.85) !important;
     }
     /* schede nell'intestazione delle finestre: la selezionata è una lente di vetro */
-    body button[class*="border-b-4"] { border-radius: 16px !important; margin: 4px 3px; background-image: none !important; box-shadow: none !important; outline: none; }
+    body button[class*="border-b-4"] { border-bottom-width: 0 !important; background-clip: padding-box !important; border-radius: 16px !important; margin: 4px 3px; background-image: none !important; box-shadow: none !important; outline: none; }
     body button[class*="border-b-4"][class*="bg-white/20"] {
       background: radial-gradient(90% 140% at 50% -40%, rgba(255,255,255,.38), rgba(255,255,255,0) 60%), rgba(255,255,255,.10) !important;
       box-shadow: inset 2px 2px 3px -1px rgba(255,255,255,.9), inset -2px -2px 3px -1px rgba(255,255,255,.7), inset 0 0 0 1px rgba(255,255,255,.5) !important;
@@ -386,6 +386,17 @@
     body :is(form#addUserForm, form#addCourseForm, form#editCourseForm) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, button.campo-glass) { padding: .5rem .75rem !important; font-size: .875rem !important; line-height: 1.35rem !important; }
     /* pannelli dentro le finestre: niente sfocatura propria, così i campi rifrangono lo sfondo reale (prima risultavano più bianchi) */
     body .fixed .rounded-xl.shadow-sm, body .fixed .rounded-xl.border.bg-white { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    /* campi e filtri a tendina nelle intestazioni colorate: vetro scuro come i pulsanti accanto */
+    body .rounded-2xl.shadow-xl > div:first-child :is(input:not([type="checkbox"]):not([type="radio"]), select) {
+      background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.10)) !important; background-color: transparent !important;
+      border: 1px solid rgba(255,255,255,.30) !important; border-radius: 9999px !important; color: #fff !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(0,0,0,.08) !important;
+      -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    body .rounded-2xl.shadow-xl > div:first-child :is(input, select):hover { background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.14)) !important; }
+    body .rounded-2xl.shadow-xl > div:first-child :is(input, select):focus { color: #fff !important; border-color: rgba(255,255,255,.6) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 3px rgba(255,255,255,.18) !important; }
+    body .rounded-2xl.shadow-xl > div:first-child input::placeholder { color: rgba(255,255,255,.65) !important; }
+    body .rounded-2xl.shadow-xl > div:first-child select::picker-icon { color: rgba(255,255,255,.85) !important; }
+    body .rounded-2xl.shadow-xl > div:first-child .relative > svg { z-index: 1; }
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
