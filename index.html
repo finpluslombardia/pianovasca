@@ -164,8 +164,7 @@
         inset 0 0 0 1px rgba(255,255,255,.55),
         inset 0 0 10px rgba(255,255,255,.35),
         inset 0 -6px 10px -6px rgba(30,58,95,.22),
-        0 0 0 .5px rgba(30,58,95,.16),
-        0 6px 16px -4px rgba(30,58,95,.30);
+        0 0 0 .5px rgba(30,58,95,.16);
       transition: left .45s cubic-bezier(.3,1.4,.4,1), width .45s cubic-bezier(.3,1.4,.4,1), top .45s cubic-bezier(.3,1.4,.4,1), height .3s, transform .25s cubic-bezier(.3,1.4,.4,1); }
     .seg-blu .seg-pill { background:
         radial-gradient(90% 140% at 50% 130%, rgba(120,170,255,.38), rgba(255,255,255,0) 60%),
@@ -257,7 +256,7 @@
     body button[class*="border-b-4"] { border-radius: 16px !important; margin: 4px 3px; background-image: none !important; box-shadow: none !important; outline: none; }
     body button[class*="border-b-4"][class*="bg-white/20"] {
       background: radial-gradient(90% 140% at 50% -40%, rgba(255,255,255,.38), rgba(255,255,255,0) 60%), rgba(255,255,255,.10) !important;
-      box-shadow: inset 2px 2px 3px -1px rgba(255,255,255,.9), inset -2px -2px 3px -1px rgba(255,255,255,.7), inset 0 0 0 1px rgba(255,255,255,.5), 0 6px 14px -6px rgba(0,0,0,.30) !important;
+      box-shadow: inset 2px 2px 3px -1px rgba(255,255,255,.9), inset -2px -2px 3px -1px rgba(255,255,255,.7), inset 0 0 0 1px rgba(255,255,255,.5) !important;
     }
     body button:focus { outline: none; }
     body button:focus-visible { box-shadow: 0 0 0 3px rgba(59,130,246,.40) !important; }
@@ -311,8 +310,10 @@
     body div:has(> button.flex-1.py-2[class*="rounded-md"]) > button { border-radius: 9999px !important; background-image: none !important; box-shadow: none !important; border: 0 !important; }
     body div:has(> button.flex-1.py-2[class*="rounded-md"]) > button[class*="bg-white"] {
       background: radial-gradient(90% 140% at 50% -40%, rgba(255,255,255,.55), rgba(255,255,255,0) 60%), rgba(255,255,255,.30) !important;
-      box-shadow: inset 2px 2px 3px -1px rgba(255,255,255,.95), inset -2px -2px 3px -1px rgba(255,255,255,.8), inset 0 0 0 1px rgba(255,255,255,.55), 0 6px 14px -6px rgba(30,58,95,.30) !important;
+      box-shadow: inset 2px 2px 3px -1px rgba(255,255,255,.95), inset -2px -2px 3px -1px rgba(255,255,255,.8), inset 0 0 0 1px rgba(255,255,255,.55) !important;
     }
+    /* corpo delle finestre a schede: stesso fondo trasparente delle altre finestre (il grigio opaco copriva il vetro) */
+    body .fixed .flex-1.overflow-y-auto[class*="bg-slate-50"], body .fixed .overflow-y-auto[class*="bg-slate-50"] { background: transparent !important; }
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
