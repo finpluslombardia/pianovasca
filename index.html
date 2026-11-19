@@ -90,7 +90,7 @@
       -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
       box-shadow: var(--glass-edge), 0 30px 80px -18px rgba(15,35,70,.55) !important;
       border: 1px solid rgba(255,255,255,.55);
-      animation: glass-pop .34s cubic-bezier(.2,.9,.3,1.12);
+      animation: glass-pop .18s cubic-bezier(.2,.9,.3,1.08);
     }
     body .rounded-2xl { border-radius: 30px !important; }
     body .rounded-xl { border-radius: 22px !important; }
@@ -139,7 +139,7 @@
     /* righe elenco e schede: vetro leggero */
     body .hover\:bg-slate-50:hover { background-color: rgba(255,255,255,.7) !important; }
 
-    @keyframes glass-pop { from { opacity: 0; transform: scale(.82); filter: blur(6px); } to { opacity: 1; transform: none; } }
+    @keyframes glass-pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
     @keyframes glass-fade { from { opacity: 0; } to { opacity: 1; } }
 
 
@@ -344,37 +344,37 @@
     /* ===== BADGE di stato in vetro tinto ===== */
     body :is(span,div,td,a,p):is([class~="bg-red-50"],[class~="bg-red-100"],[class~="bg-red-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(239,68,68,.30), rgba(239,68,68,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(239,68,68,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(239,68,68,.5) !important; }
     body :is(span,div,td,a,p):is([class~="bg-amber-50"],[class~="bg-amber-100"],[class~="bg-amber-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(245,158,11,.30), rgba(245,158,11,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(245,158,11,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(245,158,11,.5) !important; }
     body :is(span,div,td,a,p):is([class~="bg-orange-50"],[class~="bg-orange-100"],[class~="bg-orange-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(249,115,22,.30), rgba(249,115,22,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(249,115,22,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(249,115,22,.5) !important; }
     body :is(span,div,td,a,p):is([class~="bg-purple-50"],[class~="bg-purple-100"],[class~="bg-purple-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(168,85,247,.30), rgba(168,85,247,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(168,85,247,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(168,85,247,.5) !important; }
     body :is(span,div,td,a,p):is([class~="bg-blue-50"],[class~="bg-blue-100"],[class~="bg-blue-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(59,130,246,.30), rgba(59,130,246,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(59,130,246,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(59,130,246,.5) !important; }
     body :is(span,div,td,a,p):is([class~="bg-slate-50"],[class~="bg-slate-100"],[class~="bg-slate-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(100,116,139,.30), rgba(100,116,139,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(100,116,139,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(100,116,139,.5) !important; }
     body :is(span,div,td,a,p):is([class~="bg-green-50"],[class~="bg-green-100"],[class~="bg-green-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(34,197,94,.30), rgba(34,197,94,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(34,197,94,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(34,197,94,.5) !important; }
     body :is(span,div,td,a,p):is([class~="bg-emerald-50"],[class~="bg-emerald-100"],[class~="bg-emerald-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(16,185,129,.30), rgba(16,185,129,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(16,185,129,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(16,185,129,.5) !important; }
     body :is(span,div,td,a,p):is([class~="bg-yellow-50"],[class~="bg-yellow-100"],[class~="bg-yellow-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(234,179,8,.30), rgba(234,179,8,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(234,179,8,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(234,179,8,.5) !important; }
     body :is(span,div,td,a,p):is([class~="bg-rose-50"],[class~="bg-rose-100"],[class~="bg-rose-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(244,63,94,.30), rgba(244,63,94,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(244,63,94,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(244,63,94,.5) !important; }
     body :is(span,div,td,a,p):is([class~="bg-indigo-50"],[class~="bg-indigo-100"],[class~="bg-indigo-200"]):is([class*="px-"]):is([class*="text-xs"],[class*="text-[11px]"],[class*="text-[10px]"]):is([class*="rounded"]) {
       background: linear-gradient(180deg, rgba(99,102,241,.30), rgba(99,102,241,.15)) !important; --tw-bg-opacity:1;
-      border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 2px 6px -3px rgba(99,102,241,.5) !important; }
+      border: 1px solid transparent !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 2px 6px -3px rgba(99,102,241,.5) !important; }
 
     /* menu a tendina / popup: vetro con bordo luminoso */
     body .absolute:is(.bg-white,.shadow-lg,.shadow-xl,.shadow-2xl):not(.z-10):not(.inset-0) { border-radius: 18px !important; border: 1px solid rgba(255,255,255,.8) !important; overflow: hidden; padding-block: 4px;
@@ -386,6 +386,13 @@
     body :is(form#addUserForm, form#addCourseForm, form#editCourseForm) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, button.campo-glass) { padding: .5rem .75rem !important; font-size: .875rem !important; line-height: 1.35rem !important; }
     /* pannelli dentro le finestre: niente sfocatura propria, così i campi rifrangono lo sfondo reale (prima risultavano più bianchi) */
     body .fixed .rounded-xl.shadow-sm, body .fixed .rounded-xl.border.bg-white { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    /* menu a tendina chiusi e "Livello attuale": stesso vetro del campo Cognome e nome.
+       In Chrome il menu a tendina nuovo non applica la sfocatura dietro di sé, quindi il fondo è più trasparente per compensare */
+    body button.campo-glass.campo-glass.campo-glass.campo-glass.campo-glass { background-color: transparent !important; background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.58)) !important; }
+    @supports (appearance: base-select) {
+      body select:not([multiple]):not([class*="bg-white/"]) { background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.44)) !important; background-color: transparent !important; }
+      body select selectedcontent, body select > button { background: transparent !important; }
+    }
     /* campi e filtri a tendina nelle intestazioni colorate: vetro scuro come i pulsanti accanto */
     body .rounded-2xl.shadow-xl > div:first-child :is(input:not([type="checkbox"]):not([type="radio"]), select) {
       background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.10)) !important; background-color: transparent !important;
@@ -397,6 +404,9 @@
     body .rounded-2xl.shadow-xl > div:first-child input::placeholder { color: rgba(255,255,255,.65) !important; }
     body .rounded-2xl.shadow-xl > div:first-child select::picker-icon { color: rgba(255,255,255,.85) !important; }
     body .rounded-2xl.shadow-xl > div:first-child .relative > svg { z-index: 1; }
+    /* pulsante X di chiusura nelle intestazioni: senza anello bianco */
+    body .rounded-2xl.shadow-xl > div:first-child button.rounded-full.rounded-full.rounded-full.rounded-full, body .fixed [class~="bg-[#1e3a5f]"] button.rounded-full.rounded-full.rounded-full.rounded-full.rounded-full { border: 1px solid transparent !important; background-color: rgba(255,255,255,.16) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.30) !important; }
+    body .rounded-2xl.shadow-xl > div:first-child button.rounded-full.rounded-full.rounded-full.rounded-full:hover { background-color: rgba(255,255,255,.28) !important; }
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
