@@ -384,6 +384,8 @@
     body :is(input,select,textarea)[class]:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]) { background-color: transparent !important; }
     /* moduli nuovo corso / impostazioni corso / nuovo utente: stessa misura dei campi di "Aggiungi partecipante" */
     body :is(form#addUserForm, form#addCourseForm, form#editCourseForm) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, button.campo-glass) { padding: .5rem .75rem !important; font-size: .875rem !important; line-height: 1.35rem !important; }
+    /* pannelli dentro le finestre: niente sfocatura propria, così i campi rifrangono lo sfondo reale (prima risultavano più bianchi) */
+    body .fixed .rounded-xl.shadow-sm, body .fixed .rounded-xl.border.bg-white { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
