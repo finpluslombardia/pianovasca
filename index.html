@@ -460,6 +460,14 @@
         0 0 0 .5px rgba(30,58,95,.10) !important;
       border: 0 !important;
     }
+
+    /* gerarchia pesi: 600 nomi/numeri/titoli · 500 bottoni, badge, etichette, link · 400 testo */
+    body .uppercase { font-weight: 500 !important; }
+    body span.font-bold[class*="rounded"][class*="border"], body span.font-semibold[class*="rounded"][class*="border"] { font-weight: 500 !important; }
+    body button.font-bold[class*="text-white"], body a.font-bold[class*="text-white"], body button.font-bold[class*="bg-"][class*="-600"] { font-weight: 500 !important; }
+    body button.font-bold.text-xs, body button.font-semibold.text-xs, body button.font-bold.hover\:underline { font-weight: 500 !important; }
+    body label.font-bold, body label.font-semibold { font-weight: 500 !important; }
+    body a.font-bold[class*="rounded"], body button.font-bold[class*="rounded-md"][class*="border"] { font-weight: 500 !important; }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
