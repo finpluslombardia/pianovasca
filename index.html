@@ -390,7 +390,7 @@
        In Chrome il menu a tendina nuovo non applica la sfocatura dietro di sé, quindi il fondo è più trasparente per compensare */
     body button.campo-glass.campo-glass.campo-glass.campo-glass.campo-glass { background-color: transparent !important; background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.58)) !important; }
     @supports (appearance: base-select) {
-      body select:not([multiple]):not([class*="bg-white/"]) { background: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,.44)) !important; background-color: transparent !important; }
+      body select:not([multiple]):not([class*="bg-white/"]) { background: linear-gradient(180deg, rgba(255,255,255,.26), rgba(255,255,255,.52)) !important; background-color: transparent !important; }
       body select selectedcontent, body select > button { background: transparent !important; }
     }
     /* campi e filtri a tendina nelle intestazioni colorate: vetro scuro come i pulsanti accanto */
@@ -2337,8 +2337,8 @@
       return (
         <>
           <button type="button" ref={btnRef} onClick={() => aperto ? setAperto(false) : apri()} className={(className || '') + ' campo-glass flex items-center justify-between gap-2 text-left'}>
-            <span className={`truncate ${testo ? '' : 'text-slate-400'}`}>{testo || '—'}</span>
-            <span className="shrink-0 text-slate-400 text-xs">{sel.length > 1 ? `${sel.length} ▾` : '▾'}</span>
+            <span className="truncate">{testo || '—'}</span>
+            <span className="shrink-0 text-slate-500 text-[10px] leading-none">{sel.length > 1 ? `${sel.length} ▼` : '▼'}</span>
           </button>
           {aperto && pos && (
             <>
