@@ -201,8 +201,9 @@
     body .shrink-0.z-30.shadow-sm.flex.flex-col th { background-color: rgba(255,255,255,.45) !important; }
     body .shrink-0.z-30.shadow-sm.flex.flex-col button.bg-white, body .shrink-0.z-30.shadow-sm.flex.flex-col button[class*="bg-white"] { background-color: rgba(255,255,255,.85) !important; border-color: rgba(30,58,95,.14) !important; box-shadow: inset 0 1px 0 #fff, 0 3px 10px -4px rgba(30,58,95,.3) !important; }
     /* intestazione corsie: staccata dalla fascia alta, con angoli arrotondati in alto */
-    .corsie-bar { margin-top: 12px; background: transparent !important; border: 0 !important; padding-right: var(--sbw, 0px); }
-    .corsie-bar th { background-color: rgba(255,255,255,.70) !important; border-color: rgba(30,58,95,.10) !important; -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); }
+    .corsie-bar { margin-top: 12px; margin-bottom: calc(-1 * var(--ch, 0px)); position: relative; pointer-events: none; background: transparent !important; border: 0 !important; padding-right: var(--sbw, 0px); }
+    /* il piano scorre SOTTO l'intestazione: vetro che sfoca le corsie in transito */
+    .corsie-bar th { background-color: rgba(255,255,255,.42) !important; border-color: rgba(30,58,95,.10) !important; -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(22px) saturate(190%); box-shadow: inset 0 -1px 0 rgba(255,255,255,.7), inset 0 1px 0 rgba(255,255,255,.9); }
     .corsie-bar th:first-child { border-top-left-radius: 22px; }
     .corsie-bar th:last-child { border-top-right-radius: 22px; }
     .corsie-bar thead { box-shadow: 0 -1px 0 rgba(255,255,255,.9) inset; }
@@ -417,7 +418,7 @@
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
-    body main:has(> #griglia-piano-vasca:first-child) { padding-top: 0 !important; }
+    body main:has(> #griglia-piano-vasca:first-child) { padding-top: var(--ch, 0px) !important; }
 
     /* --- pillole di stato in rilievo --- */
     body span[class*="bg-"][class*="rounded"][class*="border"][class*="font-bold"] { box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 1px 3px rgba(30,58,95,.12); }
@@ -2740,6 +2741,8 @@
           const m = mainScrollRef.current; if (!m) return;
           const w = Math.max(0, m.offsetWidth - m.clientWidth);
           if (document.documentElement.style.getPropertyValue('--sbw') !== w + 'px') document.documentElement.style.setProperty('--sbw', w + 'px');
+          const hh = corsieHeaderRef.current ? corsieHeaderRef.current.offsetHeight : 0;
+          if (hh && document.documentElement.style.getPropertyValue('--ch') !== hh + 'px') document.documentElement.style.setProperty('--ch', hh + 'px');
         };
         misura();
         const iv = setInterval(misura, 300);
