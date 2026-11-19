@@ -426,6 +426,26 @@
     .glass-swap { animation: glass-swap .32s cubic-bezier(.2,.8,.3,1); }
     @keyframes glass-swap { from { opacity: 0; transform: translateY(8px) scale(.995); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
     @media (prefers-reduced-motion: reduce) { .glass-swap, body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl { animation: none !important; } .seg-glass .seg-pill { transition: none; } }
+
+    /* ===== CARATTERE più leggero, come CF Lampugnano: carattere di sistema, normale 400, etichette 500, titoli 600 ===== */
+    html, body, button, input, select, textarea { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    body .font-bold, body .font-extrabold, body .font-black { font-weight: 600 !important; }
+    body .font-semibold { font-weight: 500 !important; }
+    body .font-medium { font-weight: 400 !important; }
+    body .seg-glass .seg-btn { font-weight: 500 !important; }
+    body .seg-glass .seg-btn.seg-on { font-weight: 600 !important; }
+    body .seg-glass .seg-oggi:not(.seg-on) { font-weight: 600 !important; }
+
+    /* ===== TIPOGRAFIA PIÙ LEGGERA: un gradino in meno per ogni peso (grassetto -> semibold, semibold -> medium) ===== */
+    body .font-black, body .font-extrabold { font-weight: 700 !important; }
+    body .font-bold { font-weight: 600 !important; }
+    body .font-semibold { font-weight: 500 !important; }
+    body .font-medium { font-weight: 450 !important; }
+    body .text-2xl.font-bold, body .text-3xl.font-bold, body .text-4xl.font-bold, body .text-2xl.font-black, body .text-3xl.font-black { font-weight: 500 !important; }
+    .seg-glass .seg-btn { font-weight: 500 !important; }
+    .seg-glass .seg-btn.seg-on, .seg-glass .seg-oggi:not(.seg-on) { font-weight: 600 !important; }
+    body .rounded-2xl.shadow-xl h3 { font-weight: 600; }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
