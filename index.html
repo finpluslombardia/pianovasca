@@ -446,6 +446,20 @@
     .seg-glass .seg-btn { font-weight: 500 !important; }
     .seg-glass .seg-btn.seg-on, .seg-glass .seg-oggi:not(.seg-on) { font-weight: 600 !important; }
     body .rounded-2xl.shadow-xl h3 { font-weight: 600; }
+
+    /* lente di vetro per il giorno/vasca selezionato: più chiara della capsula, riflesso in alto, luce azzurra in basso, bordo luminoso */
+    body .seg-glass .seg-pill, body .seg-glass.seg-blu .seg-pill, body .seg-glass.seg-chiaro .seg-pill {
+      background:
+        radial-gradient(110% 80% at 28% -10%, rgba(255,255,255,.95), rgba(255,255,255,0) 58%),
+        radial-gradient(100% 100% at 82% 125%, rgba(150,195,255,.60), rgba(255,255,255,0) 62%),
+        rgba(255,255,255,.42) !important;
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,.95),
+        inset 0 2px 3px rgba(255,255,255,.95),
+        inset 0 -3px 7px rgba(110,160,255,.38),
+        0 0 0 .5px rgba(30,58,95,.10) !important;
+      border: 0 !important;
+    }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
