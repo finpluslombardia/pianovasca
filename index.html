@@ -396,12 +396,12 @@
     }
     /* campi e filtri a tendina nelle intestazioni colorate: vetro scuro come i pulsanti accanto */
     body .rounded-2xl.shadow-xl > div:first-child :is(input:not([type="checkbox"]):not([type="radio"]), select) {
-      background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.10)) !important; background-color: transparent !important;
-      border: 1px solid rgba(255,255,255,.30) !important; border-radius: 9999px !important; color: #fff !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(0,0,0,.08) !important;
+      background: rgba(255,255,255,.16) !important; background-color: rgba(255,255,255,.16) !important;
+      border: 1px solid transparent !important; border-radius: 9999px !important; color: #fff !important;
+      box-shadow: none !important;
       -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
-    body .rounded-2xl.shadow-xl > div:first-child :is(input, select):hover { background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,.14)) !important; }
-    body .rounded-2xl.shadow-xl > div:first-child :is(input, select):focus { color: #fff !important; border-color: rgba(255,255,255,.6) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 0 0 3px rgba(255,255,255,.18) !important; }
+    body .rounded-2xl.shadow-xl > div:first-child :is(input, select):hover { background: rgba(255,255,255,.26) !important; background-color: rgba(255,255,255,.26) !important; }
+    body .rounded-2xl.shadow-xl > div:first-child :is(input, select):focus { color: #fff !important; border-color: transparent !important; box-shadow: 0 0 0 2px rgba(255,255,255,.28) !important; }
     body .rounded-2xl.shadow-xl > div:first-child input::placeholder { color: rgba(255,255,255,.65) !important; }
     body .rounded-2xl.shadow-xl > div:first-child select::picker-icon { color: rgba(255,255,255,.85) !important; }
     body .rounded-2xl.shadow-xl > div:first-child .relative > svg { z-index: 1; }
@@ -514,6 +514,9 @@
     body .rounded-xl.shadow-2xl:has(> div:first-child[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-"]):not([class*="bg-transparent"])) { border-top-width: 0 !important; }
     body .rounded-2xl.shadow-xl > div:first-child[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-"]):not([class*="bg-transparent"]),
     body .rounded-xl.shadow-2xl > div:first-child[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-"]):not([class*="bg-transparent"]) { box-shadow: inset 0 -1px 0 rgba(0,0,0,.08) !important; }
+
+    /* menu "Vista" dentro la sua pillola: niente seconda pillola */
+    body select.sel-nuda.sel-nuda.sel-nuda { background: transparent !important; background-color: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 2px !important; min-height: 0 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
@@ -8722,7 +8725,7 @@
                   <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm">
                     <ClockIcon size={16} className="text-slate-500" />
                     <span className="text-sm font-medium text-slate-600 hidden sm:inline">Vista:</span>
-                    <select value={intervallo} onChange={(e) => setIntervallo(Number(e.target.value))} className="text-sm font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
+                    <select value={intervallo} onChange={(e) => setIntervallo(Number(e.target.value))} className="sel-nuda text-sm font-bold text-slate-800 bg-transparent focus:outline-none cursor-pointer">
                       <option value={60}>60 min</option>
                       <option value={45}>45 min</option>
                       <option value={30}>30 min</option>
