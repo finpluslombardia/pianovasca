@@ -469,6 +469,45 @@
     body button.font-bold.text-xs, body button.font-semibold.text-xs, body button.font-bold.hover\:underline { font-weight: 500 !important; }
     body label.font-bold, body label.font-semibold { font-weight: 500 !important; }
     body a.font-bold[class*="rounded"], body button.font-bold[class*="rounded-md"][class*="border"] { font-weight: 500 !important; }
+
+    /* ===== SCALA PESI DEFINITIVA =====
+       400 testo normale e secondario · 500 bottoni, badge, etichette, link, maiuscole · 600 nomi, numeri chiave, titoli */
+    body .font-medium, body .font-normal { font-weight: 400 !important; }
+    body .font-semibold { font-weight: 500 !important; }
+    body .font-bold, body .font-black, body .font-extrabold { font-weight: 600 !important; }
+    /* 500: elementi interattivi, etichette, badge, link, maiuscolo */
+    body button.font-medium, body a.font-medium, body label.font-medium, body select.font-medium, body input.font-medium,
+    body button.font-semibold, body a.font-semibold, body label.font-semibold, body th.font-semibold, body th.font-bold, body th.font-medium,
+    body span.font-medium[class*="rounded"], body span.font-semibold[class*="rounded"], body .uppercase { font-weight: 500 !important; }
+    body button.font-bold, body a.font-bold:not([class*="truncate"]) { font-weight: 500 !important; }
+    /* 600: nomi e valori importanti anche se oggi marcati semibold */
+    body div.font-semibold[class*="text-slate-8"], body span.font-semibold[class*="text-slate-8"]:not([class*="rounded"]), body td.font-semibold[class*="text-slate-8"], body p.font-semibold[class*="text-slate-8"] { font-weight: 600 !important; }
+    /* titoli grandi restano leggeri, titoli dei modali 600 */
+    body .text-2xl.font-bold, body .text-3xl.font-bold, body .text-4xl.font-bold, body .text-2xl.font-black, body .text-3xl.font-black { font-weight: 500 !important; }
+    body .rounded-2xl.shadow-xl h3, body .rounded-xl.shadow-2xl h3 { font-weight: 600 !important; }
+    /* box del piano vasca: nome corso 600, istruttore e riga in basso 400, orario piccolo 500 */
+    #griglia-piano-vasca span.font-semibold[class*="text-white"] { font-weight: 400 !important; }
+    #griglia-piano-vasca span[class*="text-[9px]"] { font-weight: 500 !important; }
+    /* testo secondario in vetro: opaco ma leggero */
+    body .text-slate-500:not(button):not(th):not(label):not([class*="font-bold"]):not([class*="font-semibold"]):not(.uppercase) { font-weight: 400; }
+
+    /* ===== GERARCHIA PESI v2 =====
+       400 testo normale/secondario · 500 bottoni, badge, etichette, link, intestazioni di tabella, maiuscolo · 600 nomi, numeri chiave, titoli */
+    body .font-medium { font-weight: 400 !important; }
+    body button.font-medium, body a.font-medium, body label.font-medium, body th.font-medium, body td.font-medium,
+    body [class*="rounded"][class*="border"].font-medium, body [class*="rounded"][class*="bg-"].font-medium { font-weight: 500 !important; }
+    body button.font-bold, body a.font-bold, body button.font-semibold, body a.font-semibold, body th, body th.font-bold, body th.font-semibold { font-weight: 500 !important; }
+    body td.font-bold { font-weight: 500 !important; }
+    body td.font-bold[class*="text-red"], body td.font-bold[class*="text-orange"] { font-weight: 600 !important; }
+    body span.font-bold[class*="bg-"], body span.font-semibold[class*="bg-"] { font-weight: 500 !important; }
+    body .font-semibold[class*="text-slate-8"], body .font-semibold[class*="text-slate-9"] { font-weight: 600 !important; }
+    body button.font-semibold[class*="text-blue-7"].hover\:underline { font-weight: 600 !important; }
+    body .seg-glass .seg-btn { font-weight: 500 !important; }
+    body .seg-glass .seg-btn.seg-on, body .seg-glass .seg-oggi:not(.seg-on) { font-weight: 600 !important; }
+    /* box del piano vasca: nome corso 600, orario 500, istruttore e riga in basso 400 */
+    body #griglia-piano-vasca div.absolute.z-10 * { font-weight: 400 !important; }
+    body #griglia-piano-vasca div.absolute.z-10 span.font-bold.truncate { font-weight: 600 !important; }
+    body #griglia-piano-vasca div.absolute.z-10 span.absolute.font-bold { font-weight: 500 !important; }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
