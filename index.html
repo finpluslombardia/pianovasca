@@ -517,6 +517,22 @@
 
     /* menu "Vista" dentro la sua pillola: niente seconda pillola */
     body select.sel-nuda.sel-nuda.sel-nuda { background: transparent !important; background-color: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 2px !important; min-height: 0 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+
+    /* ===== menu aperti: vetro più trasparente e sfocato (select, Livello, Filtra Corsi, menu azioni) ===== */
+    @supports (appearance: base-select) {
+      body select::picker(select) {
+        background:
+          radial-gradient(120% 60% at 20% -10%, rgba(255,255,255,.55), rgba(255,255,255,0) 60%),
+          linear-gradient(180deg, rgba(255,255,255,.46), rgba(255,255,255,.28));
+        -webkit-backdrop-filter: blur(30px) saturate(210%); backdrop-filter: blur(30px) saturate(210%);
+        border: 1px solid rgba(255,255,255,.75);
+      }
+    }
+    body .fixed.z-\[91\], body .absolute.bg-white, body .absolute.shadow-lg, body .absolute.shadow-xl, body .absolute.shadow-2xl {
+      background-image: radial-gradient(120% 50% at 20% -10%, rgba(255,255,255,.55), rgba(255,255,255,0) 60%) !important;
+      background-color: rgba(255,255,255,.50) !important;
+      -webkit-backdrop-filter: blur(30px) saturate(210%) !important; backdrop-filter: blur(30px) saturate(210%) !important;
+    }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
@@ -2775,6 +2791,7 @@
       const [editModal, setEditModal] = useState(null); 
       const [isExportMenuOpen, setIsExportMenuOpen] = useState(false); // Menu esportazione
       const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+      const [filtroPos, setFiltroPos] = useState({ top: 0, right: 0 });
       const headerFissoRef = useRef(null);
       // Intestazione delle corsie ora COMPLETAMENTE SEPARATA dalla tabella che scorre (non più
       // "sticky" al suo interno): elimina ogni possibile sovrapposizione con i riquadri dei corsi,
@@ -8630,7 +8647,7 @@
                   {/* MENU FILTRI */}
                   <div className="relative">
                     <button 
-                      onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+                      onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setFiltroPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }); setIsFilterMenuOpen(!isFilterMenuOpen); }}
                       className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
                     >
                       <FilterIcon size={16} className={(corsiEsclusiFiltro.length > 0 || istruttoriFiltro.length > 0) ? "text-blue-500 fill-blue-100" : "text-slate-500"} />
@@ -8643,8 +8660,8 @@
                       )}
                     </button>
                     
-                    {isFilterMenuOpen && (
-                      <div className="absolute top-full mt-2 right-0 bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 z-50 min-w-[300px] flex flex-col gap-2">
+                    {isFilterMenuOpen && ReactDOM.createPortal(
+                      <div className="fixed z-[91] bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 min-w-[300px] flex flex-col gap-2" style={{ top: filtroPos.top, right: filtroPos.right, maxHeight: `calc(100vh - ${filtroPos.top + 12}px)`, overflowY: 'auto' }}>
                         {(() => {
                           const tutteChiavi = corsiRaggruppatiPerFiltro.flatMap(g => g.corsi.map(c => c.key));
                           const q = ricercaFiltro.trim().toLowerCase();
@@ -8717,7 +8734,7 @@
                             </>
                           );
                         })()}
-                      </div>
+                      </div>, document.body
                     )}
                   </div>
 
