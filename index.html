@@ -99,10 +99,10 @@
 
     /* testate blu: vetro scuro con riflesso */
     body [class~="bg-[#1e3a5f]"] {
-      background-color: rgba(30,58,95,.80) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 55%) !important;
-      -webkit-backdrop-filter: blur(20px) saturate(170%); backdrop-filter: blur(20px) saturate(170%);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 0 rgba(0,0,0,.12);
+      background-color: #1e3a5f !important;
+      background-image: none !important;
+      -webkit-backdrop-filter: none; backdrop-filter: none;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
     }
     body button[class~="bg-[#1e3a5f]"] { border-radius: 13px; }
     body .bg-slate-700, body .bg-slate-800 { background-image: linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0) 60%); }
@@ -212,10 +212,9 @@
     /* testate colorate delle finestre: vetro colorato con riflesso (come le testate blu navy) */
     body .rounded-2xl.shadow-xl > div:first-child[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-"]):not([class*="bg-transparent"]),
     body .rounded-xl.shadow-2xl > div:first-child[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-"]):not([class*="bg-transparent"]) {
-      --tw-bg-opacity: .84 !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,.30), rgba(255,255,255,0) 60%) !important;
-      -webkit-backdrop-filter: blur(20px) saturate(170%); backdrop-filter: blur(20px) saturate(170%);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(0,0,0,.10) !important;
+      --tw-bg-opacity: 1 !important;
+      background-image: none !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 0 rgba(0,0,0,.08) !important;
     }
     /* piè delle finestre e pannelli secondari */
     body .rounded-2xl.shadow-xl > div[class*="border-t"][class*="bg-"], body .rounded-xl.shadow-2xl > div[class*="border-t"][class*="bg-"] {
@@ -246,6 +245,22 @@
     body button.campo-glass:hover { background-color: rgba(255,255,255,.7) !important; }
     body .fixed.z-\[91\] { background-color: rgba(255,255,255,.78) !important; -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge), var(--glass-shadow) !important; border: 1px solid rgba(255,255,255,.7) !important; border-radius: 18px !important; }
     body .fixed.z-\[91\] .bg-white { background: transparent !important; }
+    /* pannelli interni alle finestre: vetro più leggero, così si distinguono dai campi */
+    body .fixed .rounded-xl.shadow-sm { background-color: rgba(255,255,255,.40) !important; border: 1px solid rgba(255,255,255,.75) !important; }
+    /* campi: bordo morbido ma visibile e riflesso interno, tutti uguali */
+    body input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), body select, body textarea, body button.campo-glass {
+      background-color: rgba(255,255,255,.72) !important;
+      border: 1px solid rgba(30,58,95,.13) !important;
+      box-shadow: inset 0 1px 2px rgba(30,58,95,.10), 0 1px 0 rgba(255,255,255,.85) !important;
+    }
+    /* schede nell'intestazione delle finestre: la selezionata è una lente di vetro */
+    body button[class*="border-b-4"] { border-radius: 16px !important; margin: 4px 3px; background-image: none !important; box-shadow: none !important; outline: none; }
+    body button[class*="border-b-4"][class*="bg-white/20"] {
+      background: radial-gradient(90% 140% at 50% -40%, rgba(255,255,255,.38), rgba(255,255,255,0) 60%), rgba(255,255,255,.10) !important;
+      box-shadow: inset 2px 2px 3px -1px rgba(255,255,255,.9), inset -2px -2px 3px -1px rgba(255,255,255,.7), inset 0 0 0 1px rgba(255,255,255,.5), 0 6px 14px -6px rgba(0,0,0,.30) !important;
+    }
+    body button:focus { outline: none; }
+    body button:focus-visible { box-shadow: 0 0 0 3px rgba(59,130,246,.40) !important; }
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
@@ -8162,9 +8177,9 @@
                     <button type="button" onClick={() => setConfermaElimina(true)} className="px-4 py-2.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg font-bold transition-colors flex items-center gap-2"><Trash2Icon size={18} /> <span className="hidden sm:inline">Elimina Corso</span></button>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <button type="button" onClick={stampaRegistro} disabled={partecipantiAttiviModal.length === 0} className={`px-5 py-2.5 rounded-lg font-bold transition-colors flex items-center gap-2 ${partecipantiAttiviModal.length > 0 ? 'text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm' : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed'}`}><PrinterIcon size={18} /> Stampa Registro</button>
-                      <button type="button" onClick={() => setMsgCorso(true)} disabled={partecipantiAttiviModal.length === 0} title="Prepara un messaggio WhatsApp per tutti gli iscritti attivi del corso" className="px-3 py-1.5 rounded-md text-xs font-bold transition-colors flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"><MessageCircleIcon size={14}/> Scrivi al corso</button>
-                      <button type="button" onClick={() => setPassaLivello(true)} disabled={partecipantiAttiviModal.length === 0} title="Fai salire di livello gli iscritti del corso" className="px-3 py-1.5 rounded-md text-xs font-bold transition-colors flex items-center gap-1.5 text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"><span className="text-sm leading-none">↑</span> Passaggio di livello</button>
+                      <button type="button" onClick={stampaRegistro} disabled={partecipantiAttiviModal.length === 0} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${partecipantiAttiviModal.length > 0 ? 'text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-sm' : 'text-slate-400 bg-slate-100 border border-slate-200 cursor-not-allowed'}`}><PrinterIcon size={18} /> Stampa Registro</button>
+                      <button type="button" onClick={() => setMsgCorso(true)} disabled={partecipantiAttiviModal.length === 0} title="Prepara un messaggio WhatsApp per tutti gli iscritti attivi del corso" className="px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"><MessageCircleIcon size={14}/> Scrivi al corso</button>
+                      <button type="button" onClick={() => setPassaLivello(true)} disabled={partecipantiAttiviModal.length === 0} title="Fai salire di livello gli iscritti del corso" className="px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"><span className="text-sm leading-none">↑</span> Passaggio di livello</button>
                     </div>
                   )}
                   
