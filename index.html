@@ -544,6 +544,14 @@
         -webkit-backdrop-filter: blur(30px) saturate(130%); backdrop-filter: blur(30px) saturate(130%);
       }
     }
+
+    /* menu a tendina CHIUSI in Aggiungi utente, Aggiungi corso, Aggiungi/Modifica partecipante: stesso box del tasto "Vista" */
+    body :is(#addUserForm, #addCourseForm, #formPartecipante) :is(select:not([multiple]), button.campo-glass) {
+      background: rgba(255,255,255,.58) !important; background-color: rgba(255,255,255,.58) !important; background-image: none !important;
+      border: 1px solid rgba(30,58,95,.12) !important;
+      box-shadow: 0 1px 2px 0 rgba(0,0,0,.05) !important;
+      -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
@@ -8198,7 +8206,7 @@
 
                   {/* TAB: AGGIUNGI / MODIFICA PARTECIPANTE */}
                   {editModal.tab === 'partecipante' && (
-                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div id="formPartecipante" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                       <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200">
                         <h4 className="text-sm font-bold flex items-center gap-2 text-blue-700">
                           {editingPartecipanteIndex !== null ? <EditIcon size={18}/> : <PlusIcon size={18}/>}
