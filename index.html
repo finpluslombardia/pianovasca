@@ -2823,6 +2823,21 @@
       const [isExportMenuOpen, setIsExportMenuOpen] = useState(false); // Menu esportazione
       const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
       const [filtroPos, setFiltroPos] = useState({ top: 0, right: 0 });
+      const [macroFiltro, setMacroFiltro] = useState('');
+      const filtroPopRef = useRef(null);
+      const filtroBtnRef = useRef(null);
+      useEffect(() => {
+        if (!isFilterMenuOpen) return;
+        const chiudi = (e) => {
+          if (filtroPopRef.current && filtroPopRef.current.contains(e.target)) return;
+          if (filtroBtnRef.current && filtroBtnRef.current.contains(e.target)) return;
+          setIsFilterMenuOpen(false);
+        };
+        const esc = (e) => { if (e.key === 'Escape') setIsFilterMenuOpen(false); };
+        document.addEventListener('mousedown', chiudi, true);
+        document.addEventListener('keydown', esc);
+        return () => { document.removeEventListener('mousedown', chiudi, true); document.removeEventListener('keydown', esc); };
+      }, [isFilterMenuOpen]);
       const headerFissoRef = useRef(null);
       // Intestazione delle corsie ora COMPLETAMENTE SEPARATA dalla tabella che scorre (non più
       // "sticky" al suo interno): elimina ogni possibile sovrapposizione con i riquadri dei corsi,
@@ -8679,6 +8694,7 @@
                   {/* MENU FILTRI */}
                   <div className="relative">
                     <button 
+                      ref={filtroBtnRef}
                       onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setFiltroPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }); setIsFilterMenuOpen(!isFilterMenuOpen); }}
                       className="campo-vista flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 outline-none transition-colors"
                     >
@@ -8693,13 +8709,14 @@
                     </button>
                     
                     {isFilterMenuOpen && ReactDOM.createPortal(
-                      <div className="fixed z-[91] bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 min-w-[300px] flex flex-col gap-2" style={{ top: filtroPos.top, right: filtroPos.right, left: 'auto', width: 'min(400px, calc(100vw - 16px))', maxHeight: `calc(100vh - ${filtroPos.top + 12}px)`, overflowY: 'auto' }}>
+                      <div ref={filtroPopRef} className="fixed z-[91] bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 min-w-[300px] flex flex-col gap-2" style={{ top: filtroPos.top, right: filtroPos.right, left: 'auto', width: 'min(400px, calc(100vw - 16px))', maxHeight: `calc(100vh - ${filtroPos.top + 12}px)`, overflowY: 'auto' }}>
                         {(() => {
                           const tutteChiavi = corsiRaggruppatiPerFiltro.flatMap(g => g.corsi.map(c => c.key));
                           const q = ricercaFiltro.trim().toLowerCase();
                           const gruppiVisibili = corsiRaggruppatiPerFiltro
                             .map(g => ({ ...g, corsi: q ? g.corsi.filter(c => (c.label + ' ' + g.attivitaNome).toLowerCase().includes(q)) : g.corsi }))
-                            .filter(g => g.corsi.length > 0);
+                            .filter(g => g.corsi.length > 0)
+                            .filter(g => !macroFiltro || g.attivitaNome === macroFiltro);
                           const soloQuesti = (chiavi) => setCorsiEsclusiFiltro(tutteChiavi.filter(k => !chiavi.includes(k)));
                           const linkCls = "text-xs font-bold text-blue-600 hover:underline";
                           return (
@@ -8707,11 +8724,15 @@
                               <div className="flex justify-between items-center mb-1">
                                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Filtra Corsi</span>
                                 <div className="flex gap-3">
-                                  <button onClick={() => { setCorsiEsclusiFiltro([]); setIstruttoriFiltro([]); }} className={linkCls}>Tutti</button>
-                                  <button onClick={() => setCorsiEsclusiFiltro(tutteChiavi)} className={linkCls}>Nessuno</button>
+                                  <button onClick={() => { setCorsiEsclusiFiltro([]); setIstruttoriFiltro([]); setMacroFiltro(''); }} className={linkCls}>Tutti</button>
+                                  <button onClick={() => { setCorsiEsclusiFiltro(tutteChiavi); setMacroFiltro(''); }} className={linkCls}>Nessuno</button>
                                 </div>
                               </div>
                               <input type="text" value={ricercaFiltro} onChange={e => setRicercaFiltro(e.target.value)} placeholder="Cerca un corso..." className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
+                              <select value={macroFiltro} onChange={e => { const v = e.target.value; setMacroFiltro(v); if (v === '') setCorsiEsclusiFiltro([]); else { const g = corsiRaggruppatiPerFiltro.find(x => x.attivitaNome === v); if (g) soloQuesti(g.corsi.map(c => c.key)); } }} className="w-full px-3 py-1.5 text-sm rounded-lg outline-none" title="Scegli la macro-attività, poi spunta le sottocategorie">
+                                <option value="">Qualsiasi attività</option>
+                                {corsiRaggruppatiPerFiltro.map(g => <option key={g.attivitaNome} value={g.attivitaNome}>{g.attivitaNome}</option>)}
+                              </select>
                               <div className="flex bg-slate-100 rounded-lg p-1 mb-1">
                                 <button type="button" onClick={() => setModalitaFiltro('nascondi')} className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${modalitaFiltro === 'nascondi' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Nascondi</button>
                                 <button type="button" onClick={() => setModalitaFiltro('evidenzia')} className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${modalitaFiltro === 'evidenzia' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Evidenzia</button>
