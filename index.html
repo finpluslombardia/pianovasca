@@ -485,7 +485,7 @@
     /* titoli grandi restano leggeri, titoli dei modali 600 */
     body .text-2xl.font-bold, body .text-3xl.font-bold, body .text-4xl.font-bold, body .text-2xl.font-black, body .text-3xl.font-black { font-weight: 500 !important; }
     body .rounded-2xl.shadow-xl h3, body .rounded-xl.shadow-2xl h3 { font-weight: 600 !important; }
-    /* box del piano vasca: nome corso 600, istruttore e riga in basso 400, orario piccolo 500 */
+    /* box del piano vasca: nome corso 600, istruttore e riga in basso 450, orario piccolo 500 */
     #griglia-piano-vasca span.font-semibold[class*="text-white"] { font-weight: 400 !important; }
     #griglia-piano-vasca span[class*="text-[9px]"] { font-weight: 500 !important; }
     /* testo secondario in vetro: opaco ma leggero */
@@ -505,9 +505,15 @@
     body .seg-glass .seg-btn { font-weight: 500 !important; }
     body .seg-glass .seg-btn.seg-on, body .seg-glass .seg-oggi:not(.seg-on) { font-weight: 600 !important; }
     /* box del piano vasca: nome corso 600, orario 500, istruttore e riga in basso 400 */
-    body #griglia-piano-vasca div.absolute.z-10 * { font-weight: 400 !important; }
+    body #griglia-piano-vasca div.absolute.z-10 * { font-weight: 450 !important; }
     body #griglia-piano-vasca div.absolute.z-10 span.font-bold.truncate { font-weight: 600 !important; }
     body #griglia-piano-vasca div.absolute.z-10 span.absolute.font-bold { font-weight: 500 !important; }
+
+    /* testata colorata: niente filo bianco sul bordo superiore del modale */
+    body .rounded-2xl.shadow-xl:has(> div:first-child[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-"]):not([class*="bg-transparent"])),
+    body .rounded-xl.shadow-2xl:has(> div:first-child[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-"]):not([class*="bg-transparent"])) { border-top-width: 0 !important; }
+    body .rounded-2xl.shadow-xl > div:first-child[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-"]):not([class*="bg-transparent"]),
+    body .rounded-xl.shadow-2xl > div:first-child[class*="bg-"]:not([class*="bg-white"]):not([class*="bg-slate-"]):not([class*="bg-transparent"]) { box-shadow: inset 0 -1px 0 rgba(0,0,0,.08) !important; }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
