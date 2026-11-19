@@ -261,6 +261,22 @@
     }
     body button:focus { outline: none; }
     body button:focus-visible { box-shadow: 0 0 0 3px rgba(59,130,246,.40) !important; }
+    /* ===== campi e pannelli interni: vero vetro (pannello tinto, campi chiari con bordo che rifrange) ===== */
+    body .fixed .rounded-xl.shadow-sm, body .fixed .rounded-xl.border.bg-white {
+      background: linear-gradient(180deg, rgba(185,205,238,.30), rgba(185,205,238,.16)) !important;
+      border: 1px solid rgba(255,255,255,.75) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 0 0 1px rgba(255,255,255,.25), 0 10px 26px -14px rgba(30,58,95,.35) !important;
+    }
+    body input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), body select, body textarea, body button.campo-glass {
+      background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.58)) !important;
+      border: 1px solid rgba(255,255,255,.85) !important;
+      box-shadow: inset 0 1.5px 1px rgba(255,255,255,.95), inset 0 -1px 2px rgba(30,58,95,.10), 0 0 0 .5px rgba(30,58,95,.14), 0 4px 12px -6px rgba(30,58,95,.28) !important;
+      -webkit-backdrop-filter: blur(8px) saturate(160%); backdrop-filter: blur(8px) saturate(160%);
+    }
+    body input:disabled, body select:disabled, body textarea:disabled { opacity: .55; }
+    body input:focus, body select:focus, body textarea:focus, body button.campo-glass:focus-visible { box-shadow: inset 0 1.5px 1px rgba(255,255,255,.95), 0 0 0 3px rgba(59,130,246,.38), 0 4px 12px -6px rgba(30,58,95,.28) !important; border-color: rgba(59,130,246,.55) !important; }
+    /* riquadro "Dal / Al" e riquadri secondari: stesso vetro dei campi */
+    body .fixed div[class*="bg-slate-50"][class*="rounded"][class*="border"], body .fixed div[class*="bg-slate-100"][class*="rounded"][class*="border"] { background: rgba(255,255,255,.28) !important; border: 1px solid rgba(255,255,255,.75) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
@@ -8514,7 +8530,7 @@
               </div>
             )}
             {/* TABELLA UNICA - Esportata intera in un singolo foglio PDF */}
-            <div id="griglia-piano-vasca" key={`${giornoSelezionato}-${vascaSelezionata}`} className="glass-swap bg-transparent relative w-full">
+            <div id="griglia-piano-vasca" className="bg-transparent relative w-full">
               {giornoSelezionato === 7 ? (
                 <div className="flex flex-col gap-8">
                   {GIORNI.map((gNome, gIdx) => {
