@@ -201,7 +201,7 @@
     body .shrink-0.z-30.shadow-sm.flex.flex-col th { background-color: rgba(255,255,255,.45) !important; }
     body .shrink-0.z-30.shadow-sm.flex.flex-col button.bg-white, body .shrink-0.z-30.shadow-sm.flex.flex-col button[class*="bg-white"] { background-color: rgba(255,255,255,.85) !important; border-color: rgba(30,58,95,.14) !important; box-shadow: inset 0 1px 0 #fff, 0 3px 10px -4px rgba(30,58,95,.3) !important; }
     /* intestazione corsie: staccata dalla fascia alta, con angoli arrotondati in alto */
-    .corsie-bar { margin-top: 12px; background: transparent !important; border: 0 !important; }
+    .corsie-bar { margin-top: 12px; background: transparent !important; border: 0 !important; padding-right: var(--sbw, 0px); }
     .corsie-bar th { background-color: rgba(255,255,255,.70) !important; border-color: rgba(30,58,95,.10) !important; -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); }
     .corsie-bar th:first-child { border-top-left-radius: 22px; }
     .corsie-bar th:last-child { border-top-right-radius: 22px; }
@@ -412,6 +412,8 @@
     @keyframes glass-out-ov { to { opacity: 0; } }
     body .glass-out { pointer-events: none !important; animation: glass-out-ov .2s ease-in forwards !important; }
     body .glass-out > * { animation: glass-out-box .2s cubic-bezier(.5,0,.75,.4) forwards !important; }
+    /* barra di scorrimento: sottile e tenue (la sua larghezza viene misurata e tolta all'intestazione delle corsie) */
+    body main { scrollbar-width: thin; scrollbar-color: rgba(90,110,150,.45) transparent; }
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
@@ -2689,6 +2691,19 @@
       // scorrimento orizzontale viene sincronizzato via JS tra l'intestazione e l'area scorrevole.
       const corsieHeaderRef = useRef(null);
       const mainScrollRef = useRef(null);
+      // Barra di scorrimento classica (Windows, Mac con mouse): occupa spazio nell'area che scorre.
+      // Misuriamo quanto e lo togliamo anche all'intestazione delle corsie, così le colonne restano allineate.
+      useEffect(() => {
+        const misura = () => {
+          const m = mainScrollRef.current; if (!m) return;
+          const w = Math.max(0, m.offsetWidth - m.clientWidth);
+          if (document.documentElement.style.getPropertyValue('--sbw') !== w + 'px') document.documentElement.style.setProperty('--sbw', w + 'px');
+        };
+        misura();
+        const iv = setInterval(misura, 300);
+        window.addEventListener('resize', misura);
+        return () => { clearInterval(iv); window.removeEventListener('resize', misura); };
+      }, []);
       const sincronizzaScrollOrizzontale = useCallback((e) => {
         if (corsieHeaderRef.current) corsieHeaderRef.current.scrollLeft = e.target.scrollLeft;
       }, []);
