@@ -146,7 +146,6 @@
     /* --- controllo segmentato: capsula di vetro con "lente" scorrevole (stile iOS 26) --- */
     .seg-glass { display: flex; align-items: center; gap: 0; padding: 4px; border-radius: 9999px; position: relative;
       background: linear-gradient(180deg, rgba(255,255,255,.30), rgba(255,255,255,.14));
-      -webkit-backdrop-filter: blur(22px) saturate(190%); backdrop-filter: blur(22px) saturate(190%);
       box-shadow: inset 0 1.5px 1px rgba(255,255,255,.95), inset 0 -1px 1px rgba(255,255,255,.45), inset 0 0 0 .5px rgba(255,255,255,.75), inset 0 8px 14px -10px rgba(30,58,95,.20), 0 10px 28px -10px rgba(30,58,95,.35); }
     .seg-glass .seg-btn { padding: 8px 17px; border-radius: 9999px; font-size: .875rem; font-weight: 600; color: #3b4a63; background: transparent !important; box-shadow: none !important; background-image: none !important; filter: none !important; display: inline-flex; align-items: center; gap: 8px; transition: color .25s; -webkit-tap-highlight-color: transparent; }
     .seg-glass .seg-btn:hover:not(.seg-on) { color: #0f2a4d; }
@@ -157,13 +156,14 @@
       background:
         radial-gradient(120% 90% at 20% 0%, rgba(255,255,255,.95), rgba(255,255,255,0) 55%),
         linear-gradient(160deg, rgba(255,255,255,.62), rgba(255,255,255,.18) 55%, rgba(255,255,255,.45));
-      -webkit-backdrop-filter: blur(6px) saturate(230%) brightness(1.1); backdrop-filter: blur(6px) saturate(230%) brightness(1.1);
       box-shadow: inset 1.5px 1.5px 1px rgba(255,255,255,1), inset -1px -1px 1px rgba(255,255,255,.55), inset 0 0 16px rgba(255,255,255,.45), 0 0 0 .5px rgba(30,58,95,.14), 0 8px 20px -4px rgba(30,58,95,.34);
       transition: left .45s cubic-bezier(.3,1.4,.4,1), width .45s cubic-bezier(.3,1.4,.4,1), top .45s cubic-bezier(.3,1.4,.4,1), height .3s, transform .25s cubic-bezier(.3,1.4,.4,1); }
     .seg-blu .seg-pill { background:
         radial-gradient(120% 90% at 20% 0%, rgba(255,255,255,.95), rgba(255,255,255,0) 55%),
         linear-gradient(160deg, rgba(120,170,255,.50), rgba(255,255,255,.18) 55%, rgba(120,170,255,.38)); }
     .seg-glass:active .seg-pill { transform: scale(1.08); }
+    /* il contenitore tagliava l'ombra delle capsule: crea la riga netta sotto le pillole */
+    div:has(> .seg-glass) { overflow: visible !important; }
     .seg-dot { width: 6px; height: 6px; border-radius: 9999px; background: #1e3a5f; display: inline-block; }
 
     /* --- blocchi dei corsi: colori pieni e leggibili, con finitura "vetro" (riflesso, bordo, profondità) --- */
@@ -192,6 +192,12 @@
     body .shrink-0.z-30.shadow-sm.flex.flex-col .border-slate-200 { border-color: rgba(30,58,95,.12) !important; }
     body .shrink-0.z-30.shadow-sm.flex.flex-col th { background-color: rgba(255,255,255,.45) !important; }
     body .shrink-0.z-30.shadow-sm.flex.flex-col button.bg-white, body .shrink-0.z-30.shadow-sm.flex.flex-col button[class*="bg-white"] { background-color: rgba(255,255,255,.85) !important; border-color: rgba(30,58,95,.14) !important; box-shadow: inset 0 1px 0 #fff, 0 3px 10px -4px rgba(30,58,95,.3) !important; }
+    /* intestazione corsie: staccata dalla fascia alta, con angoli arrotondati in alto */
+    .corsie-bar { margin-top: 12px; background: transparent !important; border: 0 !important; }
+    .corsie-bar th { background-color: rgba(255,255,255,.70) !important; border-color: rgba(30,58,95,.10) !important; -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); }
+    .corsie-bar th:first-child { border-top-left-radius: 22px; }
+    .corsie-bar th:last-child { border-top-right-radius: 22px; }
+    .corsie-bar thead { box-shadow: 0 -1px 0 rgba(255,255,255,.9) inset; }
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
@@ -8414,7 +8420,10 @@
             {/* INTESTAZIONE FISSA DELLE CORSIE — separata dalla tabella che scorre, niente più
                 sovrapposizioni con i riquadri dei corsi. Lo scorrimento orizzontale è nascosto qui
                 e sincronizzato via JS con l'area sottostante (vedi sincronizzaScrollOrizzontale). */}
-            <div ref={corsieHeaderRef} className="bg-white border-t border-slate-200 overflow-hidden">
+          </div>
+          {/* FINE WRAPPER STICKY */}
+          {/* INTESTAZIONE DELLE CORSIE: lastra separata, con un piccolo stacco dalla fascia sopra */}
+            <div ref={corsieHeaderRef} className="corsie-bar shrink-0 z-20 overflow-hidden">
               <div className="px-4 md:px-6 w-full mx-auto">
                 <table className="w-full table-fixed border-separate border-spacing-0 select-none">
                   <thead>
@@ -8428,9 +8437,6 @@
                 </table>
               </div>
             </div>
-
-          </div>
-          {/* FINE WRAPPER STICKY */}
 
           <main ref={mainScrollRef} onScroll={sincronizzaScrollOrizzontale} className="flex-1 w-full mx-auto p-4 md:p-6 pt-4 md:pt-6 flex flex-col gap-6 overflow-auto">
             {chiusureSettimana.length > 0 && (
