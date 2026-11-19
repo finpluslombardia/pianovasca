@@ -407,6 +407,11 @@
     /* pulsante X di chiusura nelle intestazioni: senza anello bianco */
     body .rounded-2xl.shadow-xl > div:first-child button.rounded-full.rounded-full.rounded-full.rounded-full, body .fixed [class~="bg-[#1e3a5f]"] button.rounded-full.rounded-full.rounded-full.rounded-full.rounded-full { border: 1px solid transparent !important; background-color: rgba(255,255,255,.16) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.30) !important; }
     body .rounded-2xl.shadow-xl > div:first-child button.rounded-full.rounded-full.rounded-full.rounded-full:hover { background-color: rgba(255,255,255,.28) !important; }
+    /* chiusura finestre: copia che rimpicciolisce e sfuma verso il punto di apertura */
+    @keyframes glass-out-box { to { opacity: 0; transform: scale(.9); } }
+    @keyframes glass-out-ov { to { opacity: 0; } }
+    body .glass-out { pointer-events: none !important; animation: glass-out-ov .2s ease-in forwards !important; }
+    body .glass-out > * { animation: glass-out-box .2s cubic-bezier(.5,0,.75,.4) forwards !important; }
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
@@ -438,15 +443,29 @@
 
     // Le finestre si aprono dal punto in cui è stato cliccato (effetto "liquid glass")
     (function () {
-      let ult = null;
+      let ult = null, apertura = null, tasto = 0;
       document.addEventListener('pointerdown', e => { ult = { x: e.clientX, y: e.clientY, t: Date.now() }; }, true);
+      document.addEventListener('keydown', () => { tasto = Date.now(); }, true);
       new MutationObserver(muts => {
+        // chiusura: la finestra rimossa viene ricreata un attimo come copia che rimpicciolisce e sfuma verso il punto di apertura
+        if ((ult && Date.now() - ult.t < 1500) || Date.now() - tasto < 1500) muts.forEach(m => m.removedNodes.forEach(n => {
+          if (!(n instanceof HTMLElement) || !n.classList) return;
+          const ovr = n.matches('.fixed.inset-0') ? n : null;
+          if (!ovr || !ovr.firstElementChild || !ovr.firstElementChild.matches('.rounded-2xl, .rounded-xl')) return;
+          const c = ovr.cloneNode(true);
+          c.classList.add('glass-out'); c.setAttribute('aria-hidden', 'true');
+          document.body.appendChild(c);
+          const bx = c.firstElementChild;
+          if (apertura) bx.style.transformOrigin = Math.round(apertura.x - bx.offsetLeft) + 'px ' + Math.round(apertura.y - bx.offsetTop) + 'px';
+          setTimeout(() => c.remove(), 260);
+        }));
         if (!ult || Date.now() - ult.t > 1500) return;
         muts.forEach(m => m.addedNodes.forEach(n => {
           if (!(n instanceof HTMLElement)) return;
           const ov = n.matches && n.matches('.fixed.inset-0') ? n : (n.querySelector && n.querySelector('.fixed.inset-0'));
           if (!ov) return;
           const box = ov.firstElementChild; if (!box) return;
+          apertura = { x: ult.x - ov.getBoundingClientRect().left, y: ult.y - ov.getBoundingClientRect().top };
           box.style.transformOrigin = Math.round(ult.x - ov.getBoundingClientRect().left - box.offsetLeft) + 'px ' + Math.round(ult.y - ov.getBoundingClientRect().top - box.offsetTop) + 'px';
         }));
       }).observe(document.getElementById('root'), { childList: true, subtree: true });
