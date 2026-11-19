@@ -268,10 +268,10 @@
       box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 0 0 1px rgba(255,255,255,.25), 0 10px 26px -14px rgba(30,58,95,.35) !important;
     }
     body input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), body select, body textarea, body button.campo-glass {
-      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.16)) !important;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0)) !important;
       border: 1px solid rgba(255,255,255,.85) !important;
       box-shadow: inset 0 1.5px 1px rgba(255,255,255,.95), inset 0 -1px 2px rgba(30,58,95,.10), 0 0 0 .5px rgba(30,58,95,.14), 0 4px 12px -6px rgba(30,58,95,.28) !important;
-      -webkit-backdrop-filter: blur(3px) saturate(180%); backdrop-filter: blur(3px) saturate(180%);
+      -webkit-backdrop-filter: none; backdrop-filter: none;
     }
     body input:disabled, body select:disabled, body textarea:disabled { opacity: .55; }
     body input:focus, body select:focus, body textarea:focus, body button.campo-glass:focus-visible { box-shadow: inset 0 1.5px 1px rgba(255,255,255,.95), 0 0 0 3px rgba(59,130,246,.38), 0 4px 12px -6px rgba(30,58,95,.28) !important; border-color: rgba(59,130,246,.55) !important; }
@@ -389,7 +389,7 @@
     body .fixed .rounded-xl.shadow-sm, body .fixed .rounded-xl.border.bg-white { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
     /* menu a tendina chiusi e "Livello attuale": stesso vetro del campo Cognome e nome.
        In Chrome il menu a tendina nuovo non applica la sfocatura dietro di sé, quindi il fondo è più trasparente per compensare */
-    body button.campo-glass.campo-glass.campo-glass.campo-glass.campo-glass { background-color: transparent !important; background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.16)) !important; }
+    body button.campo-glass.campo-glass.campo-glass.campo-glass.campo-glass { background-color: transparent !important; background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0)) !important; }
     @supports (appearance: base-select) {
       body select:not([multiple]):not([class*="bg-white/"]) { background: linear-gradient(180deg, rgba(255,255,255,.26), rgba(255,255,255,.52)) !important; background-color: transparent !important; }
       body select selectedcontent, body select > button { background: transparent !important; }
@@ -548,10 +548,10 @@
 
     /* BASE UNICA DEI CAMPI: menu a tendina chiusi, "Livello", date e orari identici al campo "Cognome e nome" */
     body :is(select:not([multiple]):not(.sel-nuda):not([class*="bg-white/"]), button.campo-glass, input[type="date"], input[type="time"]):not(.rounded-2xl.shadow-xl > div:first-child *):not([class~="bg-[#1e3a5f]"] *) {
-      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.16)) !important; background-color: transparent !important;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0)) !important; background-color: transparent !important;
       border: 1px solid rgba(255,255,255,.85) !important;
       box-shadow: inset 0 1.5px 1px rgba(255,255,255,.95), inset 0 -1px 2px rgba(30,58,95,.10), 0 0 0 .5px rgba(30,58,95,.14), 0 4px 12px -6px rgba(30,58,95,.28) !important;
-      -webkit-backdrop-filter: blur(3px) saturate(180%) !important; backdrop-filter: blur(3px) saturate(180%) !important;
+      -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
     }
 
     /* riquadro "Dal / Al" dei periodi di iscrizione: vetro trasparente, così le date sono come gli altri campi */
@@ -559,10 +559,10 @@
 
     /* tasto "Vista": stesso vetro dei campi (come "Cognome e nome") */
     body .campo-vista.campo-vista.campo-vista {
-      background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.16)) !important; background-color: transparent !important;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,0)) !important; background-color: transparent !important;
       border: 1px solid rgba(255,255,255,.85) !important;
       box-shadow: inset 0 1.5px 1px rgba(255,255,255,.95), inset 0 -1px 2px rgba(30,58,95,.10), 0 0 0 .5px rgba(30,58,95,.14), 0 4px 12px -6px rgba(30,58,95,.28) !important;
-      -webkit-backdrop-filter: blur(3px) saturate(180%) !important; backdrop-filter: blur(3px) saturate(180%) !important;
+      -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
     }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
