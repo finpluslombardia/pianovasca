@@ -522,15 +522,15 @@
     @supports (appearance: base-select) {
       body select::picker(select) {
         background:
-          radial-gradient(120% 60% at 20% -10%, rgba(255,255,255,.55), rgba(255,255,255,0) 60%),
-          linear-gradient(180deg, rgba(255,255,255,.46), rgba(255,255,255,.28));
+          radial-gradient(120% 60% at 20% -10%, rgba(255,255,255,.30), rgba(255,255,255,0) 60%),
+          linear-gradient(180deg, rgba(255,255,255,.20), rgba(255,255,255,.10));
         -webkit-backdrop-filter: blur(30px) saturate(210%); backdrop-filter: blur(30px) saturate(210%);
         border: 1px solid rgba(255,255,255,.75);
       }
     }
     body .fixed.z-\[91\], body .absolute.bg-white, body .absolute.shadow-lg, body .absolute.shadow-xl, body .absolute.shadow-2xl {
-      background-image: radial-gradient(120% 50% at 20% -10%, rgba(255,255,255,.55), rgba(255,255,255,0) 60%) !important;
-      background-color: rgba(255,255,255,.50) !important;
+      background-image: radial-gradient(120% 50% at 20% -10%, rgba(255,255,255,.30), rgba(255,255,255,0) 60%) !important;
+      background-color: rgba(255,255,255,.22) !important;
       -webkit-backdrop-filter: blur(30px) saturate(210%) !important; backdrop-filter: blur(30px) saturate(210%) !important;
     }
 
@@ -540,7 +540,7 @@
       body select.sel-nuda::picker(select) {
         background:
           radial-gradient(120% 50% at 20% -10%, rgba(255,255,255,.6), rgba(255,255,255,0) 60%),
-          linear-gradient(180deg, rgba(212,246,255,.60), rgba(200,240,255,.64));
+          linear-gradient(180deg, rgba(212,246,255,.30), rgba(200,240,255,.32));
         -webkit-backdrop-filter: blur(30px) saturate(130%); backdrop-filter: blur(30px) saturate(130%);
       }
     }
@@ -7922,15 +7922,15 @@
                 </div>
                 <div className="overflow-y-auto p-6">
                   <form id="addCourseForm" onSubmit={salvaNuovoCorso}>
-                    <div className="mb-5">
+                    <div className={`grid gap-4 mb-5 ${(attivita.find(a => a.id === nuovoCorso.attivitaId)?.hasLevels || attivita.find(a => a.id === nuovoCorso.attivitaId)?.isFreeTextLevel) ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                      <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-1.5">Attività</label>
                       <select value={nuovoCorso.attivitaId} onChange={e => setNuovoCorso({...nuovoCorso, attivitaId: e.target.value, livello: ''})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none">
                         {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                       </select>
-                    </div>
-
+                      </div>
                     {attivita.find(a => a.id === nuovoCorso.attivitaId)?.hasLevels && (
-                      <div className="mb-5">
+                      <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                           {['acquagym', 'propaganda'].includes(nuovoCorso.attivitaId) ? 'Sottocategoria' : 'Livello'}
                         </label>
@@ -7940,22 +7940,14 @@
                         </select>
                       </div>
                     )}
-                    
                     {attivita.find(a => a.id === nuovoCorso.attivitaId)?.isFreeTextLevel && (
-                      <div className="mb-5">
+                      <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                           Nome Società
                         </label>
                         <input type="text" value={nuovoCorso.livello} onChange={e => setNuovoCorso({...nuovoCorso, livello: e.target.value})} placeholder="Es. Nuoto Club" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 outline-none" />
                       </div>
                     )}
-
-                    <div className="mb-5">
-                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
-                      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200">
-                        <button type="button" onClick={() => setNuovoCorso({...nuovoCorso, vasca: 'interna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${nuovoCorso.vasca === 'interna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Interna</button>
-                        <button type="button" onClick={() => setNuovoCorso({...nuovoCorso, vasca: 'esterna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${nuovoCorso.vasca === 'esterna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Esterna</button>
-                      </div>
                     </div>
 
                     <div className="mb-5">
@@ -8026,8 +8018,16 @@
                       </div>
                     </div>
 
-                    <div className="mb-5">
-                      <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Corsie</label>
+                    <div className="mb-5" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,2fr)', gap: 16, alignItems: 'start' }}>
+                      <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
+                      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg border border-slate-200">
+                        <button type="button" onClick={() => setNuovoCorso({...nuovoCorso, vasca: 'interna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${nuovoCorso.vasca === 'interna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Interna</button>
+                        <button type="button" onClick={() => setNuovoCorso({...nuovoCorso, vasca: 'esterna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${nuovoCorso.vasca === 'esterna' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}>Vasca Esterna</button>
+                      </div>
+                      </div>
+                      <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Seleziona Corsie</label>
                       <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
                         {(nuovoCorso.vasca === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA).map(c => (
                            <label key={c} className={`flex items-center justify-center border-2 rounded-lg py-2 cursor-pointer transition-all text-xs font-semibold ${nuovoCorso.corsie.includes(c) ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
@@ -8035,6 +8035,7 @@
                               {c}
                            </label>
                         ))}
+                      </div>
                       </div>
                     </div>
 
@@ -8085,15 +8086,15 @@
                   {/* TAB 1: IMPOSTAZIONI DEL CORSO */}
                   {editModal.tab === 'dettagli' && (
                     <form id="editCourseForm" onSubmit={salvaModificheModal}>
-                      <div className="mb-5">
+                      <div className={`grid gap-4 mb-5 ${(attivita.find(a => a.id === editModal.attivitaId)?.hasLevels || attivita.find(a => a.id === editModal.attivitaId)?.isFreeTextLevel) ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                        <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1.5">Attività</label>
                         <select value={editModal.attivitaId} onChange={e => setEditModal({...editModal, attivitaId: e.target.value, livello: ''})} className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm">
                           {attivita.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </select>
-                      </div>
-
+                        </div>
                       {attivita.find(a => a.id === editModal.attivitaId)?.hasLevels && (
-                        <div className="mb-5">
+                        <div >
                           <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                             {['acquagym', 'propaganda'].includes(editModal.attivitaId) ? 'Sottocategoria' : 'Livello'}
                           </label>
@@ -8103,22 +8104,14 @@
                           </select>
                         </div>
                       )}
-                      
                       {attivita.find(a => a.id === editModal.attivitaId)?.isFreeTextLevel && (
-                        <div className="mb-5">
+                        <div >
                           <label className="block text-sm font-semibold text-slate-700 mb-1.5">
                             Nome Società
                           </label>
                           <input type="text" value={editModal.livello} onChange={e => setEditModal({...editModal, livello: e.target.value})} placeholder="Es. Nuoto Club" className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white outline-none shadow-sm" />
                         </div>
                       )}
-
-                      <div className="mb-5">
-                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
-                        <div className="flex gap-2 p-1 bg-slate-200 rounded-lg border border-slate-300 shadow-inner">
-                          <button type="button" onClick={() => setEditModal({...editModal, vasca: 'interna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'interna' ? 'bg-white shadow text-blue-600' : 'text-slate-600 hover:text-slate-800'}`}>Vasca Interna</button>
-                          <button type="button" onClick={() => setEditModal({...editModal, vasca: 'esterna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'esterna' ? 'bg-white shadow text-blue-600' : 'text-slate-600 hover:text-slate-800'}`}>Vasca Esterna</button>
-                        </div>
                       </div>
 
                       <div className="mb-5">
@@ -8197,8 +8190,16 @@
                         </div>
                       )}
 
-                      <div className="mb-5">
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Seleziona Corsie</label>
+                      <div className="mb-5" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,2fr)', gap: 16, alignItems: 'start' }}>
+                        <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Vasca</label>
+                        <div className="flex gap-2 p-1 bg-slate-200 rounded-lg border border-slate-300 shadow-inner">
+                          <button type="button" onClick={() => setEditModal({...editModal, vasca: 'interna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'interna' ? 'bg-white shadow text-blue-600' : 'text-slate-600 hover:text-slate-800'}`}>Vasca Interna</button>
+                          <button type="button" onClick={() => setEditModal({...editModal, vasca: 'esterna', corsie: []})} className={`flex-1 py-2 rounded-md text-sm font-bold transition-all ${editModal.vasca === 'esterna' ? 'bg-white shadow text-blue-600' : 'text-slate-600 hover:text-slate-800'}`}>Vasca Esterna</button>
+                        </div>
+                        </div>
+                        <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Seleziona Corsie</label>
                         <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
                           {(editModal.vasca === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA).map(c => (
                              <label key={c} className={`flex items-center justify-center border-2 rounded-lg py-2 cursor-pointer transition-all text-xs font-semibold ${editModal.corsie.includes(c) ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
@@ -8206,6 +8207,7 @@
                                 {c}
                              </label>
                           ))}
+                        </div>
                         </div>
                       </div>
 
@@ -8679,7 +8681,7 @@
                   <div className="relative">
                     <button 
                       onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setFiltroPos({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) }); setIsFilterMenuOpen(!isFilterMenuOpen); }}
-                      className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm text-sm font-medium text-slate-600 outline-none hover:bg-slate-50 transition-colors"
+                      className="campo-vista flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 outline-none transition-colors"
                     >
                       <FilterIcon size={16} className={(corsiEsclusiFiltro.length > 0 || istruttoriFiltro.length > 0) ? "text-blue-500 fill-blue-100" : "text-slate-500"} />
                       <span className="hidden sm:inline">Filtri:</span>
@@ -8692,7 +8694,7 @@
                     </button>
                     
                     {isFilterMenuOpen && ReactDOM.createPortal(
-                      <div className="fixed z-[91] bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 min-w-[300px] flex flex-col gap-2" style={{ top: filtroPos.top, right: filtroPos.right, maxHeight: `calc(100vh - ${filtroPos.top + 12}px)`, overflowY: 'auto' }}>
+                      <div className="fixed z-[91] bg-white border border-slate-200 shadow-xl rounded-lg py-3 px-4 min-w-[300px] flex flex-col gap-2" style={{ top: filtroPos.top, right: filtroPos.right, left: 'auto', width: 'min(400px, calc(100vw - 16px))', maxHeight: `calc(100vh - ${filtroPos.top + 12}px)`, overflowY: 'auto' }}>
                         {(() => {
                           const tutteChiavi = corsiRaggruppatiPerFiltro.flatMap(g => g.corsi.map(c => c.key));
                           const q = ricercaFiltro.trim().toLowerCase();
