@@ -8729,14 +8729,6 @@
                                 </div>
                               </div>
                               <input type="text" value={ricercaFiltro} onChange={e => setRicercaFiltro(e.target.value)} placeholder="Cerca un corso..." className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
-                              <select value={macroFiltro} onChange={e => { const v = e.target.value; setMacroFiltro(v); if (v === '') setCorsiEsclusiFiltro([]); else { const g = corsiRaggruppatiPerFiltro.find(x => x.attivitaNome === v); if (g) soloQuesti(g.corsi.map(c => c.key)); } }} className="w-full px-3 py-1.5 text-sm rounded-lg outline-none" title="Scegli la macro-attività, poi spunta le sottocategorie">
-                                <option value="">Qualsiasi attività</option>
-                                {corsiRaggruppatiPerFiltro.map(g => <option key={g.attivitaNome} value={g.attivitaNome}>{g.attivitaNome}</option>)}
-                              </select>
-                              <div className="flex bg-slate-100 rounded-lg p-1 mb-1">
-                                <button type="button" onClick={() => setModalitaFiltro('nascondi')} className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${modalitaFiltro === 'nascondi' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Nascondi</button>
-                                <button type="button" onClick={() => setModalitaFiltro('evidenzia')} className={`flex-1 text-xs font-bold py-1.5 rounded-md transition-colors ${modalitaFiltro === 'evidenzia' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Evidenzia</button>
-                              </div>
                               <div className="h-px bg-slate-200 mb-1"></div>
                               {elencoIstruttori.length > 0 && (
                                 <div className="mb-1">
@@ -8753,6 +8745,11 @@
                                   <div className="h-px bg-slate-200 mt-2"></div>
                                 </div>
                               )}
+                              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Attività</div>
+                              <select value={macroFiltro} onChange={e => { const v = e.target.value; setMacroFiltro(v); if (v === '') setCorsiEsclusiFiltro([]); else { const g = corsiRaggruppatiPerFiltro.find(x => x.attivitaNome === v); if (g) soloQuesti(g.corsi.map(c => c.key)); } }} className="w-full px-3 py-1.5 text-sm rounded-lg outline-none" title="Scegli la macro-attività, poi spunta le sottocategorie">
+                                <option value="">Qualsiasi attività</option>
+                                {corsiRaggruppatiPerFiltro.map(g => <option key={g.attivitaNome} value={g.attivitaNome}>{g.attivitaNome}</option>)}
+                              </select>
                               <div className="max-h-[55vh] overflow-y-auto flex flex-col gap-3 pr-1">
                                 {gruppiVisibili.map(gruppo => {
                                   const chiaviG = gruppo.corsi.map(c => c.key);
