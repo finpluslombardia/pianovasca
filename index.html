@@ -90,7 +90,7 @@
       -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
       box-shadow: var(--glass-edge), 0 30px 80px -18px rgba(15,35,70,.55) !important;
       border: 1px solid rgba(255,255,255,.55);
-      animation: glass-pop .28s cubic-bezier(.2,.9,.3,1.15);
+      animation: glass-pop .34s cubic-bezier(.2,.9,.3,1.12);
     }
     body .rounded-2xl { border-radius: 30px !important; }
     body .rounded-xl { border-radius: 22px !important; }
@@ -142,9 +142,46 @@
     ::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 10px; border: 2px solid transparent; background-clip: content-box; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,.55); background-clip: content-box; border: 2px solid transparent; }
 
-    @keyframes glass-pop { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+    @keyframes glass-pop { from { opacity: 0; transform: scale(.82); filter: blur(6px); } to { opacity: 1; transform: none; } }
     @keyframes glass-fade { from { opacity: 0; } to { opacity: 1; } }
 
+
+    /* --- controllo segmentato a pillola scorrevole --- */
+    .seg-glass { display: flex; align-items: center; gap: 2px; padding: 5px; border-radius: 9999px;
+      background: rgba(255,255,255,.34); box-shadow: inset 0 1px 3px rgba(30,58,95,.14), inset 0 0 0 1px rgba(255,255,255,.55), 0 1px 0 rgba(255,255,255,.6);
+      -webkit-backdrop-filter: blur(14px) saturate(170%); backdrop-filter: blur(14px) saturate(170%); }
+    .seg-glass .seg-btn { padding: 8px 18px; border-radius: 9999px; font-size: .875rem; font-weight: 600; color: #475569; background: transparent; display: inline-flex; align-items: center; gap: 8px; transition: color .25s; }
+    .seg-glass .seg-btn:hover:not(.seg-on) { color: #1e3a5f; }
+    .seg-glass .seg-oggi:not(.seg-on) { color: #1e3a5f; font-weight: 800; }
+    .seg-glass .seg-pill { position: absolute; z-index: 5; border-radius: 9999px; pointer-events: none;
+      transition: left .42s cubic-bezier(.3,1.35,.45,1), width .42s cubic-bezier(.3,1.35,.45,1), top .42s cubic-bezier(.3,1.35,.45,1), height .3s; }
+    .seg-blu .seg-pill { background: linear-gradient(180deg, rgba(255,255,255,.28), rgba(255,255,255,0) 55%), rgba(30,58,95,.88);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 0 0 1px rgba(255,255,255,.18), 0 8px 18px -6px rgba(30,58,95,.55); }
+    .seg-blu .seg-on { color: #fff; }
+    .seg-chiaro .seg-pill { background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.7));
+      box-shadow: inset 0 1px 0 #fff, inset 0 0 0 1px rgba(255,255,255,.8), 0 6px 16px -6px rgba(30,58,95,.35); }
+    .seg-chiaro .seg-on { color: #2563eb; font-weight: 700; }
+    .seg-dot { width: 6px; height: 6px; border-radius: 9999px; background: #1e3a5f; display: inline-block; }
+    .seg-on .seg-dot { background: #fff; }
+    body .seg-glass button { box-shadow: none !important; background-image: none !important; filter: none !important; }
+
+    /* --- blocchi dei corsi: vetro colorato --- */
+    body .absolute.z-10.left-0.rounded-lg.flex.flex-col.shadow-md.cursor-pointer {
+      background-image: linear-gradient(180deg, rgba(255,255,255,.38) 0%, rgba(255,255,255,.08) 42%, rgba(255,255,255,0) 60%, rgba(0,0,0,.10) 100%);
+      border: 1px solid rgba(255,255,255,.55) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.7), inset 0 -1px 0 rgba(0,0,0,.12), 0 10px 20px -10px rgba(15,35,70,.6) !important;
+      border-radius: 14px !important;
+      transition: transform .2s cubic-bezier(.2,.9,.3,1.2), box-shadow .2s, filter .2s;
+    }
+    body .absolute.z-10.left-0.rounded-lg.flex.flex-col.shadow-md.cursor-pointer:hover { transform: translateY(-1px) scale(1.012); filter: saturate(1.12) brightness(1.04) !important; z-index: 15; }
+
+    /* --- pillole di stato in rilievo --- */
+    body span[class*="bg-"][class*="rounded"][class*="border"][class*="font-bold"] { box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 1px 3px rgba(30,58,95,.12); }
+
+    /* --- animazioni --- */
+    .glass-swap { animation: glass-swap .32s cubic-bezier(.2,.8,.3,1); }
+    @keyframes glass-swap { from { opacity: 0; transform: translateY(8px) scale(.995); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+    @media (prefers-reduced-motion: reduce) { .glass-swap, body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl { animation: none !important; } .seg-glass .seg-pill { transition: none; } }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
@@ -161,6 +198,22 @@
 
   <script type="text/babel">
     const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+    // Le finestre si aprono dal punto in cui è stato cliccato (effetto "liquid glass")
+    (function () {
+      let ult = null;
+      document.addEventListener('pointerdown', e => { ult = { x: e.clientX, y: e.clientY, t: Date.now() }; }, true);
+      new MutationObserver(muts => {
+        if (!ult || Date.now() - ult.t > 1500) return;
+        muts.forEach(m => m.addedNodes.forEach(n => {
+          if (!(n instanceof HTMLElement)) return;
+          const ov = n.matches && n.matches('.fixed.inset-0') ? n : (n.querySelector && n.querySelector('.fixed.inset-0'));
+          if (!ov) return;
+          const box = ov.firstElementChild; if (!box) return;
+          box.style.transformOrigin = Math.round(ult.x - ov.getBoundingClientRect().left - box.offsetLeft) + 'px ' + Math.round(ult.y - ov.getBoundingClientRect().top - box.offsetTop) + 'px';
+        }));
+      }).observe(document.getElementById('root'), { childList: true, subtree: true });
+    })();
 
     // --- COMPONENTI ICONE ---
     const Icon = ({ children, size = 24, className = "" }) => (
@@ -1004,6 +1057,38 @@
       return o.map(g => GIORNI[g].slice(0, 3)).join(', ');
     };
     const liberoTocca = (l, ymd, gIdx, vasca) => (l.vasca === 'tutte' || l.vasca === vasca) && l.dal <= ymd && l.al >= ymd && (l.giorni || []).includes(gIdx);
+    // Controllo segmentato "liquid glass": la pillola di vetro scivola sotto la voce selezionata
+    const SegGlass = ({ items, value, onChange, tema = 'blu', className = '' }) => {
+      const ref = useRef(null);
+      const [pos, setPos] = useState(null);
+      const misura = useCallback(() => {
+        const el = ref.current && ref.current.querySelector('[data-seg-on="1"]');
+        if (el) setPos({ left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight });
+      }, []);
+      React.useLayoutEffect(() => { misura(); }, [value, items.length, misura]);
+      useEffect(() => {
+        const el = ref.current; if (!el) return;
+        let ro = null;
+        if (window.ResizeObserver) { ro = new ResizeObserver(misura); ro.observe(el); }
+        window.addEventListener('resize', misura);
+        const t = setTimeout(misura, 300);
+        return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', misura); clearTimeout(t); };
+      }, [misura]);
+      return (
+        <div ref={ref} className={`seg-glass seg-${tema} relative ${className}`}>
+          {pos && <span aria-hidden="true" className="seg-pill" style={{ left: pos.left, top: pos.top, width: pos.width, height: pos.height }}></span>}
+          {items.map(it => {
+            const on = it.value === value;
+            return (
+              <button key={it.value} type="button" data-seg-on={on ? '1' : '0'} onClick={() => onChange(it.value)} title={it.title} className={`seg-btn relative z-10 whitespace-nowrap ${on ? 'seg-on' : ''} ${it.oggi ? 'seg-oggi' : ''}`}>
+                {it.label}
+              </button>
+            );
+          })}
+        </div>
+      );
+    };
+
     const NuotoLiberoModal = ({ periodi, setPeriodi, mostraToast, onClose, piano, chiusure, settimanaInizio }) => {
       const oggiYMD = toYMD(new Date());
       const [form, setForm] = useState(null);
@@ -8172,32 +8257,14 @@
             <div className="bg-slate-50/95 backdrop-blur-sm px-4 py-3 md:px-6 md:py-4 border-b border-slate-200 relative z-10 w-full mx-auto">
               <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
                 <div className="flex flex-col md:flex-row gap-4 items-start md:items-center w-full md:w-auto overflow-hidden">
-                    <div className="flex bg-slate-200/60 p-1.5 rounded-xl shrink-0">
-                      <button
-                        onClick={() => setVascaSelezionata('interna')}
-                        className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${vascaSelezionata === 'interna' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        Vasca Interna
-                      </button>
-                      <button
-                        onClick={() => setVascaSelezionata('esterna')}
-                        className={`px-5 py-2 rounded-lg font-bold text-sm transition-all ${vascaSelezionata === 'esterna' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                      >
-                        Vasca Esterna
-                      </button>
-                    </div>
-                    
-                    <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-hide w-full md:w-auto">
-                      {GIORNI.map((giorno, idx) => (
-                        <button key={giorno} onClick={() => setGiornoSelezionato(idx)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors flex items-center gap-2 ${giornoSelezionato === idx ? 'bg-[#1e3a5f] text-white shadow-md' : (idx === (new Date().getDay() + 6) % 7 ? 'bg-white text-[#1e3a5f] font-bold border border-[#1e3a5f]/50 hover:bg-slate-100' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100')}`}>
-                          {giorno}
-                          {idx === (new Date().getDay() + 6) % 7 && <span title="Oggi" className={`w-1.5 h-1.5 rounded-full ${giornoSelezionato === idx ? 'bg-white' : 'bg-[#1e3a5f]'}`}></span>}
-                        </button>
-                      ))}
-                      <button onClick={() => setGiornoSelezionato(7)} className={`px-4 py-2 rounded-full whitespace-nowrap font-medium text-sm transition-colors ${giornoSelezionato === 7 ? 'bg-[#1e3a5f] text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'}`}>
-                        Settimana
-                      </button>
-                    </div>
+                    <SegGlass tema="chiaro" className="shrink-0" value={vascaSelezionata} onChange={setVascaSelezionata}
+                      items={[{ value: 'interna', label: 'Vasca Interna' }, { value: 'esterna', label: 'Vasca Esterna' }]} />
+
+                    <SegGlass tema="blu" className="w-full md:w-auto overflow-x-auto scrollbar-hide" value={giornoSelezionato} onChange={setGiornoSelezionato}
+                      items={[
+                        ...GIORNI.map((giorno, idx) => { const oggi = idx === (new Date().getDay() + 6) % 7; return { value: idx, oggi, label: <>{giorno}{oggi && <span title="Oggi" className="seg-dot"></span>}</> }; }),
+                        { value: 7, label: 'Settimana' }
+                      ]} />
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
@@ -8356,7 +8423,7 @@
               </div>
             )}
             {/* TABELLA UNICA - Esportata intera in un singolo foglio PDF */}
-            <div id="griglia-piano-vasca" className="bg-transparent relative w-full">
+            <div id="griglia-piano-vasca" key={`${giornoSelezionato}-${vascaSelezionata}`} className="glass-swap bg-transparent relative w-full">
               {giornoSelezionato === 7 ? (
                 <div className="flex flex-col gap-8">
                   {GIORNI.map((gNome, gIdx) => {
