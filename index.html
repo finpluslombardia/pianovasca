@@ -295,7 +295,7 @@
       @starting-style { body select::picker(select):popover-open { opacity: 0; transform: translateY(-6px) scale(.98); } }
       body select option { padding: 9px 12px; border-radius: 13px; font-size: .9rem; color: #1e293b; background: transparent; transition: background-color .12s; }
       body select option:hover, body select option:focus-visible { background: rgba(59,130,246,.14); outline: none; }
-      body select option:checked { background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.6)); box-shadow: inset 0 1px 0 #fff, 0 0 0 .5px rgba(30,58,95,.14), 0 4px 10px -4px rgba(30,58,95,.25); font-weight: 700; color: #1d4ed8; }
+      body select option:checked { background: linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.6)); box-shadow: inset 0 1px 0 #fff, inset 0 0 0 .5px rgba(30,58,95,.12); font-weight: 700; color: #1d4ed8; }
       body select option::checkmark { color: #2563eb; }
       body select option:disabled { opacity: .45; }
     }
@@ -380,6 +380,10 @@
     body .absolute:is(.bg-white,.shadow-lg,.shadow-xl,.shadow-2xl):not(.z-10):not(.inset-0) { border-radius: 18px !important; border: 1px solid rgba(255,255,255,.8) !important; overflow: hidden; padding-block: 4px;
       background: linear-gradient(180deg, rgba(255,255,255,.80), rgba(238,244,255,.66)) !important; }
     body .absolute:is(.bg-white,.shadow-lg,.shadow-xl,.shadow-2xl) :is(button,li,[role="option"],label):hover:not(:disabled) { background: rgba(255,255,255,.75) !important; border-radius: 12px; box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(255,255,255,.8); }
+    /* campi: nessun fondo bianco pieno sotto il vetro (bg-white del markup lo copriva) */
+    body :is(input,select,textarea)[class]:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]) { background-color: transparent !important; }
+    /* moduli nuovo corso / impostazioni corso / nuovo utente: stessa misura dei campi di "Aggiungi partecipante" */
+    body :is(form#addUserForm, form#addCourseForm, form#editCourseForm) :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea, button.campo-glass) { padding: .5rem .75rem !important; font-size: .875rem !important; line-height: 1.35rem !important; }
     /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
     #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
     #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
