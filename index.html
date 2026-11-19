@@ -58,10 +58,10 @@
     html { background: #dbe7f6; }
     body {
       background:
-        radial-gradient(60vmax 50vmax at 8% 0%, rgba(125,170,255,.55), transparent 60%),
-        radial-gradient(55vmax 45vmax at 100% 10%, rgba(255,160,200,.42), transparent 60%),
-        radial-gradient(60vmax 50vmax at 85% 100%, rgba(120,225,205,.45), transparent 60%),
-        radial-gradient(50vmax 40vmax at 0% 100%, rgba(190,160,255,.40), transparent 60%),
+        radial-gradient(60vmax 50vmax at 8% 0%, rgba(90,150,255,.75), transparent 60%),
+        radial-gradient(55vmax 45vmax at 100% 10%, rgba(255,130,185,.60), transparent 60%),
+        radial-gradient(60vmax 50vmax at 85% 100%, rgba(70,210,190,.62), transparent 60%),
+        radial-gradient(50vmax 40vmax at 0% 100%, rgba(165,120,255,.58), transparent 60%),
         #e6eefa !important;
       background-attachment: fixed !important;
     }
@@ -138,9 +138,6 @@
 
     /* righe elenco e schede: vetro leggero */
     body .hover\:bg-slate-50:hover { background-color: rgba(255,255,255,.7) !important; }
-    ::-webkit-scrollbar { width: 10px; height: 10px; }
-    ::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 10px; border: 2px solid transparent; background-clip: content-box; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,.55); background-clip: content-box; border: 2px solid transparent; }
 
     @keyframes glass-pop { from { opacity: 0; transform: scale(.82); filter: blur(6px); } to { opacity: 1; transform: none; } }
     @keyframes glass-fade { from { opacity: 0; } to { opacity: 1; } }
@@ -165,15 +162,43 @@
     .seg-on .seg-dot { background: #fff; }
     body .seg-glass button { box-shadow: none !important; background-image: none !important; filter: none !important; }
 
-    /* --- blocchi dei corsi: vetro colorato --- */
+    /* --- blocchi dei corsi: vetro colorato trasparente --- */
     body .absolute.z-10.left-0.rounded-lg.flex.flex-col.shadow-md.cursor-pointer {
-      background-image: linear-gradient(180deg, rgba(255,255,255,.38) 0%, rgba(255,255,255,.08) 42%, rgba(255,255,255,0) 60%, rgba(0,0,0,.10) 100%);
-      border: 1px solid rgba(255,255,255,.55) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.7), inset 0 -1px 0 rgba(0,0,0,.12), 0 10px 20px -10px rgba(15,35,70,.6) !important;
-      border-radius: 14px !important;
+      --tw-bg-opacity: .62 !important;
+      -webkit-backdrop-filter: blur(14px) saturate(190%); backdrop-filter: blur(14px) saturate(190%);
+      background-image:
+        radial-gradient(120% 70% at 50% -10%, rgba(255,255,255,.55), rgba(255,255,255,0) 60%),
+        linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,0) 50%, rgba(255,255,255,.10));
+      border: 1px solid rgba(255,255,255,.75) !important;
+      box-shadow: inset 0 1.5px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(255,255,255,.35), inset 0 0 14px rgba(255,255,255,.28), 0 12px 24px -12px rgba(15,35,70,.55) !important;
+      border-radius: 16px !important;
+      text-shadow: 0 1px 2px rgba(0,0,0,.28);
       transition: transform .2s cubic-bezier(.2,.9,.3,1.2), box-shadow .2s, filter .2s;
     }
-    body .absolute.z-10.left-0.rounded-lg.flex.flex-col.shadow-md.cursor-pointer:hover { transform: translateY(-1px) scale(1.012); filter: saturate(1.12) brightness(1.04) !important; z-index: 15; }
+    body .absolute.z-10.left-0.rounded-lg.flex.flex-col.shadow-md.cursor-pointer:hover { transform: translateY(-1px) scale(1.012); filter: saturate(1.15) brightness(1.05) !important; z-index: 15; }
+    body .absolute.z-10.left-0.rounded-lg .bg-black\/10 { background: rgba(255,255,255,.18) !important; border-top-color: rgba(255,255,255,.55) !important; }
+
+    /* --- fascia alta (titolo, giorni, corsie): un'unica lastra di vetro ben distinta --- */
+    body .shrink-0.z-30.shadow-sm.flex.flex-col {
+      background: linear-gradient(180deg, rgba(255,255,255,.80), rgba(255,255,255,.58)) !important;
+      -webkit-backdrop-filter: blur(34px) saturate(200%); backdrop-filter: blur(34px) saturate(200%);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 14px 34px -14px rgba(30,58,95,.45) !important;
+      border-bottom: 1px solid rgba(255,255,255,.85);
+    }
+    body .shrink-0.z-30.shadow-sm.flex.flex-col > *, body .shrink-0.z-30.shadow-sm.flex.flex-col header { background: transparent !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+    body .shrink-0.z-30.shadow-sm.flex.flex-col header { border-color: rgba(30,58,95,.10) !important; }
+    body .shrink-0.z-30.shadow-sm.flex.flex-col .border-slate-200 { border-color: rgba(30,58,95,.12) !important; }
+    body .shrink-0.z-30.shadow-sm.flex.flex-col th { background-color: rgba(255,255,255,.45) !important; }
+    body .shrink-0.z-30.shadow-sm.flex.flex-col button.bg-white, body .shrink-0.z-30.shadow-sm.flex.flex-col button[class*="bg-white"] { background-color: rgba(255,255,255,.85) !important; border-color: rgba(30,58,95,.14) !important; box-shadow: inset 0 1px 0 #fff, 0 3px 10px -4px rgba(30,58,95,.3) !important; }
+    /* controlli segmentati ben visibili */
+    .seg-glass { background: rgba(255,255,255,.78) !important; box-shadow: inset 0 1px 3px rgba(30,58,95,.18), inset 0 0 0 1px rgba(30,58,95,.10), 0 6px 16px -8px rgba(30,58,95,.35) !important; }
+    .seg-glass .seg-btn:not(.seg-on) { color: #334155; }
+    .seg-glass.seg-blu .seg-btn.seg-on { color: #fff !important; }
+    .seg-chiaro .seg-pill { background: linear-gradient(180deg,#fff,rgba(255,255,255,.85)); box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(37,99,235,.18), 0 6px 14px -6px rgba(37,99,235,.45); }
+    /* griglia: stessa larghezza esatta dell'intestazione delle corsie (niente bordo che la restringe) */
+    #griglia-piano-vasca .rounded-xl.shadow-sm { border-width: 0 !important; }
+    #griglia-piano-vasca > .rounded-xl.shadow-sm { border-radius: 0 0 24px 24px !important; }
+    body main:has(> #griglia-piano-vasca:first-child) { padding-top: 0 !important; }
 
     /* --- pillole di stato in rilievo --- */
     body span[class*="bg-"][class*="rounded"][class*="border"][class*="font-bold"] { box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 1px 3px rgba(30,58,95,.12); }
