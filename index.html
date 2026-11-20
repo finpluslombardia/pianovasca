@@ -564,6 +564,14 @@
       box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 0 0 .5px rgba(30,58,95,.12), 0 4px 12px -6px rgba(30,58,95,.22) !important;
       -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
     }
+
+    /* capsule Vasca e Giorni: stesso vetro trasparente dei campi e del tasto "Vista" */
+    body .seg-glass.seg-glass.seg-glass {
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0)) !important; background-color: transparent !important;
+      border: 1px solid rgba(255,255,255,.6) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 0 0 .5px rgba(30,58,95,.12), 0 4px 12px -6px rgba(30,58,95,.22) !important;
+      -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+    }
     @media (prefers-reduced-transparency: reduce) {
       body .rounded-2xl.shadow-xl, body .rounded-xl.shadow-2xl, body .rounded-2xl.shadow-lg, body .rounded-xl.shadow-sm, body .absolute.bg-white { background-color: #fff !important; -webkit-backdrop-filter: none; backdrop-filter: none; }
     }
@@ -8820,6 +8828,19 @@
                 e sincronizzato via JS con l'area sottostante (vedi sincronizzaScrollOrizzontale). */}
           </div>
           {/* FINE WRAPPER STICKY */}
+            {chiusureSettimana.length > 0 && (
+              <div className="shrink-0 px-4 md:px-6 pt-3 w-full">
+              <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex flex-col gap-2">
+                {chiusureSettimana.map(c => (
+                  <div key={c.id} className="flex items-center gap-3 flex-wrap">
+                    <BanIcon size={18} className="text-amber-700 shrink-0"/>
+                    <div className="text-sm text-amber-900 flex-1 min-w-0"><b>{c.vasca === 'tutte' ? 'Chiusura della struttura' : `Vasca ${c.vasca} chiusa`}</b> {c.al === c.dal ? `il ${formatDate(c.dal)}` : `dal ${formatDate(c.dal)} al ${formatDate(c.al)}`}{c.motivo ? ` · ${c.motivo}` : ''}</div>
+                    <button onClick={() => { setChiusuraDaAprire(c.id); setIsChiusureOpen(true); }} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-bold">Avvisa iscritti</button>
+                  </div>
+                ))}
+              </div>
+              </div>
+            )}
           {/* INTESTAZIONE DELLE CORSIE: lastra separata, con un piccolo stacco dalla fascia sopra */}
             <div ref={corsieHeaderRef} className="corsie-bar shrink-0 z-20 overflow-hidden">
               <div className="px-4 md:px-6 w-full mx-auto">
@@ -8837,17 +8858,6 @@
             </div>
 
           <main ref={mainScrollRef} onScroll={sincronizzaScrollOrizzontale} className="flex-1 w-full mx-auto p-4 md:p-6 pt-4 md:pt-6 flex flex-col gap-6 overflow-auto">
-            {chiusureSettimana.length > 0 && (
-              <div className="bg-amber-50 border border-amber-300 rounded-xl px-4 py-3 flex flex-col gap-2">
-                {chiusureSettimana.map(c => (
-                  <div key={c.id} className="flex items-center gap-3 flex-wrap">
-                    <BanIcon size={18} className="text-amber-700 shrink-0"/>
-                    <div className="text-sm text-amber-900 flex-1 min-w-0"><b>{c.vasca === 'tutte' ? 'Chiusura della struttura' : `Vasca ${c.vasca} chiusa`}</b> {c.al === c.dal ? `il ${formatDate(c.dal)}` : `dal ${formatDate(c.dal)} al ${formatDate(c.al)}`}{c.motivo ? ` · ${c.motivo}` : ''}</div>
-                    <button onClick={() => { setChiusuraDaAprire(c.id); setIsChiusureOpen(true); }} className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-xs font-bold">Avvisa iscritti</button>
-                  </div>
-                ))}
-              </div>
-            )}
             {/* TABELLA UNICA - Esportata intera in un singolo foglio PDF */}
             <div id="griglia-piano-vasca" className="bg-transparent relative w-full">
               {giornoSelezionato === 7 ? (
