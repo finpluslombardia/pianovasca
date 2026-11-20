@@ -5611,11 +5611,11 @@
 
           // righe orarie: una linea per ogni ora, più sottile per le mezze ore
           let linee = '', etichette = '';
-          for (let m = da; m <= a; m += 30) {
+          for (let m = da; m <= a; m += 15) {
             const top = ((m - da) / tot) * 100;
             const ora = m % 60 === 0;
-            linee += `<div class="linea ${ora ? 'ora' : ''}" style="top:${top}%"></div>`;
-            if (ora && m < a) etichette += `<div class="et" style="top:${top}%">${hhmm(m)}</div>`;
+            linee += `<div class="linea ${ora ? 'ora' : m % 30 === 0 ? 'mezza' : ''}" style="top:${top}%"></div>`;
+            if (m < a) etichette += `<div class="et ${ora ? 'h' : ''}" style="top:${top}%">${hhmm(m)}</div>`;
           }
           const colonne = activeCorsie.map((c, i) => `<div class="vert" style="left:${(i / activeCorsie.length) * 100}%"></div>`).join('');
 
@@ -5692,12 +5692,13 @@
                 .intest .asse { width: 14mm; flex: none; }
                 .lane { flex: 1; text-align: center; font-size: 8.5pt; font-weight: 700; padding: 1.6mm 0; border-left: 1px solid #cbd5e1; }
                 .corpo { flex: 1; display: flex; min-height: 0; }
-                .corpo .asse { width: 14mm; flex: none; position: relative; background: #f8fafc !important; border-right: 1px solid #cbd5e1; }
-                .et { position: absolute; left: 0; right: 0; transform: translateY(-50%); text-align: center; font-size: 7.5pt; color: #475569; font-weight: 600; }
-                .et:first-child { transform: none; }
+                .corpo .asse { width: 14mm; flex: none; position: relative; overflow: visible; background: #f8fafc !important; border-right: 1px solid #cbd5e1; }
+                .et { position: absolute; left: 0; right: 0; transform: translateY(-50%); text-align: center; font-size: 5.5pt; line-height: 1; color: #94a3b8; font-weight: 500; }
+                .et.h { font-size: 6.5pt; color: #334155; font-weight: 700; }
                 .area { flex: 1; position: relative; }
                 .linea { position: absolute; left: 0; right: 0; border-top: 1px dotted #e2e8f0; }
-                .linea.ora { border-top: 1px solid #cbd5e1; }
+                .linea.mezza { border-top: 1px dashed #cbd5e1; }
+                .linea.ora { border-top: 1px solid #94a3b8; }
                 .vert { position: absolute; top: 0; bottom: 0; border-left: 1px solid #e2e8f0; }
                 .vert:first-of-type { border-left: 0; }
                 .libero { position: absolute; left: 0; right: 0; background: #cbd5e1 !important; opacity: .85; }
