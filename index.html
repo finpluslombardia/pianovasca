@@ -5632,8 +5632,6 @@
             const soloNome = info?.isFreeTextLevel || ['acquagym', 'propaganda'].includes(c.data.id) || liv?.noNumero;
             const titolo = nomeLiv ? (soloNome ? nomeLiv : `Liv. ${c.data.livello} - ${nomeLiv}`) : (info ? info.name : '');
             const sotto = nomeLiv && info ? info.name : '';
-            const att = (c.data.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)).length;
-            const occ = (c.data.maxUtenti || att) ? `${att}${c.data.maxUtenti ? '/' + c.data.maxUtenti : ''} iscritti` : '';
             const col = coloriDi(info?.color);
             const idx = activeCorsie.indexOf(c.corsie[0]);
             if (idx < 0) return '';
@@ -5643,8 +5641,8 @@
             const orari = `${esc(c.oraInizio)}–${hhmm(c.startMin + c.durata)}`;
             const classe = liv3 ? 'l3' : liv2 ? 'l2' : 'l1';
             let interno;
-            if (liv3) interno = `<div class="t"><b>${esc(titolo)}</b></div>${c.data.istruttore ? `<div class="i">${esc(c.data.istruttore)}</div>` : ''}<div class="f"><span>${orari}${sotto ? ' · ' + esc(sotto) : ''}</span><span>${esc(occ)}</span></div>`;
-            else if (liv2) interno = `<div class="r"><span class="t"><b>${esc(titolo)}</b></span><span class="o">${orari}</span></div><div class="r"><span class="i">${esc(c.data.istruttore || '')}</span><span class="o">${esc(occ)}</span></div>`;
+            if (liv3) interno = `<div class="t"><b>${esc(titolo)}</b></div>${c.data.istruttore ? `<div class="i">${esc(c.data.istruttore)}</div>` : ''}<div class="f"><span>${orari}${sotto ? ' · ' + esc(sotto) : ''}</span></div>`;
+            else if (liv2) interno = `<div class="r"><span class="t"><b>${esc(titolo)}</b></span><span class="o">${orari}</span></div><div class="r"><span class="i">${esc(c.data.istruttore || '')}</span></div>`;
             else interno = `<div class="r"><span class="t"><b>${esc(titolo)}</b>${c.data.istruttore ? ' · ' + esc(c.data.istruttore) : ''}</span><span class="o">${orari}</span></div>`;
             return `<div class="corso ${classe}" style="left:${(idx / activeCorsie.length) * 100}%;width:${(c.corsie.length / activeCorsie.length) * 100}%;top:${((c.startMin - da) / tot) * 100}%;height:${(c.durata / tot) * 100}%;background:${col.bg};color:${col.fg}">${interno}</div>`;
           }).join('');
