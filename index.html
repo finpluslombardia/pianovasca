@@ -5568,6 +5568,164 @@
         printWindow.document.close();
       };
 
+      // --- ESPORTA IL PIANO VASCA IN PDF: una pagina A4 orizzontale per ogni giorno della settimana visualizzata ---
+      const esportaPianoPDF = () => {
+        setIsExportMenuOpen(false);
+        const esc = (t) => String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const activeCorsie = vascaSelezionata === 'interna' ? CORSIE_INTERNA : CORSIE_ESTERNA;
+        const nomeVasca = vascaSelezionata === 'interna' ? 'Vasca Interna' : 'Vasca Esterna';
+        const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+        const toMin = (s) => { const [a, b] = String(s).split(':').map(Number); return a * 60 + (b || 0); };
+
+        // Colori reali dei riquadri: letti dallo stile calcolato della classe Tailwind dell'attività
+        const cacheColori = {};
+        const coloriDi = (classe) => {
+          const k = classe || 'bg-slate-500 text-white';
+          if (cacheColori[k]) return cacheColori[k];
+          const el = document.createElement('div');
+          el.className = k; el.style.display = 'none';
+          document.body.appendChild(el);
+          const cs = getComputedStyle(el);
+          const r = { bg: cs.backgroundColor, fg: cs.color };
+          document.body.removeChild(el);
+          return (cacheColori[k] = r);
+        };
+
+        const pagine = [];
+        GIORNI.forEach((giorno, gIdx) => {
+          const corsi = getCorsiForDay(gIdx);
+          const dataG = new Date(inizioSettimana); dataG.setDate(dataG.getDate() + gIdx);
+          const ymdG = toYMD(dataG);
+          const liberi = nuotoLibero.filter(l => liberoTocca(l, ymdG, gIdx, vascaSelezionata));
+          if (corsi.length === 0 && liberi.length === 0) return; // niente da stampare: giorno saltato
+
+          // Fascia oraria mostrata: dal primo all'ultimo impegno del giorno (arrotondata all'ora)
+          let da = Infinity, a = -Infinity;
+          corsi.forEach(c => { da = Math.min(da, c.startMin); a = Math.max(a, c.startMin + c.durata); });
+          liberi.forEach(l => { da = Math.min(da, toMin(l.dalle)); a = Math.max(a, toMin(l.alle)); });
+          da = Math.max(START_MIN_TOTAL, Math.floor(da / 60) * 60);
+          a = Math.min(END_MIN_TOTAL, Math.ceil(a / 60) * 60);
+          if (a <= da) a = da + 60;
+          const tot = a - da;
+
+          // righe orarie: una linea per ogni ora, più sottile per le mezze ore
+          let linee = '', etichette = '';
+          for (let m = da; m <= a; m += 30) {
+            const top = ((m - da) / tot) * 100;
+            const ora = m % 60 === 0;
+            linee += `<div class="linea ${ora ? 'ora' : ''}" style="top:${top}%"></div>`;
+            if (ora && m < a) etichette += `<div class="et" style="top:${top}%">${hhmm(m)}</div>`;
+          }
+          const colonne = activeCorsie.map((c, i) => `<div class="vert" style="left:${(i / activeCorsie.length) * 100}%"></div>`).join('');
+
+          const bandeLibero = liberi.map(l => {
+            const i0 = Math.max(da, toMin(l.dalle)), i1 = Math.min(a, toMin(l.alle));
+            if (i1 <= i0) return '';
+            return `<div class="libero" style="top:${((i0 - da) / tot) * 100}%;height:${((i1 - i0) / tot) * 100}%"><span>Nuoto libero · ${esc(l.dalle)}–${esc(l.alle)}</span></div>`;
+          }).join('');
+
+          const box = corsi.map(c => {
+            const info = attivita.find(x => x.id === c.data.id);
+            const liv = info?.levels?.find(l => l.val === c.data.livello);
+            const nomeLiv = info?.isFreeTextLevel ? c.data.livello : liv?.name;
+            const soloNome = info?.isFreeTextLevel || ['acquagym', 'propaganda'].includes(c.data.id) || liv?.noNumero;
+            const titolo = nomeLiv ? (soloNome ? nomeLiv : `Liv. ${c.data.livello} - ${nomeLiv}`) : (info ? info.name : '');
+            const sotto = nomeLiv && info ? info.name : '';
+            const att = (c.data.partecipanti || []).filter(p => isAttivoInSettimana(p, inizioSettimana)).length;
+            const occ = (c.data.maxUtenti || att) ? `${att}${c.data.maxUtenti ? '/' + c.data.maxUtenti : ''} iscritti` : '';
+            const col = coloriDi(info?.color);
+            const idx = activeCorsie.indexOf(c.corsie[0]);
+            if (idx < 0) return '';
+            // quante righe di testo stanno nel riquadro: dipende dall'altezza reale sulla pagina (~158 mm di corpo)
+            const hMm = (c.durata / tot) * 158;
+            const liv3 = hMm >= 13, liv2 = !liv3 && hMm >= 6.2;
+            const orari = `${esc(c.oraInizio)}–${hhmm(c.startMin + c.durata)}`;
+            const classe = liv3 ? 'l3' : liv2 ? 'l2' : 'l1';
+            let interno;
+            if (liv3) interno = `<div class="t"><b>${esc(titolo)}</b></div>${c.data.istruttore ? `<div class="i">${esc(c.data.istruttore)}</div>` : ''}<div class="f"><span>${orari}${sotto ? ' · ' + esc(sotto) : ''}</span><span>${esc(occ)}</span></div>`;
+            else if (liv2) interno = `<div class="r"><span class="t"><b>${esc(titolo)}</b></span><span class="o">${orari}</span></div><div class="r"><span class="i">${esc(c.data.istruttore || '')}</span><span class="o">${esc(occ)}</span></div>`;
+            else interno = `<div class="r"><span class="t"><b>${esc(titolo)}</b>${c.data.istruttore ? ' · ' + esc(c.data.istruttore) : ''}</span><span class="o">${orari}</span></div>`;
+            return `<div class="corso ${classe}" style="left:${(idx / activeCorsie.length) * 100}%;width:${(c.corsie.length / activeCorsie.length) * 100}%;top:${((c.startMin - da) / tot) * 100}%;height:${(c.durata / tot) * 100}%;background:${col.bg};color:${col.fg}">${interno}</div>`;
+          }).join('');
+
+          const chiusi = chiusure.filter(c => (c.vasca === 'tutte' || c.vasca === vascaSelezionata) && c.dal <= ymdG && c.al >= ymdG);
+          const avviso = chiusi.length ? `<div class="chiusura">${chiusi.map(c => `<b>${c.vasca === 'tutte' ? 'Chiusura della struttura' : 'Vasca chiusa'}</b>${c.motivo ? ' · ' + esc(c.motivo) : ''}`).join(' &nbsp;|&nbsp; ')}</div>` : '';
+
+          pagine.push(`
+            <section class="pagina">
+              <div class="testa">
+                <h1>${esc(giorno)} ${esc(formatDate(ymdG))}</h1>
+                <div class="meta">${esc(nomeVasca)} · Stagione ${esc(stagioneSelezionata)}</div>
+              </div>
+              ${avviso}
+              <div class="tab">
+                <div class="intest"><div class="asse"></div>${activeCorsie.map(c => `<div class="lane">Corsia ${esc(c)}</div>`).join('')}</div>
+                <div class="corpo">
+                  <div class="asse">${etichette}</div>
+                  <div class="area">${linee}${colonne}${bandeLibero}${box}</div>
+                </div>
+              </div>
+            </section>`);
+        });
+
+        if (pagine.length === 0) { alert('Nessun corso da esportare in questa settimana.'); return; }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) { alert("Attenzione: Abilita i popup nel browser per visualizzare e stampare."); return; }
+        printWindow.document.write(`
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <title>Piano vasca - ${esc(nomeVasca)} - settimana dal ${esc(formatDate(toYMD(inizioSettimana)))}</title>
+              <style>
+                @page { size: A4 landscape; margin: 8mm; }
+                * { box-sizing: border-box; }
+                html, body { margin: 0; padding: 0; }
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #1e293b; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                .pagina { height: 193mm; display: flex; flex-direction: column; break-after: page; page-break-after: always; overflow: hidden; }
+                .pagina:last-child { break-after: auto; page-break-after: auto; }
+                .testa { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #1e3a5f; padding-bottom: 1.5mm; margin-bottom: 2mm; }
+                .testa h1 { margin: 0; font-size: 16pt; color: #0f172a; }
+                .testa .meta { font-size: 10pt; color: #64748b; }
+                .chiusura { background: #fffbeb !important; border: 1px solid #fcd34d; color: #78350f; font-size: 9pt; padding: 1.5mm 3mm; border-radius: 2mm; margin-bottom: 2.5mm; }
+                .tab { flex: 1; display: flex; flex-direction: column; min-height: 0; border: 1px solid #cbd5e1; border-radius: 2mm; overflow: hidden; }
+                .intest { display: flex; background: #e2e8f0 !important; border-bottom: 1px solid #94a3b8; }
+                .intest .asse { width: 14mm; flex: none; }
+                .lane { flex: 1; text-align: center; font-size: 8.5pt; font-weight: 700; padding: 1.6mm 0; border-left: 1px solid #cbd5e1; }
+                .corpo { flex: 1; display: flex; min-height: 0; }
+                .corpo .asse { width: 14mm; flex: none; position: relative; background: #f8fafc !important; border-right: 1px solid #cbd5e1; }
+                .et { position: absolute; left: 0; right: 0; transform: translateY(-50%); text-align: center; font-size: 7.5pt; color: #475569; font-weight: 600; }
+                .et:first-child { transform: none; }
+                .area { flex: 1; position: relative; }
+                .linea { position: absolute; left: 0; right: 0; border-top: 1px dotted #e2e8f0; }
+                .linea.ora { border-top: 1px solid #cbd5e1; }
+                .vert { position: absolute; top: 0; bottom: 0; border-left: 1px solid #e2e8f0; }
+                .vert:first-of-type { border-left: 0; }
+                .libero { position: absolute; left: 0; right: 0; background: #cbd5e1 !important; opacity: .85; }
+                .libero span { display: block; text-align: center; font-size: 8pt; font-weight: 700; color: #334155; padding-top: 1.2mm; }
+                .corso { position: absolute; border: .3mm solid #fff; border-radius: 1.2mm; overflow: hidden; display: flex; flex-direction: column; padding: .6mm 1.4mm; line-height: 1.15; justify-content: center; }
+                .corso .t, .corso .i { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+                .corso .t { font-size: 8.5pt; } .corso .i { font-size: 7.5pt; opacity: .95; }
+                .corso.l3 { text-align: center; }
+                .corso .f { display: flex; justify-content: space-between; gap: 2mm; font-size: 6.5pt; opacity: .9; margin-top: .5mm; white-space: nowrap; overflow: hidden; }
+                .corso .f span:first-child { overflow: hidden; text-overflow: ellipsis; }
+                .corso .r { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; min-width: 0; }
+                .corso .o { font-size: 6.5pt; opacity: .9; white-space: nowrap; flex: none; }
+                .corso.l2 { padding-top: .2mm; padding-bottom: .2mm; line-height: 1.08; } .corso.l2 .t { font-size: 7.5pt; } .corso.l2 .i { font-size: 7pt; }
+                .corso.l1 { padding-top: 0; padding-bottom: 0; } .corso.l1 .t { font-size: 7pt; }
+              </style>
+            </head>
+            <body>
+              ${pagine.join('')}
+              <script>
+                window.onload = () => { setTimeout(() => { window.print(); window.close(); }, 500); }
+              <\/script>
+            </body>
+          </html>
+        `);
+        printWindow.document.close();
+      };
+
       // --- STAMPA ISCRITTI DI UN GIORNO ---
       const stampaIscrittiGiorno = () => {
         const nomiGiorni = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
@@ -8920,6 +9078,10 @@
                             <button onClick={() => { setIsExportMenuOpen(false); esportaExcel(); }} className="w-full px-3 py-2 text-left hover:bg-slate-50 rounded-md flex items-start gap-3 cursor-pointer">
                               <span className="mt-0.5 text-[#1e3a5f] shrink-0"><Icon size={18}><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></Icon></span>
                               <span className="flex flex-col"><span className="text-sm font-bold text-slate-800">Excel / Fogli</span><span className="text-xs text-slate-500">Tabella da aprire in Excel o Fogli Google</span></span>
+                            </button>
+                            <button onClick={esportaPianoPDF} className="w-full px-3 py-2 text-left hover:bg-slate-50 rounded-md flex items-start gap-3 cursor-pointer">
+                              <span className="mt-0.5 text-[#1e3a5f] shrink-0"><Icon size={18}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><polyline points="14 3 14 8 19 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></Icon></span>
+                              <span className="flex flex-col"><span className="text-sm font-bold text-slate-800">PDF del piano</span><span className="text-xs text-slate-500">Un giorno per pagina, vasca e filtri attuali</span></span>
                             </button>
                             <button onClick={esportaDati} className="w-full px-3 py-2 text-left hover:bg-slate-50 rounded-md flex items-start gap-3 cursor-pointer">
                               <span className="mt-0.5 text-[#1e3a5f] shrink-0"><DownloadIcon size={18} /></span>
